@@ -37,15 +37,16 @@ namespace_id = "1002"
 simple = { limit = 2, period = 60 }
 
 # BILLING_DAY is the plan's renewal day, or 28 if it falls later (decision 118).
+# SHARING_OPEN goes to "true" before sharing_open in docs/limits.json, which only asks clients and reaches them late.
 [vars]
 ADMIN_URL = "https://panel.tisty.cl"
 BILLING_DAY = "1"
+SHARING_OPEN = "false"
 CF_ACCOUNT_ID = "239d64b3f31b26a9da33dd5b68209970"
 CF_ZONE_ID = "56530808856fabd50bb1489615f3a031"
 CF_RULESET_ID = "fd140f2bc4e8460cb16cbf882f79c2fc"
 CF_RULE_ID = "49cfba980c6f46639cc6b9cb0960ee40"
 CF_DATABASE_ID = "767d0dce-dff0-41b0-9857-b3ddcf2d36ad"
-CF_SCRIPT_NAME = "folio-private"
 CF_BUCKET_NAME = "folio-private-envelopes"
 
 [triggers]

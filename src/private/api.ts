@@ -14,7 +14,7 @@ import { type Refused, tooFast } from "../core/refused";
 import { type ReportTools, reportDoc, saidOf } from "../core/report";
 import { takeRevocations } from "../core/revocations";
 import { startNow } from "../core/start";
-import { type FirstUpload, filesEnvelopeBytesAtMost, uploadDoc, uploadFiles } from "../core/upload";
+import { type FirstUpload, filesEnvelopeBytesAtMost, type UploadTools, uploadDoc, uploadFiles } from "../core/upload";
 
 const PREFIX = "/api/v1/";
 const DOC_PATH = /^docs\/([A-Za-z0-9]{8})(?:\/(report|admin|pause|resume|appeal|latest|permit))?$/;
@@ -79,7 +79,7 @@ const ipOf = (request: Request): string => request.headers.get("CF-Connecting-IP
 const cfOf = (request: Request) => (request as { cf?: { country?: string; colo?: string; asn?: number } }).cf;
 
 export interface Api {
-  tools: ReportTools & SyncTools;
+  tools: ReportTools & SyncTools & UploadTools;
   waitUntil: (work: Promise<unknown>) => void;
   now: number;
 }

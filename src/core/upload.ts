@@ -26,6 +26,10 @@ export interface Uploading {
   files?: string;
 }
 
+export interface UploadTools extends ReadTools {
+  sharingOpen: boolean;
+}
+
 export type UploadAnswer = { stored: true; version: number; filesWanted?: true } | Refused;
 
 export type FilesUploadAnswer = { stored: true; hash: string } | Refused;
@@ -182,7 +186,7 @@ const storeVersion = async (
   uploading: Uploading,
   net: string,
   keys: KeyAdmission,
-  tools: ReadTools,
+  tools: UploadTools,
 ): Promise<UploadAnswer> => {
   const { id, now, first, files } = uploading;
   const { store, limits } = tools;
@@ -191,6 +195,7 @@ const storeVersion = async (
   const sharing = first && (!held || held.latest === 0) ? first : null;
   if (!held && !sharing) return { refused: "missing" };
   if (sharing) {
+    if (!tools.sharingOpen) return { refused: "uploads_off" };
     const refused = await mayShare(uploading, sharing, tools);
     if (refused) return refused;
   }
@@ -259,7 +264,7 @@ const storeVersion = async (
   return answerOf(uploaded, manifest.version, now);
 };
 
-const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<UploadAnswer> => {
+const uploadVersion = async (uploading: Uploading, tools: UploadTools): Promise<UploadAnswer> => {
   const { files, now } = uploading;
   if (files !== undefined && !FILES_HASH.test(files)) return { refused: "bad_upload" };
   const net = await netIfOpen(uploading, tools);
@@ -272,7 +277,7 @@ const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<Up
   }
 };
 
-export const uploadDoc = async (uploading: Uploading, tools: ReadTools): Promise<UploadAnswer> => {
+export const uploadDoc = async (uploading: Uploading, tools: UploadTools): Promise<UploadAnswer> => {
   const answer = await uploadVersion(uploading, tools);
   if ("refused" in answer || uploading.files === undefined) return answer;
   const arrived = await tools.store.hasFiles(uploading.id, uploading.files);

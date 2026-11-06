@@ -77,6 +77,26 @@ beforeEach(async () => {
   if (held.objects.length > 0) await testEnv.ENVELOPES.delete(held.objects.map((one) => one.key));
 });
 
+describe("sharing over HTTP", () => {
+  const sharing = (more: object) =>
+    send(API, { method: "PUT", headers: { "Folio-Start": "not a real start" }, body: "x" }, undefined, more);
+
+  it.each([
+    ["says it is closed", { SHARING_OPEN: "false" }],
+    ["says something else", { SHARING_OPEN: "TRUE" }],
+    ["says nothing", { SHARING_OPEN: undefined }],
+  ])("refuses a new document when the setting %s", async (_what, more) => {
+    const answer = await sharing(more);
+    expect(answer.status).toBe(503);
+    expect(await answer.json()).toEqual({ refused: "uploads_off" });
+  });
+
+  it("goes on to look at a new document when it is open", async () => {
+    const answer = await sharing({ SHARING_OPEN: "true" });
+    expect(await answer.json()).toEqual({ refused: "bad_upload" });
+  });
+});
+
 describe("reporting over HTTP", () => {
   const report = (body: unknown, headers: Record<string, string> = {}) =>
     send(`${API}/report`, { method: "POST", body: JSON.stringify(body), headers });
