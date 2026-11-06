@@ -320,6 +320,57 @@ jobs:
             | sed '/-----BEGIN SSH SIGNATURE-----/,$d' > "$RUNNER_TEMP/notes.md"
           gh release create "$TAG" dist/release/SHA256SUMS dist/release/folio.spdx.json --verify-tag --notes-file "$RUNNER_TEMP/notes.md"
 
+  # In its own environment and with its own token, so what is public never holds the keys to what is private (decision 109).
+  public:
+    name: Deploy the public page
+    needs: tested
+    if: github.event_name == 'push'
+    environment: prod-public
+    concurrency:
+      group: public
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      PUBLIC_URL: https://folio.tisty.app
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: The account and its token are there
+        run: |
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "::error::the prod-public environment has no CLOUDFLARE_API_TOKEN secret"; exit 1; }
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || { echo "::error::the prod-public environment has no CLOUDFLARE_ACCOUNT_ID variable"; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - name: Deploy
+        run: npx --no-install wrangler deploy --config wrangler.public.toml --tag "$TAG" --message "$TAG ${GITHUB_SHA:0:8}"
+      - name: It answers as it should
+        run: |
+          set -uo pipefail
+          for attempt in $(seq 1 20); do
+            status=$(curl -s --max-time 10 -D "$RUNNER_TEMP/public-headers" -o "$RUNNER_TEMP/public-page" -w '%{http_code}' "$PUBLIC_URL/")
+            if grep -qsi '^cf-mitigated:' "$RUNNER_TEMP/public-headers"; then
+              echo "::warning::$PUBLIC_URL challenged this runner, so $TAG stays deployed without being checked"
+              exit 0
+            fi
+            if [ "$status" = 200 ] && grep -q 'Folio' "$RUNNER_TEMP/public-page" \
+              && grep -qi "^content-security-policy: default-src 'none'" "$RUNNER_TEMP/public-headers"; then
+              echo "$PUBLIC_URL answers as it should"
+              exit 0
+            fi
+            echo "not yet ($attempt/20): $status"
+            sleep 15
+          done
+          echo "::error::$PUBLIC_URL does not answer as it should after the deploy"
+          exit 1
+
   rollback:
     name: Put a version back
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
