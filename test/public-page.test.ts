@@ -83,6 +83,12 @@ describe("the public page", () => {
     expect(HEADERS).toContain("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self';");
   });
 
+  it("asks Cloudflare not to change it, on every address", () => {
+    const rule = HEADERS.split("\n\n")[0] ?? "";
+    expect(rule.startsWith("/*\n")).toBe(true);
+    expect(rule).toContain("no-transform");
+  });
+
   it("wears the same icon and mascot as the reader's page", () => {
     for (const name of ["icon.svg", "tisto.svg"]) {
       expect(read(`${PLACE}/${name}`)).toBe(read(`src/page/public/${name}`));

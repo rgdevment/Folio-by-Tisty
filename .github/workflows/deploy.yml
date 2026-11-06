@@ -423,6 +423,11 @@ jobs:
           }
           export -f answers
           bash scripts/wait-for.sh "$PUBLIC_URL" 20 15 answers
+      - name: It is served as written
+        run: |
+          bash scripts/page-code.sh written src/public/page/index.html "$PUBLIC_URL/"
+          bash scripts/page-code.sh written src/public/page/404.html "$PUBLIC_URL/not-a-page"
+          bash scripts/page-code.sh detects https://www.tisty.app/
 
   rollback:
     name: Put a version back
