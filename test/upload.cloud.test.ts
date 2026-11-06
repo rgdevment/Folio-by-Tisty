@@ -396,6 +396,50 @@ describe("a key Folio has not seen", () => {
     expect(await keys()).not.toContain(rootOf(ana));
   });
 
+  const keysSpent = async () =>
+    (await testEnv.DB.prepare("SELECT COALESCE(SUM(keys), 0) AS n FROM net_day").first<{ n: number }>())?.n;
+
+  it("spends none of the day's keys on a request refused after it was admitted, however often it retries", async () => {
+    const fresh = await newPerson();
+    const busy = { ...tools, limits: { ...LIMITS, uploadsAnHour: 0 } };
+    const first = await started();
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: fresh });
+    const retry = { id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => bytes, first };
+    for (let at = 0; at < LIMITS.newKeysADay + 1; at += 1) {
+      expect(await uploadDoc(retry, busy)).toMatchObject({ refused: "quota" });
+    }
+    expect(await keysSpent()).toBe(0);
+    expect(await keys()).not.toContain(rootOf(fresh));
+    expect(await send(first.id, bytes, NOW, first)).toEqual({ stored: true, version: 1 });
+    expect(await keysSpent()).toBe(1);
+  });
+
+  it("gives back the owner's slot when the signer's does not fit", async () => {
+    for (let at = 0; at < LIMITS.newKeysADay - 1; at += 1) await sharedBy(await newPerson());
+    const { permit, pair } = await newToken();
+    const first = await started();
+    const bytes = await sealedEnvelope({
+      id: first.id,
+      version: 1,
+      owner: await newPerson(),
+      signer: await newPerson(),
+      permit,
+      token: pair,
+    });
+    expect(await send(first.id, bytes, NOW, first)).toMatchObject({ refused: "quota" });
+    expect(await keysSpent()).toBe(LIMITS.newKeysADay - 1);
+  });
+
+  it("gives the slot back when the store fails", async () => {
+    const fresh = await newPerson();
+    const first = await started();
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: fresh });
+    const put = vi.spyOn(testEnv.ENVELOPES, "put").mockRejectedValueOnce(new Error("no bucket today"));
+    await expect(send(first.id, bytes, NOW, first)).rejects.toThrow();
+    put.mockRestore();
+    expect(await keysSpent()).toBe(0);
+  });
+
   it("does not spend the day's keys on one it knows, however many times it shares", async () => {
     await sharedBy(mario);
     await sharedBy(mario);
