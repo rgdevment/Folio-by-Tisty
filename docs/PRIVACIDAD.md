@@ -73,9 +73,13 @@ borrarlos u oponerte a su uso. Como no hay cuentas, lo más directo es:
   compartirlo desde Tisty. Se borra del servidor de inmediato.
 - **Cualquier otra petición:** escribe a <rgdevment@tisty.app>. El resumen de
   tu IP no permite saber quién eres, así que en general no hay datos que
-  puedan asociarse a ti. Lo mismo vale para tu llave pública, que solo tú puedes
-  demostrar que es tuya: para borrarla, firma la petición con esa llave. Su
-  reputación se va con ella.
+  puedan asociarse a ti.
+- **Tu llave pública:** solo tú puedes demostrar que es tuya, así que firma la
+  petición con ella. Sale de la lista de llaves y parte de nuevo como una
+  nueva, sin su reputación y sin ninguna marca. Sigue mientras duren estos
+  lugares: en los documentos que sigues compartiendo y las versiones que firmaste,
+  en una llave que retiraste, en lo que guarda una denuncia hasta por 180 días y
+  en los respaldos por 30 días.
 
 ## Menores de edad
 

@@ -73,8 +73,12 @@ most direct ways are:
   sharing it from Tisty. It is deleted from the server at once.
 - **Anything else:** write to <rgdevment@tisty.app>. The digest of your IP does
   not reveal who you are, so in general there is no data that can be tied to
-  you. The same goes for your public key, which only you can show is yours: to
-  erase it, sign the request with that key. Its reputation goes with it.
+  you.
+- **Your public key:** only you can show it is yours, so sign the request with
+  it. It leaves the list of keys and starts over as a new one, with its
+  reputation gone and no mark left. It stays for as long as these last: in the
+  documents you still share and the versions you signed, in a key you took back,
+  in what a report keeps for up to 180 days, and in the backups for 30 days.
 
 ## Children
 
