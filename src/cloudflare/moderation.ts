@@ -7,6 +7,13 @@ const SEEN_AT_MOST = 200;
 const HOUR_MS = 3_600_000;
 const NOT_FALSE = "r.cleared = 0 AND r.net NOT IN (SELECT net FROM false_reporters)";
 
+export const mayCorrect = (row: {
+  blocked_at: number | null;
+  blocked_by_operator: number;
+  counts_from: number;
+  latest: number;
+}): boolean => row.blocked_at !== null && row.blocked_by_operator === 0 && row.counts_from > row.latest;
+
 export const acceptAppeal = async (
   db: D1Database,
   { pausedDays }: Pick<Limits, "pausedDays">,
@@ -30,7 +37,7 @@ export const acceptAppeal = async (
       .bind(id),
     db
       .prepare(
-        `UPDATE docs SET blocked_at = NULL, appealed_at = NULL, blocked_hour = NULL, appealed_hour = NULL, fix_by = NULL,
+        `UPDATE docs SET blocked_at = NULL, appealed_at = NULL, blocked_hour = NULL, appealed_hour = NULL, fix_by = NULL, blocked_by_operator = 0,
            dies_on = CASE WHEN paused_at IS NULL THEN ?1 + ttl_days ELSE paused_at + ?2 END
          WHERE id = ?3 AND blocked_at IS NOT NULL`,
       )
@@ -60,7 +67,7 @@ export class CloudModeration {
         .bind(SEEN_AT_MOST),
       this.#db
         .prepare(
-          `SELECT id, owner, latest, versions, blocked_at, appealed_at, appealed_hour, counts_from
+          `SELECT id, owner, latest, versions, blocked_at, appealed_at, appealed_hour, counts_from, blocked_by_operator
            FROM docs WHERE blocked_at IS NOT NULL
            ORDER BY appealed_hour IS NULL, blocked_at DESC, id LIMIT ?`,
         )
@@ -82,6 +89,7 @@ export class CloudModeration {
           appealed_at: number | null;
           appealed_hour: number | null;
           counts_from: number;
+          blocked_by_operator: number;
         }[]
       ).map((row) => ({
         id: row.id,
@@ -89,7 +97,7 @@ export class CloudModeration {
         blockedAt: row.blocked_at,
         appealedAt: row.appealed_at,
         waitsForOperator: row.appealed_hour !== null,
-        mayCorrect: row.counts_from > row.latest,
+        mayCorrect: mayCorrect(row),
         signers: (JSON.parse(row.versions) as { n: number; signer: string }[]).map(({ n, signer }) => ({
           n,
           byOwner: signer === row.owner,
@@ -118,12 +126,14 @@ export class CloudModeration {
     return "done";
   }
 
+  // A block that reports already placed is taken over too, or its owner could still lift it after this decision.
   async block(id: string, note: string, now: number): Promise<Acted> {
     const today = dayOf(now);
     const changed = await this.#db
       .prepare(
-        `UPDATE docs SET blocked_at = ?1, blocked_hour = ?2, dies_on = ?1 + ?3
-         WHERE id = ?4 AND latest >= 0 AND blocked_at IS NULL`,
+        `UPDATE docs SET blocked_by_operator = 1, blocked_at = COALESCE(blocked_at, ?1),
+           blocked_hour = COALESCE(blocked_hour, ?2), dies_on = ?1 + ?3
+         WHERE id = ?4 AND latest >= 0 AND blocked_by_operator = 0`,
       )
       .bind(today, Math.floor(now / HOUR_MS), this.#limits.evidenceDays, id)
       .run();

@@ -7,6 +7,7 @@ import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
 import { dayOf } from "../src/core/limits";
 import { toBase64Url } from "../src/core/start";
+import type { Held } from "../src/core/store";
 
 const testEnv = env as unknown as {
   DB: D1Database;
@@ -227,6 +228,81 @@ describe("what it shows", () => {
       .bind(TODAY)
       .run();
     expect((await moderation.queue(NOW)).newKeys).toBe(4);
+  });
+});
+
+describe("a block the operator placed", () => {
+  const ownerSends = (known?: Held) =>
+    store.upload(
+      {
+        id: ID,
+        n: 2,
+        hash: "h2",
+        body: "same content",
+        net: "n",
+        at: NOW,
+        signer: "o1",
+        machine: "m1",
+        contract: "1.4.3",
+        byOwner: true,
+        permit: null,
+        ownerMark: "m1.t",
+      },
+      TODAY,
+      known,
+    );
+
+  it("is not accepted alone, whoever signed what is reported, and no version lifts it", async () => {
+    await share("someone else");
+    expect((await acting(`/api/docs/${ID}/block`, "phishing confirmado")).status).toBe(200);
+    await reported("phishing", ["n1"]);
+    expect(await store.appeal(ID, TODAY, HOUR)).toBe("review");
+    expect((await store.held(ID))?.correctable).toBe(false);
+    expect(await ownerSends()).toBe("blocked");
+    expect((await row())?.blocked_at).toBe(TODAY);
+    const [waiting] = (await moderation.queue(NOW)).docs;
+    expect(waiting).toMatchObject({ waitsForOperator: true, mayCorrect: false });
+  });
+
+  it("takes over a block from reports, even one whose appeal was already accepted alone", async () => {
+    await share("someone else");
+    await reported();
+    expect(await store.appeal(ID, TODAY, HOUR)).toBe("accepted");
+    expect((await store.held(ID))?.correctable).toBe(true);
+    expect((await acting(`/api/docs/${ID}/block`, "lo revisé")).status).toBe(200);
+    expect((await store.held(ID))?.correctable).toBe(false);
+    expect((await store.owned(ID, TODAY))?.status.mayCorrect).toBe(false);
+    expect((await moderation.queue(NOW)).docs[0]?.mayCorrect).toBe(false);
+    expect(await ownerSends()).toBe("blocked");
+    expect((await row())?.blocked_at).toBe(TODAY);
+  });
+
+  it("stops a version already on its way when the operator decides", async () => {
+    await share("someone else");
+    await reported();
+    await store.appeal(ID, TODAY, HOUR);
+    const before = await store.held(ID);
+    await acting(`/api/docs/${ID}/block`, "lo revisé");
+    await ownerSends(before ?? undefined);
+    expect((await row())?.blocked_at).toBe(TODAY);
+    expect((await store.held(ID))?.latest).toBe(1);
+  });
+
+  it("is placed once, and logged once", async () => {
+    await share();
+    expect((await acting(`/api/docs/${ID}/block`, "una")).status).toBe(200);
+    expect((await acting(`/api/docs/${ID}/block`, "otra")).status).toBe(404);
+    expect(await logged()).toEqual([{ action: "block", note: "una" }]);
+  });
+
+  it("is lifted by the operator, and later blocks go by the usual rule", async () => {
+    await share("someone else");
+    await acting(`/api/docs/${ID}/block`, "phishing confirmado");
+    expect((await acting(`/api/docs/${ID}/accept`)).status).toBe(200);
+    expect((await row())?.blocked_at).toBeNull();
+    await reported();
+    expect((await row())?.blocked_at).toBe(TODAY);
+    expect(await store.appeal(ID, TODAY, HOUR)).toBe("accepted");
   });
 });
 

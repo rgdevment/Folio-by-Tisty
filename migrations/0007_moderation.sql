@@ -6,3 +6,6 @@ CREATE TABLE moderation (
   note TEXT,
   PRIMARY KEY (at, doc, action)
 ) WITHOUT ROWID;
+
+-- Only the operator lifts what the operator blocked: no appeal or new version overrules that decision.
+ALTER TABLE docs ADD COLUMN blocked_by_operator INTEGER NOT NULL DEFAULT 0;

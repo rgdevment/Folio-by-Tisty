@@ -95,7 +95,8 @@ responsabilidad. No se permite usar Folio para:
   Si todas las versiones denunciadas las firmó alguien a quien dejó editar, el
   reclamo se acepta solo, salvo que haya una denuncia de abuso infantil: el link
   de edición deja de funcionar, las denuncias quedan registradas y sigue
-  bloqueado hasta que suba una versión propia.
+  bloqueado hasta que suba una versión propia. Un bloqueo puesto tras revisar el
+  documento a mano solo lo levanta quien lo revisó, y su reclamo siempre le llega.
 - **Las denuncias de delitos se envían a quien corresponde:** a la PDI o a la
   Fiscalía, y el phishing y el malware además a Google Safe Browsing y a
   Cloudflare. Los reclamos de derechos de autor los hace su titular, con orden

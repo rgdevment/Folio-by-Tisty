@@ -559,7 +559,8 @@ paths:
         version with no permit, signed by the owner, which lifts it. Reports of earlier versions no longer
         count toward a new block.
 
-        Anything else says `review`, and the operator is told. That block stays until the operator decides.
+        Anything else says `review`, and the operator is told, as does any block the operator placed. That
+        block stays until the operator decides.
         If telling fails the answer is `failed`, and the appeal can be sent again. Once it went, sending it
         again answers 409.
       parameters:

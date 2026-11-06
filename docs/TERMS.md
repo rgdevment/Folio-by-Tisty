@@ -97,7 +97,9 @@ responsibility. You may not use Folio for:
   can appeal there. If someone they let edit signed every version reported, the
   appeal is accepted on its own, unless there is a report of child abuse: the
   edit link stops working, the reports stay on record, and it stays blocked
-  until they send a version of their own.
+  until they send a version of their own. A block placed after reviewing the
+  document by hand is only lifted by whoever reviewed it, and its appeal always
+  goes to them.
 - **Reports of crimes go where they belong:** to the PDI (Chile's
   investigations police) or the public prosecutor, and phishing and malware
   also to Google Safe Browsing and Cloudflare. Copyright claims are made by the
