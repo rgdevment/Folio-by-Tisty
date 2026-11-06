@@ -26,10 +26,12 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
     steps:
-      - name: The account, its token and the recipient are there
+      - name: The account, its token, the recipient and the heartbeat are there
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.BACKUP_CLOUDFLARE_API_TOKEN }}
+          HEARTBEAT: ${{ secrets.BACKUP_HEARTBEAT_URL }}
         run: |
+          [ -n "$HEARTBEAT" ] || { echo "::error::the prod-private environment has no BACKUP_HEARTBEAT_URL, so a backup that stops would say nothing"; exit 1; }
           [ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "::error::the prod-private environment has no BACKUP_CLOUDFLARE_API_TOKEN secret"; exit 1; }
           [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || { echo "::error::the prod-private environment has no CLOUDFLARE_ACCOUNT_ID variable"; exit 1; }
           case "$RECIPIENT" in
@@ -82,7 +84,4 @@ jobs:
       - name: It went
         env:
           HEARTBEAT: ${{ secrets.BACKUP_HEARTBEAT_URL }}
-        run: |
-          if [ -n "$HEARTBEAT" ]; then
-            curl -fsS --retry 3 -o /dev/null "$HEARTBEAT"
-          fi
+        run: curl -fsS --retry 3 -o /dev/null "$HEARTBEAT"

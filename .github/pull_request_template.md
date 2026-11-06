@@ -13,4 +13,3 @@
 - [ ] The issue was discussed first, if this is more than a bug fix
 - [ ] Both languages carry the same texts
 - [ ] The terms, privacy or security policy changed with it, if it touches them
-- [ ] I signed the [CLA](../CLA.md), or I will when the bot asks
