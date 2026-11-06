@@ -9,7 +9,8 @@ const CLASS_B = new Set(["HeadBucket", "HeadObject", "GetObject", "UsageSummary"
 const FREE = new Set(["DeleteObject", "DeleteBucket", "AbortMultipartUpload"]);
 
 // A rule made once by hand and only switched here, so the token never has to create anything.
-const BLOCK_EXPRESSION = 'starts_with(http.request.uri.path, "/api/")';
+// The host because the rule covers the zone, and the panel on its subdomain has to keep working during a block.
+const BLOCK_EXPRESSION = 'http.host eq "tisty.cl" and starts_with(http.request.uri.path, "/api/")';
 
 export interface SpendBindings {
   CF_API_TOKEN: string;
@@ -18,18 +19,14 @@ export interface SpendBindings {
   CF_RULESET_ID: string;
   CF_RULE_ID: string;
   CF_DATABASE_ID: string;
-  CF_SCRIPT_NAME: string;
-  CF_PANEL_SCRIPT_NAME: string;
   CF_BUCKET_NAME: string;
 }
 
-const QUERY = `query Usage($account: string!, $script: string!, $panel: string!, $database: string!, $bucket: string!,
+// Every Worker's requests and not only Folio's, because the plan bills them by account.
+const QUERY = `query Usage($account: string!, $database: string!, $bucket: string!,
   $since: Time!, $until: Time!, $sinceDate: Date!, $untilDate: Date!, $storedSince: Time!) {
   viewer { accounts(filter: { accountTag: $account }) {
-    workers: workersInvocationsAdaptive(limit: 1, filter: { scriptName: $script, datetime_geq: $since, datetime_leq: $until }) {
-      sum { requests }
-    }
-    panel: workersInvocationsAdaptive(limit: 1, filter: { scriptName: $panel, datetime_geq: $since, datetime_leq: $until }) {
+    workers: workersInvocationsAdaptive(limit: 1, filter: { datetime_geq: $since, datetime_leq: $until }) {
       sum { requests }
     }
     d1: d1AnalyticsAdaptiveGroups(limit: 1, filter: { databaseId: $database, date_geq: $sinceDate, date_leq: $untilDate }) {
@@ -52,7 +49,6 @@ interface Answered {
     viewer?: {
       accounts?: {
         workers: { sum: { requests: number } }[];
-        panel: { sum: { requests: number } }[];
         d1: { sum: { rowsRead: number; rowsWritten: number } }[];
         r2: { sum: { requests: number }; dimensions: { actionType: string } }[];
         stored: { max: { payloadSize: number; metadataSize: number } }[];
@@ -74,13 +70,11 @@ export class CloudSpend {
   }
 
   async usageSince(start: number, now: number): Promise<Usage> {
-    const { CF_ACCOUNT_ID, CF_SCRIPT_NAME, CF_PANEL_SCRIPT_NAME, CF_DATABASE_ID, CF_BUCKET_NAME } = this.#bindings;
+    const { CF_ACCOUNT_ID, CF_DATABASE_ID, CF_BUCKET_NAME } = this.#bindings;
     const response = await this.#call("/graphql", "POST", {
       query: QUERY,
       variables: {
         account: CF_ACCOUNT_ID,
-        script: CF_SCRIPT_NAME,
-        panel: CF_PANEL_SCRIPT_NAME,
         database: CF_DATABASE_ID,
         bucket: CF_BUCKET_NAME,
         since: iso(start),
@@ -102,7 +96,7 @@ export class CloudSpend {
         .reduce((sum, one) => sum + one.sum.requests, 0);
     const stored = account.stored[0]?.max;
     return {
-      requests: (account.workers[0]?.sum.requests ?? 0) + (account.panel[0]?.sum.requests ?? 0),
+      requests: account.workers[0]?.sum.requests ?? 0,
       rowsRead: account.d1[0]?.sum.rowsRead ?? 0,
       rowsWritten: account.d1[0]?.sum.rowsWritten ?? 0,
       classA: countOf(false),

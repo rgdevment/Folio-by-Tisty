@@ -326,9 +326,13 @@ jobs:
         with:
           name: panel
           path: dist/admin
-      - name: The panel knows its operator
+      - name: The panel knows its Access and its operator
         run: |
           set -euo pipefail
+          for name in ACCESS_TEAM ACCESS_AUDIENCE; do
+            grep -qE "^$name = \"[^\"]+\"$" wrangler.admin.toml \
+              || { echo "::error::wrangler.admin.toml has no $name, and without it the panel refuses everyone"; exit 1; }
+          done
           npx --no-install wrangler secret list --config wrangler.admin.toml --format json > "$RUNNER_TEMP/secrets.json"
           jq -e 'any(.[]; .name == "OPERATOR_EMAIL")' "$RUNNER_TEMP/secrets.json" > /dev/null \
             || { echo "::error::folio-admin has no OPERATOR_EMAIL secret, and without it the panel refuses everyone"; exit 1; }
@@ -340,7 +344,11 @@ jobs:
           set -uo pipefail
           team=$(sed -n 's/^ACCESS_TEAM = "\(.*\)"$/\1/p' wrangler.admin.toml)
           for attempt in $(seq 1 20); do
-            said=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$PANEL_URL/")
+            said=$(curl -s --max-time 10 -D "$RUNNER_TEMP/panel-headers" -o /dev/null -w '%{http_code} %{redirect_url}' "$PANEL_URL/")
+            if grep -qsi '^cf-mitigated:' "$RUNNER_TEMP/panel-headers"; then
+              echo "::warning::$PANEL_URL challenged this runner, so Access stays unchecked for $TAG"
+              exit 0
+            fi
             case "$said" in
               "302 https://$team.cloudflareaccess.com/"*)
                 echo "$PANEL_URL sends a stranger to Access"
