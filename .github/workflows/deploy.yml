@@ -249,7 +249,7 @@ jobs:
           fi
           answers() {
             local status said
-            status=$(curl -s -D "$RUNNER_TEMP/headers" -o "$RUNNER_TEMP/body" -w '%{http_code}' "$FOLIO_URL/api/v1/docs/AAAAAAAA") || return 1
+            status=$(curl -s --max-time 10 -D "$RUNNER_TEMP/headers" -o "$RUNNER_TEMP/body" -w '%{http_code}' "$FOLIO_URL/api/v1/docs/AAAAAAAA") || return 1
             if grep -qi '^cf-mitigated:' "$RUNNER_TEMP/headers"; then
               return 2
             fi
@@ -259,32 +259,16 @@ jobs:
             jq -e '.refused == "missing"' "$RUNNER_TEMP/body" > /dev/null || return 1
             grep -qi '^x-robots-tag: noindex' "$RUNNER_TEMP/headers" || return 1
             # Asked as a browser opens a link, so anything but the page means its assets did not ship.
-            status=$(curl -s -D "$RUNNER_TEMP/page-headers" -o "$RUNNER_TEMP/page" -w '%{http_code}' \
+            status=$(curl -s --max-time 10 -D "$RUNNER_TEMP/page-headers" -o "$RUNNER_TEMP/page" -w '%{http_code}' \
               -H 'Sec-Fetch-Mode: navigate' "$FOLIO_URL/AAAAAAAA") || return 1
             [ "$status" = 200 ] || return 1
             grep -qi '^content-security-policy:.*script-src .self.' "$RUNNER_TEMP/page-headers" || return 1
             grep -q 'id="sheet"' "$RUNNER_TEMP/page" || return 1
-            [ "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$FOLIO_URL/")" = "301 https://www.tisty.app/" ] || return 1
-            curl -s "$FOLIO_URL/robots.txt" | grep -qx 'Disallow: /' || return 1
+            [ "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{redirect_url}' "$FOLIO_URL/")" = "301 https://www.tisty.app/" ] || return 1
+            curl -s --max-time 10 "$FOLIO_URL/robots.txt" | grep -qx 'Disallow: /' || return 1
           }
-          for attempt in $(seq 1 10); do
-            verdict=0
-            answers || verdict=$?
-            case $verdict in
-              0)
-                echo "$FOLIO_URL answers as $TAG should"
-                exit 0
-                ;;
-              2)
-                echo "::warning::$FOLIO_URL challenged this runner, so $TAG stays deployed without being checked"
-                exit 0
-                ;;
-            esac
-            echo "not yet ($attempt/10)"
-            sleep 6
-          done
-          echo "::error::$FOLIO_URL does not answer as $TAG should after the deploy"
-          exit 1
+          export -f answers
+          bash scripts/wait-for.sh "$FOLIO_URL" 10 6 answers
 
       - name: Back to what ran before
         if: (failure() || cancelled()) && steps.deploy.outcome != 'skipped' && steps.before.outputs.version != ''
@@ -343,23 +327,19 @@ jobs:
         run: |
           set -uo pipefail
           team=$(sed -n 's/^ACCESS_TEAM = "\(.*\)"$/\1/p' wrangler.admin.toml)
-          for attempt in $(seq 1 20); do
+          export team
+          sends_to_access() {
+            local said
             said=$(curl -s --max-time 10 -D "$RUNNER_TEMP/panel-headers" -o /dev/null -w '%{http_code} %{redirect_url}' "$PANEL_URL/")
-            if grep -qsi '^cf-mitigated:' "$RUNNER_TEMP/panel-headers"; then
-              echo "::warning::$PANEL_URL challenged this runner, so Access stays unchecked for $TAG"
-              exit 0
-            fi
+            grep -qsi '^cf-mitigated:' "$RUNNER_TEMP/panel-headers" && return 2
             case "$said" in
-              "302 https://$team.cloudflareaccess.com/"*)
-                echo "$PANEL_URL sends a stranger to Access"
-                exit 0
-                ;;
+              "302 https://$team.cloudflareaccess.com/"*) return 0 ;;
             esac
-            echo "not yet ($attempt/20): ${said%% *}"
-            sleep 15
-          done
-          echo "::error::$PANEL_URL does not send a stranger to Access: check its application in Zero Trust"
-          exit 1
+            return 1
+          }
+          export -f sends_to_access
+          bash scripts/wait-for.sh "$PANEL_URL" 20 15 sends_to_access \
+            || { echo "::error::a stranger is not sent to Access: check its application in Zero Trust"; exit 1; }
 
   release:
     name: Publish the release
