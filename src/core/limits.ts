@@ -24,6 +24,8 @@ export interface Limits {
   rowsPerOwnerADay: number;
   netDocsADay: number;
   netBytesADay: number;
+  newKeysADay: number;
+  newKeysToNotice: number;
   reportsAnHour: number;
   reportDetailAtMost: number;
   sealedLinkAtMost: number;
@@ -66,6 +68,8 @@ export const LEVEL_ONE: Limits = {
   rowsPerOwnerADay: 5000,
   netDocsADay: 50,
   netBytesADay: 200 * 1000 * 1000,
+  newKeysADay: 5,
+  newKeysToNotice: 100,
   reportsAnHour: 10,
   reportDetailAtMost: 2000,
   sealedLinkAtMost: 1024,

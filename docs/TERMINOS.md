@@ -17,6 +17,12 @@ lucro. No hay empresa detrás ni nadie que gane dinero con él. El código del
 servicio es público, bajo la
 [Functional Source License 1.1, Apache 2.0 Future License](../LICENSE).
 
+## Qué es Folio
+
+Folio es un servicio aparte de la app Tisty. Tisty escribe, firma y cifra; Folio
+guarda lo que llega y se lo entrega a quien tiene el link. Folio solo recibe y
+muestra: los documentos se editan en Tisty, nunca aquí.
+
 ## Qué cubren
 
 El servicio que guarda y sirve los documentos compartidos, en
@@ -40,6 +46,21 @@ La app Tisty tiene sus propios [términos](https://github.com/rgdevment/Tisty/bl
   servirse, pero su copia queda hasta 180 días, o lo que la orden pida.
 - **Hay topes** de tamaño y de cantidad de imágenes y adjuntos, que el servicio
   puede cambiar. Tisty te avisa antes de compartir si algo no cabe.
+
+## Tu llave y tu reputación
+
+- **Aceptas estos términos** la primera vez que compartes desde Tisty, y ahí
+  Tisty te explica lo básico.
+- **Tu llave es lo que permite a Folio distinguirte.** Tisty firma lo que
+  compartes con una llave tuya, y Folio guarda su parte pública para siempre,
+  aunque tus documentos ya no estén. No dice quién eres. El nombre que eliges
+  mostrar viaja cifrado, y solo lo lee quien tiene el link.
+- **Tu reputación es de esa llave.** Los topes parten bajos, y la reputación es
+  lo que dará acceso a más. Todavía no está decidido cómo se gana, y estos
+  términos lo dirán cuando lo esté. Las denuncias por sí solas nunca la quitan:
+  solo cuenta lo que confirma el operador.
+- **Una llave nueva parte con los topes más bajos,** y cada red puede traer solo
+  unas pocas nuevas al día.
 
 ## Qué no se permite
 

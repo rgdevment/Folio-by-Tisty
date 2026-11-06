@@ -109,6 +109,35 @@ const share = async (
   return refused ? ({ refused } as Refused) : null;
 };
 
+interface KeyAdmission {
+  admit(roots: string[]): Promise<Refused | null>;
+  keep(): Promise<void>;
+  giveBack(): Promise<void>;
+}
+
+// The slot is taken first so parallel requests cannot pass the day's top, and returned unless a version is stored.
+const keyAdmission = (net: string, today: number, { store }: ReadTools): KeyAdmission => {
+  let fresh: string[] = [];
+  return {
+    admit: async (roots) => {
+      for (const root of new Set(roots)) {
+        const admitted = await store.admitKey(root, net, today);
+        if (admitted === "full") return { refused: "quota", until: (today + 1) * DAY_MS };
+        if (admitted === "new") fresh.push(root);
+      }
+      return null;
+    },
+    keep: async () => {
+      await store.keepKeys(fresh, today);
+      fresh = [];
+    },
+    giveBack: async () => {
+      if (fresh.length > 0) await store.giveKeysBack(fresh.length, net, today);
+      fresh = [];
+    },
+  };
+};
+
 const mayUpload = ({ manifest, signature }: ReadEnvelope, held: Held): boolean => {
   const owner = manifest.owner as Owner;
   if (owner.root !== held.owner || (owner.permit ?? null) !== held.permit) return false;
@@ -149,13 +178,15 @@ const answerOf = (uploaded: Uploaded, version: number, now: number): UploadAnswe
   }
 };
 
-const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<UploadAnswer> => {
+const storeVersion = async (
+  uploading: Uploading,
+  net: string,
+  keys: KeyAdmission,
+  tools: ReadTools,
+): Promise<UploadAnswer> => {
   const { id, now, first, files } = uploading;
   const { store, limits } = tools;
-  if (files !== undefined && !FILES_HASH.test(files)) return { refused: "bad_upload" };
   const today = dayOf(now);
-  const net = await netIfOpen(uploading, tools);
-  if (typeof net !== "string") return net;
   let held = await store.held(id);
   const sharing = first && (!held || held.latest === 0) ? first : null;
   if (!held && !sharing) return { refused: "missing" };
@@ -180,6 +211,8 @@ const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<Up
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
+    const full = await keys.admit([(manifest.owner as Owner).root, signature.root]);
+    if (full) return full;
     const refused = await share(uploading, sharing, read, net, tools);
     if (refused) return refused;
     held = await store.held(id);
@@ -193,6 +226,10 @@ const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<Up
 
   const allowedAt = uploadAllowedAt(held.versions, signature.root, now, limits);
   if (allowedAt > now) return { refused: "slow", until: allowedAt };
+  if (!sharing) {
+    const full = await keys.admit([signature.root]);
+    if (full) return full;
+  }
   if (!(await store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour))) {
     return { refused: "quota", until: hourEnds(now) };
   }
@@ -217,7 +254,22 @@ const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<Up
     today,
     held,
   );
+  // Kept only once a version is, so a request that stores nothing leaves no key to age.
+  if (uploaded === "stored") await keys.keep();
   return answerOf(uploaded, manifest.version, now);
+};
+
+const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<UploadAnswer> => {
+  const { files, now } = uploading;
+  if (files !== undefined && !FILES_HASH.test(files)) return { refused: "bad_upload" };
+  const net = await netIfOpen(uploading, tools);
+  if (typeof net !== "string") return net;
+  const keys = keyAdmission(net, dayOf(now), tools);
+  try {
+    return await storeVersion(uploading, net, keys, tools);
+  } finally {
+    await keys.giveBack();
+  }
 };
 
 export const uploadDoc = async (uploading: Uploading, tools: ReadTools): Promise<UploadAnswer> => {

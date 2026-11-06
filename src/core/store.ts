@@ -85,6 +85,8 @@ export interface News {
   reports: { doc: string; category: string; nets: number }[];
   blocked: string[];
   appealed: string[];
+  newKeys: number;
+  newKeysDay: number;
 }
 
 // What a read needs of a document, in one row.
@@ -146,6 +148,9 @@ export interface Store {
   filesOf(id: string, hash: string): Promise<ReadableStream | null>;
   dayKey(today: number): Promise<string>;
   evidenceKey(today: number): Promise<string>;
+  admitKey(root: string, net: string, today: number): Promise<"known" | "new" | "full">;
+  keepKeys(roots: string[], today: number): Promise<void>;
+  giveKeysBack(count: number, net: string, today: number): Promise<void>;
   takeHourly(net: string, action: string, hour: number, atMost: number, taking?: number): Promise<boolean>;
   report(report: Report, today: number, hour: number): Promise<Reported>;
   owned(id: string, today: number): Promise<Owned | null>;

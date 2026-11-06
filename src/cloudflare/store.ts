@@ -365,6 +365,35 @@ export class Cloud implements Store {
     return taken.meta.changes > 0;
   }
 
+  async admitKey(root: string, net: string, today: number): Promise<"known" | "new" | "full"> {
+    const known = await this.#db.prepare("SELECT 1 FROM keys WHERE root = ?").bind(root).first();
+    if (known) return "known";
+    const taken = await this.#db
+      .prepare(
+        `INSERT INTO net_day (day, net, docs, bytes, keys) VALUES (?1, ?2, 0, 0, 1)
+         ON CONFLICT (day, net) DO UPDATE SET keys = keys + 1 WHERE keys < ?3`,
+      )
+      .bind(today, net, this.#limits.newKeysADay)
+      .run();
+    return taken.meta.changes === 0 ? "full" : "new";
+  }
+
+  async keepKeys(roots: string[], today: number): Promise<void> {
+    if (roots.length === 0) return;
+    await this.#db.batch(
+      roots.map((root) =>
+        this.#db.prepare("INSERT OR IGNORE INTO keys (root, first_day) VALUES (?, ?)").bind(root, today),
+      ),
+    );
+  }
+
+  async giveKeysBack(count: number, net: string, today: number): Promise<void> {
+    await this.#db
+      .prepare("UPDATE net_day SET keys = keys - ? WHERE day = ? AND net = ?")
+      .bind(count, today, net)
+      .run();
+  }
+
   async #giveQuotaBack(net: string, docs: number, bytes: number, today: number): Promise<void> {
     await this.#db
       .prepare("UPDATE net_day SET docs = docs - ?, bytes = bytes - ? WHERE day = ? AND net = ?")
@@ -739,7 +768,8 @@ export class Cloud implements Store {
     }
     try {
       await this.#db.batch([
-        this.#db.prepare("DELETE FROM net_day WHERE day < ?").bind(today),
+        // Yesterday's stays: the digest at 00:00 counts its new keys, on the same minute as this sweep.
+        this.#db.prepare("DELETE FROM net_day WHERE day < ?").bind(today - 1),
         this.#db.prepare("DELETE FROM net_hour WHERE hour < ?").bind(today * HOURS_IN_A_DAY),
         this.#db.prepare("DELETE FROM false_reporters WHERE at < ?").bind(today - this.#limits.evidenceDays),
         this.#db
@@ -910,7 +940,8 @@ export class Cloud implements Store {
   }
 
   async news(after: number, before: number, atMost: number): Promise<News> {
-    const [reports, blocked, appealed] = await this.#db.batch([
+    const newKeysDay = Math.floor((before - 1) / HOURS_IN_A_DAY);
+    const [reports, blocked, appealed, keys] = await this.#db.batch([
       this.#db
         .prepare(
           `SELECT doc, category, COUNT(*) AS nets FROM reports
@@ -924,12 +955,15 @@ export class Cloud implements Store {
       this.#db
         .prepare("SELECT id FROM docs WHERE appealed_hour > ?1 AND appealed_hour < ?2 ORDER BY id LIMIT ?3")
         .bind(after, before, atMost),
+      this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS keys FROM net_day WHERE day = ?").bind(newKeysDay),
     ]);
     const ids = (rows: typeof blocked): string[] => ((rows?.results ?? []) as { id: string }[]).map(({ id }) => id);
     return {
       reports: (reports?.results ?? []) as News["reports"],
       blocked: ids(blocked),
       appealed: ids(appealed),
+      newKeys: (keys?.results?.[0] as { keys: number } | undefined)?.keys ?? 0,
+      newKeysDay,
     };
   }
 

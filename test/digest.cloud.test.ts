@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { sendMail } from "../src/cloudflare/mail";
 import { Cloud } from "../src/cloudflare/store";
 import { sendDigest } from "../src/core/digest";
-import { dayOf } from "../src/core/limits";
+import { dayOf, LEVEL_ONE } from "../src/core/limits";
 import { hourOf } from "../src/core/start";
 import worker from "../src/private/index";
 
@@ -114,6 +114,32 @@ describe("the mail", () => {
     const text = send.mock.calls[0]?.[1] as string;
     expect(text).toContain(`Bloqueados:\n${ID}`);
     expect(text).toContain(`Reclamos:\n${ID}`);
+  });
+
+  it("tells when many keys are new today, and not when they are few", async () => {
+    const newKeys = (keys: number) =>
+      testEnv.DB.prepare("INSERT OR REPLACE INTO net_day (day, net, docs, bytes, keys) VALUES (?, 'n', 0, 0, ?)")
+        .bind(TODAY, keys)
+        .run();
+    await newKeys(LEVEL_ONE.newKeysToNotice - 1);
+    expect((await digest()).sent).toBe(false);
+    await newKeys(LEVEL_ONE.newKeysToNotice);
+    const { send, sent } = await digest();
+    expect(sent).toBe(true);
+    expect(send.mock.calls[0]?.[1]).toContain(`Llaves nuevas el 2026-11-20: ${LEVEL_ONE.newKeysToNotice}`);
+    await testEnv.DB.prepare("DELETE FROM net_day").run();
+  });
+
+  it("counts the whole of yesterday at 00:00, even when the sweep of that minute ran first", async () => {
+    await testEnv.DB.prepare("INSERT INTO net_day (day, net, docs, bytes, keys) VALUES (?, 'n', 0, 0, ?)")
+      .bind(TODAY, LEVEL_ONE.newKeysToNotice)
+      .run();
+    await store.sweep(TODAY + 1);
+    const { send } = await digest(LATER);
+    expect(send.mock.calls[0]?.[1]).toContain(`Llaves nuevas el 2026-11-20: ${LEVEL_ONE.newKeysToNotice}`);
+    await store.sweep(TODAY + 2);
+    const left = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM net_day").first<{ n: number }>();
+    expect(left?.n).toBe(0);
   });
 
   it("tells of the spending stage only when it changed", async () => {

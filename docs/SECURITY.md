@@ -42,7 +42,8 @@ be met with legal threats.
 - **Abuse costs.** Reporting and sharing something new ask for a proof of work,
   and so does a new reader past the day's free ones. Starting a share and reading
   have a speed limit per network, and uploading has a quota per network and a
-  wait per person.
+  wait per person. A network brings only a few new keys a day, and a new key
+  starts from the lowest limits.
 
 ## What it does not protect
 
