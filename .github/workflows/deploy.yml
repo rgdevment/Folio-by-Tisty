@@ -14,6 +14,7 @@ permissions:
 
 env:
   FOLIO_URL: https://tisty.cl
+  PANEL_URL: https://panel.tisty.cl
   DATABASE: folio-private
 
 jobs:
@@ -95,6 +96,12 @@ jobs:
           path: dist/page
           if-no-files-found: error
           include-hidden-files: true
+          retention-days: 7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: panel
+          path: dist/admin
+          if-no-files-found: error
           retention-days: 7
       - name: What the release publishes
         env:
@@ -290,6 +297,61 @@ jobs:
       # After the step that goes back: a working version stays up, and a difference is for a person to read.
       - name: What it serves is what was attested
         run: bash scripts/page-code.sh served dist/page "$FOLIO_URL"
+
+  # Apart from the Worker: a panel that does not go up leaves the service and its release as they are.
+  panel:
+    name: Deploy the panel
+    needs: [page, deploy]
+    if: github.event_name == 'push'
+    environment: prod-private
+    concurrency:
+      group: panel
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: panel
+          path: dist/admin
+      - name: The panel knows its operator
+        run: |
+          set -euo pipefail
+          npx --no-install wrangler secret list --config wrangler.admin.toml --format json > "$RUNNER_TEMP/secrets.json"
+          jq -e 'any(.[]; .name == "OPERATOR_EMAIL")' "$RUNNER_TEMP/secrets.json" > /dev/null \
+            || { echo "::error::folio-admin has no OPERATOR_EMAIL secret, and without it the panel refuses everyone"; exit 1; }
+      - name: Deploy
+        run: npx --no-install wrangler deploy --config wrangler.admin.toml --tag "$TAG" --message "$TAG ${GITHUB_SHA:0:8}"
+      # A domain's first certificate takes minutes, and without Access its token is all that guards the panel.
+      - name: Access stands in front of it
+        run: |
+          set -uo pipefail
+          team=$(sed -n 's/^ACCESS_TEAM = "\(.*\)"$/\1/p' wrangler.admin.toml)
+          for attempt in $(seq 1 20); do
+            said=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$PANEL_URL/")
+            case "$said" in
+              "302 https://$team.cloudflareaccess.com/"*)
+                echo "$PANEL_URL sends a stranger to Access"
+                exit 0
+                ;;
+            esac
+            echo "not yet ($attempt/20): ${said%% *}"
+            sleep 15
+          done
+          echo "::error::$PANEL_URL does not send a stranger to Access: check its application in Zero Trust"
+          exit 1
 
   release:
     name: Publish the release

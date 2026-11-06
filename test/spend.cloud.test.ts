@@ -21,6 +21,7 @@ const BINDINGS = {
   CF_RULE_ID: "rule",
   CF_DATABASE_ID: "database",
   CF_SCRIPT_NAME: "folio-private",
+  CF_PANEL_SCRIPT_NAME: "folio-admin",
   CF_BUCKET_NAME: "bucket",
 };
 
@@ -117,6 +118,7 @@ describe("reading the usage", () => {
         accounts: [
           {
             workers: [{ sum: { requests: 11 } }],
+            panel: [{ sum: { requests: 100 } }],
             d1: [{ sum: { rowsRead: 22, rowsWritten: 33 } }],
             r2: [
               { sum: { requests: 1 }, dimensions: { actionType: "PutObject" } },
@@ -135,7 +137,7 @@ describe("reading the usage", () => {
   it("adds up each class of R2 by R2's own price list, leaving out what is free", async () => {
     const { spend } = answering(usage);
     expect(await spend.usageSince(0, 86_400_000)).toEqual({
-      requests: 11,
+      requests: 111,
       rowsRead: 22,
       rowsWritten: 33,
       classA: 3,
@@ -155,6 +157,7 @@ describe("reading the usage", () => {
       account: "account",
       database: "database",
       script: "folio-private",
+      panel: "folio-admin",
       bucket: "bucket",
       since: "2026-11-15T00:00:00.000Z",
       sinceDate: "2026-11-15",
@@ -163,7 +166,9 @@ describe("reading the usage", () => {
   });
 
   it("counts nothing where nothing happened yet", async () => {
-    const { spend } = answering({ data: { viewer: { accounts: [{ workers: [], d1: [], r2: [], stored: [] }] } } });
+    const { spend } = answering({
+      data: { viewer: { accounts: [{ workers: [], panel: [], d1: [], r2: [], stored: [] }] } },
+    });
     expect(await spend.usageSince(0, 1)).toEqual({
       requests: 0,
       rowsRead: 0,
