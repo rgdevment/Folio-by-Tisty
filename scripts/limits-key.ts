@@ -11,6 +11,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEVEL_ONE, publishedLimits } from "../src/core/limits.ts";
+import { sharingFaults } from "./limits-sharing.ts";
 
 type Published = ReturnType<typeof publishedLimits>;
 
@@ -112,7 +113,14 @@ const holdsTo = (name: string, said: unknown, server: unknown): boolean => {
 // The file may ask for less than the server takes, never for more: a number there that it would refuse fails its reader.
 export const pastTheServer = (said: Record<string, unknown>, server: Published): string[] => {
   const held = server as Record<string, unknown>;
-  const { serial: _serial, uploads_halted_until: _halted, terms: _terms, ...numbers } = said;
+  const {
+    serial: _serial,
+    uploads_halted_until: _halted,
+    terms: _terms,
+    sharing_open: _open,
+    sharing_closed_note: _note,
+    ...numbers
+  } = said;
   const unknown = Object.keys(numbers).filter((name) => !Object.hasOwn(held, name));
   const wrong = Object.keys(held).filter((name) => !holdsTo(name, said[name], held[name]));
   return [...unknown, ...wrong];
@@ -158,17 +166,28 @@ export const signLimits = (
   const current = existsSync(files.limits)
     ? (JSON.parse(readFileSync(files.limits, "utf8")) as Record<string, unknown>)
     : {};
-  const { serial = 0, uploads_halted_until: kept, terms, ...numbers } = current;
+  const {
+    serial = 0,
+    uploads_halted_until: kept,
+    terms,
+    sharing_open: sharingOpen = false,
+    sharing_closed_note: note,
+    ...numbers
+  } = current;
   const until = haltedUntil(haltedDays, kept, Math.floor(now / 1000));
   const next = {
     serial: (serial as number) + 1,
     ...server,
     ...numbers,
     terms: termsOf(files, terms as Terms | undefined),
+    sharing_open: sharingOpen,
+    ...(note === undefined ? {} : { sharing_closed_note: note }),
     ...(until === null ? {} : { uploads_halted_until: until }),
   };
   const past = pastTheServer(next, server);
   if (past.length > 0) throw new Error(`the server would not hold to these: ${past.join(", ")}`);
+  const faults = sharingFaults(next);
+  if (faults.length > 0) throw new Error(`Tisty would not take this: ${faults.join("; ")}`);
 
   const said = Buffer.from(`${JSON.stringify(next, null, 2)}\n`);
   const name = basename(files.limits);
