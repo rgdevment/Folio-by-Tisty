@@ -13,6 +13,7 @@ import {
   signedFile,
   signLimits,
 } from "../scripts/limits-key";
+import { sharingFaults } from "../scripts/limits-sharing";
 import { LEVEL_ONE, publishedLimits } from "../src/core/limits";
 
 const said = Buffer.from('{"serial":1}\n');
@@ -80,6 +81,119 @@ describe("what the file may say", () => {
   });
 });
 
+describe("the sharing fields", () => {
+  const closedWith = (es: unknown) => sharingFaults({ sharing_open: false, sharing_closed_note: { es } });
+
+  it("take a service that is open or closed, with no message", () => {
+    expect(sharingFaults({ sharing_open: true })).toEqual([]);
+    expect(sharingFaults({ sharing_open: false })).toEqual([]);
+  });
+
+  it.each([[undefined], ["true"], [1], [null]])("refuse %j as whether it is open", (open) => {
+    expect(sharingFaults({ sharing_open: open })).toEqual(["sharing_open is not true or false"]);
+  });
+
+  it("take the message Tisty gives as its example, in one language or both", () => {
+    const es = "Abrimos el lunes.\nMira los detalles [aquí](https://folio.tisty.app/lanzamiento).";
+    const en = "We open on Monday.\nSee the details [here](https://folio.tisty.app/launch).";
+    expect(sharingFaults({ sharing_open: false, sharing_closed_note: { es, en } })).toEqual([]);
+    expect(closedWith(es)).toEqual([]);
+  });
+
+  it("take exactly what fits, and refuse past it", () => {
+    expect(closedWith("a".repeat(400))).toEqual([]);
+    expect(closedWith("a".repeat(401))[0]).toContain("401 characters");
+    expect(closedWith("a\n\nb\nc\nd\ne")).toEqual([]);
+    expect(closedWith("a\n\nb\nc\nd\ne\nf")[0]).toContain("over 6 lines");
+  });
+
+  it("count the syntax of a link among the characters", () => {
+    const link = "[a](https://tisty.app/)";
+    expect(closedWith(link + "b".repeat(400 - link.length))).toEqual([]);
+    expect(closedWith(link + "b".repeat(401 - link.length))[0]).toContain("401 characters");
+  });
+
+  it.each([
+    ["tisty.app", "https://tisty.app"],
+    ["its subdomains", "https://folio.tisty.app/a?b=c#d"],
+    ["tisty.cl", "https://tisty.cl/a"],
+  ])("take a link to %s", (_where, address) => {
+    expect(closedWith(`[a](${address})`)).toEqual([]);
+  });
+
+  it.each([
+    ["plain http", "http://tisty.app"],
+    ["another site", "https://example.com"],
+    ["a name that only ends alike", "https://nottisty.app"],
+    ["a name that only starts alike", "https://tisty.app.example.com"],
+    ["a subdomain of tisty.cl", "https://a.tisty.cl"],
+    ["a port", "https://tisty.app:443/"],
+    ["a user", "https://user@tisty.app/"],
+    ["a user hidden by a backslash", "https://tisty.app\\@example.com"],
+    ["no address", ""],
+    ["a scheme in capitals", "HTTPS://tisty.app"],
+    ["a name in capitals", "https://TISTY.app/"],
+    ["parentheses in its address", "https://tisty.app/a(b)c"],
+  ])("refuse a link with %s", (_what, address) => {
+    expect(closedWith(`[a](${address})`)[0]).toContain("links where Tisty would not");
+  });
+
+  it("refuse a link with no text, and one that is not whole", () => {
+    expect(closedWith("[ ](https://tisty.app)")[0]).toContain("no text");
+    expect(closedWith("[a](https://tisty.app")[0]).toContain("not whole");
+  });
+
+  it.each([
+    ["bold", "**a**"],
+    ["italics", "*a*"],
+    ["italics with underscores", "_a_"],
+    ["strikethrough", "~~a~~"],
+    ["code", "`a`"],
+    ["a quote", "> a"],
+    ["a title", "# a"],
+    ["a list", "a\n- b"],
+    ["a numbered list", "1. a"],
+    ["a picture", "![a](https://tisty.app)"],
+    ["HTML", "<b>a</b>"],
+    ["bold inside a link", "[**a**](https://tisty.app)"],
+  ])("refuse %s, which Tisty would show literally", (_what, es) => {
+    expect(closedWith(es)).toContain("sharing_closed_note es has formatting Tisty would show literally");
+  });
+
+  it("leave alone a link whose address looks like formatting", () => {
+    expect(closedWith("[a](https://tisty.app/a__b)")).toEqual([]);
+  });
+
+  it("leave alone what only looks a little like formatting", () => {
+    expect(closedWith("3 * 4 = 12, a_b y 5 > 4")).toEqual([]);
+  });
+
+  it.each([
+    ["a tab", "a\tb"],
+    ["a carriage return", "a\r\nb"],
+    ["a control character", "a\u0007b"],
+    ["a space of no width", "a\u200bb"],
+    ["a joiner", "a\u2060b"],
+    ["a text reversal", "a\u202eb"],
+    ["a line separator", "a\u2028b"],
+    ["a blank Hangul letter", "a\u3164b"],
+  ])("refuse %s", (_what, es) => {
+    expect(closedWith(es)[0]).toContain("invisible");
+  });
+
+  it("refuse the line Tisty adds below", () => {
+    expect(closedWith("Conoce más en folio.tisty.app.")[0]).toContain("repeats");
+  });
+
+  it("refuse a message that says nothing, or is not one", () => {
+    expect(closedWith("  ")[0]).toContain("is empty");
+    expect(closedWith(1)[0]).toContain("not text");
+    expect(sharingFaults({ sharing_open: false, sharing_closed_note: {} })[0]).toContain("says nothing");
+    expect(sharingFaults({ sharing_open: false, sharing_closed_note: "a" })[0]).toContain("not an object");
+    expect(sharingFaults({ sharing_open: false, sharing_closed_note: { pt: "a" } })[0]).toContain("pt");
+  });
+});
+
 describe("signing the limits", () => {
   let place: string;
   let files: LimitsFiles;
@@ -141,6 +255,31 @@ describe("signing the limits", () => {
     const terms = read().terms as { version: string; es: string; en: string };
     expect(terms.version).toBe("2");
     expect(terms[text === "termsEs" ? "es" : "en"]).toBe(sha256("otro texto\r\n"));
+  });
+
+  it("starts closed, with no message", () => {
+    signing();
+    expect(read().sharing_open).toBe(false);
+    expect(read()).not.toHaveProperty("sharing_closed_note");
+  });
+
+  it("keeps whether it is open and its message", () => {
+    signing();
+    const note = { es: "Abrimos el lunes." };
+    writeFileSync(files.limits, JSON.stringify({ ...read(), sharing_open: true, sharing_closed_note: note }));
+    signing();
+    expect(read().sharing_open).toBe(true);
+    expect(read().sharing_closed_note).toEqual(note);
+  });
+
+  it("writes nothing with a message Tisty would drop", () => {
+    signing();
+    writeFileSync(files.limits, JSON.stringify({ ...read(), sharing_closed_note: { es: "**a**" } }));
+    const before = readFileSync(files.limits, "utf8");
+    const signature = readFileSync(`${files.limits}.minisig`, "utf8");
+    expect(() => signing()).toThrow("formatting");
+    expect(readFileSync(files.limits, "utf8")).toBe(before);
+    expect(readFileSync(`${files.limits}.minisig`, "utf8")).toBe(signature);
   });
 
   it("does not replace the key copies are built with", () => {
@@ -212,6 +351,10 @@ describe("the limits Folio publishes", () => {
   it("ask for nothing the server would refuse", () => {
     expect(pastTheServer(published, SERVER)).toEqual([]);
     expect(published.serial).toBeGreaterThan(0);
+  });
+
+  it("say whether sharing is open, in a way Tisty takes", () => {
+    expect(sharingFaults(published)).toEqual([]);
   });
 
   it("are signed with the key Tisty is built with", () => {

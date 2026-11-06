@@ -30,6 +30,15 @@ info:
     seconds, says uploads are paused until then, never more than a week ahead. It may ask for less than the server
     takes and never for more, and the server holds to its own numbers whoever calls it.
 
+    **Whether sharing is open** is named there too. `sharing_open` says whether the service has opened for new
+    documents: anything but `true`, or nothing at all, means a client does not offer to share a new one. It differs
+    from `uploads_halted_until`, a temporary pause of up to a week once the service is open. `sharing_closed_note`
+    is optional and holds, in `es` and `en`, the message to show while it is not open, up to 400 characters and 6
+    lines. It is plain text with `\n` for a new line, and its only format is `[text](https://…)`, to `tisty.app`,
+    its subdomains or `tisty.cl`, with no port or user. A language that breaks these, or is missing, leaves the
+    client's own message. Both are signals for clients: what is already shared does not depend on them, and the
+    server does not read them.
+
     **The terms in force** are named there too. In `terms`, `es` and `en` are the SHA-256, in hex, of
     `docs/TERMINOS.md` and `docs/TERMS.md` as served from the same place, and `version`, a whole number written as a
     string, grows with every change to either text. A text and the signed file that names it reach `main` together.

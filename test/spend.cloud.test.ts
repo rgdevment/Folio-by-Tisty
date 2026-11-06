@@ -20,7 +20,6 @@ const BINDINGS = {
   CF_RULESET_ID: "ruleset",
   CF_RULE_ID: "rule",
   CF_DATABASE_ID: "database",
-  CF_SCRIPT_NAME: "folio-private",
   CF_BUCKET_NAME: "bucket",
 };
 
@@ -154,12 +153,17 @@ describe("reading the usage", () => {
     expect(variables).toMatchObject({
       account: "account",
       database: "database",
-      script: "folio-private",
       bucket: "bucket",
       since: "2026-11-15T00:00:00.000Z",
       sinceDate: "2026-11-15",
       untilDate: "2026-11-20",
     });
+  });
+
+  it("reads the requests of every Worker, as the account is billed for them", async () => {
+    const { calls, spend } = answering(usage);
+    await spend.usageSince(0, 1);
+    expect(JSON.parse(String(calls[0]?.init.body)).query).not.toContain("scriptName");
   });
 
   it("counts nothing where nothing happened yet", async () => {
@@ -207,6 +211,7 @@ describe("the rule", () => {
     const body = JSON.parse(String(calls[0]?.init.body));
     expect(body).toMatchObject({ action: "block", enabled: true });
     expect(body.expression).toContain('"/api/"');
+    expect(body.expression).toContain('http.host eq "tisty.cl"');
     await spend.setBlocked(false);
     expect(JSON.parse(String(calls[1]?.init.body)).enabled).toBe(false);
   });

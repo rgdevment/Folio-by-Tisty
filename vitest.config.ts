@@ -17,7 +17,8 @@ export default defineConfig(async () => {
               },
             }),
           ],
-          test: { name: "cloud", include: ["test/*.cloud.test.ts"] },
+          // Each file starts a worker and applies every migration, which a busy CI runner can take past the default 10 s.
+          test: { name: "cloud", include: ["test/*.cloud.test.ts"], hookTimeout: 60_000 },
         },
       ],
     },
