@@ -379,6 +379,23 @@ describe("a key Folio has not seen", () => {
     expect(docs?.n).toBe(5);
   });
 
+  it("keeps no key from a request that stores nothing, so none can age without a version", async () => {
+    const fresh = await newPerson();
+    const first = { ...(await started()), ttlDays: 99 };
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: fresh });
+    expect(await send(first.id, bytes, NOW, first)).toEqual({ refused: "bad_upload" });
+    expect(await keys()).not.toContain(rootOf(fresh));
+  });
+
+  it("keeps no key whose version did not fit in the day's bytes", async () => {
+    const { permit, pair } = await newToken();
+    const id = await shared({ permit });
+    await testEnv.DB.prepare("UPDATE net_day SET bytes = ?").bind(LIMITS.netBytesADay).run();
+    const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+    expect(await send(id, edited, NOW + 60_000)).toMatchObject({ refused: "quota" });
+    expect(await keys()).not.toContain(rootOf(ana));
+  });
+
   it("does not spend the day's keys on one it knows, however many times it shares", async () => {
     await sharedBy(mario);
     await sharedBy(mario);

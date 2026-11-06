@@ -365,10 +365,9 @@ export class Cloud implements Store {
     return taken.meta.changes > 0;
   }
 
-  // The network's cupo goes first, so a key that does not fit leaves no trace.
-  async admitKey(root: string, net: string, today: number): Promise<boolean> {
+  async admitKey(root: string, net: string, today: number): Promise<"known" | "new" | "full"> {
     const known = await this.#db.prepare("SELECT 1 FROM keys WHERE root = ?").bind(root).first();
-    if (known) return true;
+    if (known) return "known";
     const taken = await this.#db
       .prepare(
         `INSERT INTO net_day (day, net, docs, bytes, keys) VALUES (?1, ?2, 0, 0, 1)
@@ -376,9 +375,16 @@ export class Cloud implements Store {
       )
       .bind(today, net, this.#limits.newKeysADay)
       .run();
-    if (taken.meta.changes === 0) return false;
-    await this.#db.prepare("INSERT OR IGNORE INTO keys (root, first_day) VALUES (?, ?)").bind(root, today).run();
-    return true;
+    return taken.meta.changes === 0 ? "full" : "new";
+  }
+
+  async keepKeys(roots: string[], today: number): Promise<void> {
+    if (roots.length === 0) return;
+    await this.#db.batch(
+      roots.map((root) =>
+        this.#db.prepare("INSERT OR IGNORE INTO keys (root, first_day) VALUES (?, ?)").bind(root, today),
+      ),
+    );
   }
 
   async #giveQuotaBack(net: string, docs: number, bytes: number, today: number): Promise<void> {

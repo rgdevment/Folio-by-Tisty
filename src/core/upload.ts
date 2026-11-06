@@ -109,16 +109,19 @@ const share = async (
   return refused ? ({ refused } as Refused) : null;
 };
 
-const keysRefused = async (
+const newKeysOf = async (
   roots: string[],
   net: string,
   now: number,
   { store }: ReadTools,
-): Promise<Refused | null> => {
+): Promise<string[] | Refused> => {
+  const fresh: string[] = [];
   for (const root of new Set(roots)) {
-    if (!(await store.admitKey(root, net, dayOf(now)))) return { refused: "quota", until: (dayOf(now) + 1) * DAY_MS };
+    const admitted = await store.admitKey(root, net, dayOf(now));
+    if (admitted === "full") return { refused: "quota", until: (dayOf(now) + 1) * DAY_MS };
+    if (admitted === "new") fresh.push(root);
   }
-  return null;
+  return fresh;
 };
 
 const mayUpload = ({ manifest, signature }: ReadEnvelope, held: Held): boolean => {
@@ -190,10 +193,12 @@ const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<Up
     return { stored: true, version: manifest.version };
   }
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
+  let newKeys: string[] = [];
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
-    const keyRefused = await keysRefused([(manifest.owner as Owner).root, signature.root], net, now, tools);
-    if (keyRefused) return keyRefused;
+    const admitted = await newKeysOf([(manifest.owner as Owner).root, signature.root], net, now, tools);
+    if (!Array.isArray(admitted)) return admitted;
+    newKeys = admitted;
     const refused = await share(uploading, sharing, read, net, tools);
     if (refused) return refused;
     held = await store.held(id);
@@ -208,8 +213,9 @@ const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<Up
   const allowedAt = uploadAllowedAt(held.versions, signature.root, now, limits);
   if (allowedAt > now) return { refused: "slow", until: allowedAt };
   if (!sharing) {
-    const keyRefused = await keysRefused([signature.root], net, now, tools);
-    if (keyRefused) return keyRefused;
+    const admitted = await newKeysOf([signature.root], net, now, tools);
+    if (!Array.isArray(admitted)) return admitted;
+    newKeys = admitted;
   }
   if (!(await store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour))) {
     return { refused: "quota", until: hourEnds(now) };
@@ -235,6 +241,8 @@ const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<Up
     today,
     held,
   );
+  // Kept only once a version is, so a request that stores nothing leaves no key to age.
+  if (uploaded === "stored") await store.keepKeys(newKeys, today);
   return answerOf(uploaded, manifest.version, now);
 };
 
