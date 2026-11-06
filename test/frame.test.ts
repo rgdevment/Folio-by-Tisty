@@ -75,6 +75,8 @@ beforeEach(() => {
   place.Element.prototype.scrollIntoView = function (this: Element) {
     scrolled.push(this);
   };
+  vi.stubGlobal("window", place);
+  vi.stubGlobal("window", place);
   vi.stubGlobal("document", place.document);
   vi.stubGlobal("DOMParser", place.DOMParser);
   vi.stubGlobal("MutationObserver", place.MutationObserver);
@@ -229,7 +231,6 @@ describe("a card in the words", () => {
 
 describe("a link that lets someone edit", () => {
   const EDIT_ADDRESS = "https://tisty.cl/k7Qm2xPa#THEKEY.THETOKEN";
-  const copied = vi.fn(async (_said: string) => {});
 
   beforeEach(() => {
     const dom = new JSDOM(readFileSync("src/page/index.html", "utf8"), { url: EDIT_ADDRESS });
@@ -242,20 +243,150 @@ describe("a link that lets someone edit", () => {
     vi.stubGlobal("window", place);
     vi.stubGlobal("document", place.document);
     vi.stubGlobal("location", place.location);
-    vi.stubGlobal("navigator", { clipboard: { writeText: copied } });
-    copied.mockClear();
     draw(HELD);
   });
 
-  it("copies the link to read it, and never its token", async () => {
-    place.document.getElementById("copy-link")?.click();
-    await vi.waitFor(() => expect(copied).toHaveBeenCalled());
-    expect(copied).toHaveBeenCalledExactlyOnceWith("https://tisty.cl/k7Qm2xPa#THEKEY");
+  it("takes the key out of the address before it prints, and puts it back after", () => {
+    let addressPrinted = "";
+    place.print = vi.fn(() => {
+      addressPrinted = place.location.href;
+    });
+    place.document.getElementById("print")?.click();
+    expect(addressPrinted).toBe("https://tisty.cl/k7Qm2xPa");
+    expect(place.location.href).toBe("https://tisty.cl/k7Qm2xPa");
+    place.dispatchEvent(new place.Event("afterprint"));
+    expect(place.location.href).toBe(EDIT_ADDRESS);
+  });
+
+  it.each(["pointerdown", "keydown"])("puts the key back on a %s, where a browser never says it printed", (kind) => {
+    place.dispatchEvent(new place.Event("beforeprint"));
+    expect(place.location.hash).toBe("");
+    place.dispatchEvent(new place.Event(kind));
+    expect(place.location.href).toBe(EDIT_ADDRESS);
+  });
+
+  it.each([
+    ["Ctrl", { ctrlKey: true }],
+    ["Cmd", { metaKey: true }],
+  ])("takes the key out when printing with %s+P, before the browser takes the address", (_key, held) => {
+    let addressPrinted = "";
+    place.print = vi.fn(() => {
+      addressPrinted = place.location.href;
+    });
+    const asking = new place.KeyboardEvent("keydown", { key: "p", cancelable: true, ...held });
+    place.dispatchEvent(asking);
+    expect(addressPrinted).toBe("https://tisty.cl/k7Qm2xPa");
+    expect(asking.defaultPrevented).toBe(true);
+    place.dispatchEvent(new place.Event("afterprint"));
+    expect(place.location.href).toBe(EDIT_ADDRESS);
+  });
+
+  it("leaves a key press that is not printing alone", () => {
+    place.print = vi.fn();
+    place.dispatchEvent(new place.KeyboardEvent("keydown", { key: "p" }));
+    expect(place.print).not.toHaveBeenCalled();
+    expect(place.location.href).toBe(EDIT_ADDRESS);
+  });
+
+  it("does not lose the key when printing is asked for twice", () => {
+    place.print = vi.fn();
+    place.document.getElementById("print")?.click();
+    place.dispatchEvent(new place.Event("beforeprint"));
+    place.dispatchEvent(new place.Event("afterprint"));
+    expect(place.location.href).toBe(EDIT_ADDRESS);
+  });
+
+  it("offers no button to pass the link on, which is its author's to share", () => {
+    expect(place.document.getElementById("copy-link")).toBeNull();
+    expect(place.document.body.textContent).not.toContain("Copiar link");
   });
 
   it("hands Tisty the token, which is the one place it goes", () => {
     const edit = place.document.getElementById("edit-in-tisty") as HTMLAnchorElement;
     expect(edit.getAttribute("href")).toBe(`tisty://edit?link=${encodeURIComponent(EDIT_ADDRESS)}`);
+  });
+});
+
+describe("on paper", () => {
+  const FOLDED = { ...HELD, html: '<h1 id="paseos">Paseos</h1><details><summary>Más</summary><p>dentro</p></details>' };
+  const WITH_PAGES: Document = {
+    ...HELD,
+    html: "<p>primera</p>",
+    pages: [
+      { id: "AAAAAAAA", at: 1, body: "", html: "<p>segunda</p>" },
+      { id: "BBBBBBBB", at: 2, body: "", html: "<p>tercera</p>" },
+    ] as unknown as Page[],
+  };
+
+  const printing = (): void => {
+    place.dispatchEvent(new place.Event("beforeprint"));
+  };
+  const printed = (): void => {
+    place.dispatchEvent(new place.Event("afterprint"));
+  };
+  const words = (): (string | null)[] => [...root.querySelectorAll("p")].map((one) => one.textContent);
+
+  it("opens the folds for the paper, and closes them again after", () => {
+    draw(FOLDED);
+    const fold = root.querySelector("details") as HTMLDetailsElement;
+    printing();
+    expect(fold.hasAttribute("open")).toBe(true);
+    printed();
+    expect(fold.hasAttribute("open")).toBe(false);
+  });
+
+  it("leaves a fold the reader opened as it was", () => {
+    draw(FOLDED);
+    const fold = root.querySelector("details") as HTMLDetailsElement;
+    fold.setAttribute("open", "");
+    printing();
+    printed();
+    expect(fold.hasAttribute("open")).toBe(true);
+  });
+
+  it("prints every page in order, from the first, and takes them out after", () => {
+    draw(WITH_PAGES);
+    printing();
+    expect(words()).toEqual(["primera", "segunda", "tercera"]);
+    expect(root.querySelectorAll(".printed-page.after")).toHaveLength(2);
+    printed();
+    expect(words()).toEqual(["primera"]);
+  });
+
+  it("keeps the order while another page is on screen", () => {
+    draw({
+      ...WITH_PAGES,
+      html: '<p><a href="tisty:page/1">Enero</a></p>',
+    });
+    const first = root.querySelector("p")?.textContent;
+    (place.document.querySelector("#pages button") as HTMLButtonElement).click();
+    printing();
+    expect(words()).toEqual([first, "segunda", "tercera"]);
+    expect(root.querySelectorAll(".printed-page.before")).toHaveLength(1);
+    expect(root.querySelectorAll(".printed-page.after")).toHaveLength(1);
+    printed();
+    expect(words()).toEqual(["segunda"]);
+  });
+
+  it("offers no button where the browser cannot print", () => {
+    (place as unknown as { print?: unknown }).print = undefined;
+    draw(HELD);
+    expect((place.document.getElementById("print") as HTMLElement).hidden).toBe(true);
+  });
+
+  it("asks for the paper the reader chose", () => {
+    const sizes: string[] = [];
+    vi.stubGlobal(
+      "CSSStyleSheet",
+      class {
+        replaceSync(said: string) {
+          sizes.push(said);
+        }
+      },
+    );
+    (place.document as unknown as { adoptedStyleSheets: unknown[] }).adoptedStyleSheets = [];
+    draw(HELD);
+    expect(sizes.at(-1)).toBe("@page { size: 210mm 297mm; }");
   });
 });
 

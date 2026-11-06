@@ -478,8 +478,37 @@ svg[data-theme="dark"],
   display: inline;
 }
 
+.printed-page {
+  display: none;
+}
+
 /* Paper is light, whichever theme the screen was in. */
 @media print {
+  .sheet {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .printed-page {
+    display: block;
+  }
+
+  .printed-page.before {
+    break-after: page;
+  }
+
+  .printed-page.after {
+    break-before: page;
+  }
+
+  /* Nothing on paper can be pressed. */
+  .card-go,
+  a[data-file] .card-blurb,
+  audio,
+  video {
+    display: none;
+  }
+
   :host([data-theme="dark"]) svg[data-theme="dark"] {
     display: none;
   }
