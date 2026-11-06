@@ -83,8 +83,10 @@ describe("the public page", () => {
     expect(HEADERS).toContain("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self';");
   });
 
-  it("asks Cloudflare to add nothing to it", () => {
-    expect(HEADERS).toContain("no-transform");
+  it("asks Cloudflare not to change it, on every address", () => {
+    const rule = HEADERS.split("\n\n")[0] ?? "";
+    expect(rule.startsWith("/*\n")).toBe(true);
+    expect(rule).toContain("no-transform");
   });
 
   it("wears the same icon and mascot as the reader's page", () => {

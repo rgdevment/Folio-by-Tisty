@@ -38,12 +38,17 @@ describe("the page's headers", () => {
     expect(csp).not.toMatch(/https?:|unsafe|\*/);
   });
 
+  it("ask Cloudflare not to change a page, and keep hashed assets for good", () => {
+    const rules = HEADERS.split("\n\n");
+    const pages = rules.find((one) => one.startsWith("/*\n")) ?? "";
+    const assets = rules.find((one) => one.startsWith("/assets/*\n")) ?? "";
+    expect(pages).toContain("no-transform");
+    expect(assets).toContain("! Cache-Control");
+    expect(assets).toContain("immutable, no-transform");
+  });
+
   it("keep tisty.cl out of every search (decision 63)", () => {
     expect(HEADERS).toContain("X-Robots-Tag: noindex");
-    expect(HEADERS.match(/^ {2}Cache-Control: /gm)?.length).toBe(
-      HEADERS.match(/^ {2}Cache-Control: .*no-transform/gm)?.length,
-    );
-    expect(HEADERS).toContain("! Cache-Control");
     expect(read("src/page/public/robots.txt")).toContain("Disallow: /");
   });
 });
