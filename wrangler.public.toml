@@ -1,0 +1,10 @@
+name = "folio-public"
+compatibility_date = "2026-08-01"
+workers_dev = false
+
+routes = [{ pattern = "folio.tisty.app", custom_domain = true }]
+
+# Only assets for now, so a visit wakes no code and counts as no request (decision 109).
+[assets]
+directory = "./src/public/page"
+not_found_handling = "404-page"

@@ -53,6 +53,10 @@ IP and your requests when you connect, as any web server does, and handles them
 under its own [privacy policy](https://www.cloudflare.com/privacypolicy/). It
 never receives the key after the `#`, so it cannot read what you share either.
 
+The page at `folio.tisty.app` only explains what Folio is. It is fixed files: it
+keeps nothing about you, on the server or in your browser. Cloudflare also
+receives your IP and your requests when you visit it.
+
 ## The promise of encryption, said honestly
 
 - **Between two Tisty**, nobody else can read what is shared: not the operator,

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Folio by Tisty</title>
+    <meta
+      name="description"
+      content="Folio lets you share documents privately with anyone, using an encrypted link. It isn't available yet."
+    />
+    <meta name="theme-color" content="#faf8f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e0d0b" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://folio.tisty.app/" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="stylesheet" href="/site.css" />
+    <script src="/language.js"></script>
+  </head>
+  <body>
+    <header class="top">
+      <a class="brand" href="/">
+        <img src="/icon.svg" alt="" width="28" height="28" />
+        <span>Folio <small>by Tisty</small></span>
+      </a>
+      <div class="languages">
+        <button type="button" data-language="es" lang="es">ES</button>
+        <button type="button" data-language="en" lang="en">EN</button>
+      </div>
+    </header>
+
+    <main class="hero">
+      <div class="words">
+        <p class="status">
+          <span class="dot" aria-hidden="true"></span>
+          <span lang="es">En construcción</span>
+          <span lang="en">Under construction</span>
+        </p>
+        <h1 lang="es">Comparte un documento. Solo lo lee quien tenga el link.</h1>
+        <h1 lang="en">Share a document. Only people with the link can read it.</h1>
+        <p class="lead" lang="es">
+          Folio te permite compartir documentos en privado con quien quieras, con un link y cifrados de forma segura.
+          Todavía no está disponible.
+        </p>
+        <p class="lead" lang="en">
+          Folio lets you share documents privately with anyone, using an encrypted link. It isn't available yet.
+        </p>
+        <p class="action">
+          <a class="button" href="https://www.tisty.app/es/" lang="es">Mientras tanto, conoce Tisty</a>
+          <a class="button" href="https://www.tisty.app/" lang="en">Meanwhile, meet Tisty</a>
+        </p>
+      </div>
+
+      <figure class="scene" aria-hidden="true">
+        <svg viewBox="31.5 8.5 156 156" width="320" height="320">
+          <title>Folio</title>
+          <g stroke-linecap="round" stroke-linejoin="round">
+            <rect class="back" x="70" y="22" width="104" height="128" rx="14" transform="rotate(7 120 90)" />
+            <g transform="rotate(-6 100 90)">
+              <path
+                class="sheet"
+                d="M58 24h74l26 26v86a14 14 0 0 1-14 14H58a14 14 0 0 1-14-14V38a14 14 0 0 1 14-14Z"
+              />
+              <path class="fold" d="M132 24v14a12 12 0 0 0 12 12h14" />
+              <path class="line first" pathLength="1" d="M62 68h56" />
+              <path class="line second" pathLength="1" d="M62 86h72" />
+              <path class="line third" pathLength="1" d="M62 104h44" />
+              <path class="line last" pathLength="1" d="M62 122h28" />
+            </g>
+            <g class="seal">
+              <circle cx="150" cy="134" r="20" />
+              <path d="M140.5 134.5l6.5 6.5 12.5-13" />
+            </g>
+          </g>
+        </svg>
+        <img class="tisto" src="/tisto.svg" alt="" width="120" height="100" />
+      </figure>
+    </main>
+
+    <section class="facts">
+      <div class="fact">
+        <h2 lang="es">Cifrado antes de salir</h2>
+        <h2 lang="en">Encrypted before it leaves</h2>
+        <p lang="es">La llave va en el link, y el servidor nunca la recibe.</p>
+        <p lang="en">The key travels in the link, and the server never receives it.</p>
+      </div>
+      <div class="fact">
+        <h2 lang="es">Sin cuentas</h2>
+        <h2 lang="en">No accounts</h2>
+        <p lang="es">Quien recibe el link lo abre en su navegador, sin registrarse.</p>
+        <p lang="en">Whoever gets the link opens it in a browser, with no sign-up.</p>
+      </div>
+      <div class="fact">
+        <h2 lang="es">Tú decides cuánto dura</h2>
+        <h2 lang="en">You decide how long</h2>
+        <p lang="es">Hasta 15 días sin actividad, y puedes dejar de compartir cuando quieras.</p>
+        <p lang="en">Up to 15 days without activity, and you can stop sharing at any time.</p>
+      </div>
+    </section>
+
+    <p class="caveat" lang="es">
+      Hay excepciones: con una denuncia seria o una orden, un documento deja de servirse y puede guardarse hasta 180 días
+      o lo que la orden pida, y quien denuncia puede hacerle llegar el link al operador. Los detalles están en la
+      <a href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/PRIVACIDAD.md">política de privacidad</a>.
+    </p>
+    <p class="caveat" lang="en">
+      There are exceptions: after a serious report or an order, a document stops being served and may be kept up to 180
+      days or what the order asks, and whoever reports it can get the link to the operator. The details are in the
+      <a href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/PRIVACY.md">privacy policy</a>.
+    </p>
+
+    <footer class="bottom">
+      <a href="https://www.tisty.app/es/" lang="es">Tisty</a>
+      <a href="https://www.tisty.app/" lang="en">Tisty</a>
+      <a href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/PRIVACIDAD.md" lang="es">Privacidad</a>
+      <a href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/PRIVACY.md" lang="en">Privacy</a>
+      <a href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/TERMINOS.md" lang="es">Términos</a>
+      <a href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/TERMS.md" lang="en">Terms</a>
+      <a href="https://github.com/rgdevment/Folio-by-Tisty" lang="es">Código</a>
+      <a href="https://github.com/rgdevment/Folio-by-Tisty" lang="en">Code</a>
+    </footer>
+  </body>
+</html>
