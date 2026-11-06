@@ -258,6 +258,7 @@ const drawActions = (): void => {
   const edit = element<HTMLAnchorElement>("edit-in-tisty");
   edit.href = `tisty://edit?link=${encodeURIComponent(location.href)}`;
   offerTisty(edit);
+  element("print").addEventListener("click", () => window.print());
 };
 
 let opener: HTMLElement | null = null;

@@ -244,6 +244,13 @@ describe("a link that lets someone edit", () => {
     draw(HELD);
   });
 
+  it("prints from its button", () => {
+    const printing = vi.fn();
+    place.print = printing;
+    place.document.getElementById("print")?.click();
+    expect(printing).toHaveBeenCalledOnce();
+  });
+
   it("offers no button to pass the link on, which is its author's to share", () => {
     expect(place.document.getElementById("copy-link")).toBeNull();
     expect(place.document.body.textContent).not.toContain("Copiar link");

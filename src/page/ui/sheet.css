@@ -480,6 +480,11 @@ svg[data-theme="dark"],
 
 /* Paper is light, whichever theme the screen was in. */
 @media print {
+  .sheet {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
   :host([data-theme="dark"]) svg[data-theme="dark"] {
     display: none;
   }
