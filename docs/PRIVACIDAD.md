@@ -7,8 +7,8 @@
 Folio guarda lo mínimo para funcionar, y casi todo va cifrado con una
 llave que nunca recibe. No hay cuentas, ni cookies, ni analítica, ni anuncios,
 ni nada de terceros en la página. Lo que guarda caduca solo, salvo la parte
-pública de tu llave y las llaves que retiraste. Esta política cuenta exactamente
-qué guarda, por qué y por cuánto tiempo.
+pública de tu llave y las llaves que retiraste; el operador borra sus correos a
+mano. Esta política cuenta exactamente qué guarda, por qué y por cuánto tiempo.
 
 Quién responde por estos datos: Mario, persona natural en Chile, que opera
 Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
@@ -31,9 +31,11 @@ Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 | Tu llave pública sola, y el día en que Folio la vio por primera vez, sin relación con ninguna red ni documento | Que los topes y la reputación sigan con ella, y que una llave nueva parta con los más bajos | Para siempre, aunque tus documentos ya no estén |
 | Cuántas veces se leyó, contando una vez por día y por visitante | Mostrarte las lecturas en Tisty | Lo mismo que el documento |
 | Una línea por cada lectura servida: el id del link (sin su llave, así que no abre nada), el país y el centro de datos de Cloudflare, nunca tu IP | Saber cuánto se lee cada documento y desde dónde, y dimensionar el servicio | Hasta 7 días, en los registros de Workers de Cloudflare |
-| Un resumen de tu IP (un HMAC con una llave que cambia) | Topes por IP y bloqueos ante abuso | Lo que dura la cuota o el bloqueo |
+| Un resumen de tu IP (un HMAC con una llave que cambia) | Topes por IP y bloqueos ante abuso | Lo que dura la cuota o el bloqueo, y hasta un día más |
 | Una copia diaria de la base de datos, cifrada con una llave guardada fuera de línea, sin los resúmenes de lectura del día ni los cupos, y sin los documentos | Recuperarse de una falla | 30 días, en GitHub |
 | Lo que el operador hizo con un documento y por qué, también abrirlo: su id, la acción y el motivo | Poder responder por ello después | 180 días |
+| Un resumen por correo al operador, hasta dos veces al día: el id de los links denunciados, bloqueados o reclamados, la categoría y cuántas redes denunciaron, nunca una llave, una IP o el contenido | Avisarle qué revisar | Hasta 180 días, o más si una orden lo pide, en su buzón de Migadu |
+| Lo que le escribes al operador por correo, con tu dirección | Responderte | Hasta 180 días desde el último mensaje, o más si una orden lo pide, en su buzón de Migadu |
 | Las llaves que retiraste, como las firmó tu raíz: la parte pública de la llave y la de tu raíz | Para que quien lea sepa que una llave robada o retirada ya no habla por ti | Para siempre, porque quien lea siempre tiene que poder saberlo |
 | Las denuncias: categoría, detalle y versión denunciada, en claro; si lo dejaron el link, sellado para que solo el operador lo abra; y un resumen de la red de quien denuncia (un HMAC con una llave que cambia cada 180 días), para que cada red denuncie una sola vez | Moderar y enviarlas a quien corresponde | 180 días, o más si una orden lo pide. Si se acepta un reclamo contra la denuncia, el resumen de esa red queda 180 días desde entonces, para que deje de contar |
 
@@ -46,7 +48,7 @@ descarta al terminar el día. Su llave cambia cada día y no se guarda. La base 
 datos conserva su propia copia hasta por 30 días, para recuperarse de una falla,
 y el resumen sigue ahí hasta entonces; nunca entra en los respaldos.
 
-## Cloudflare
+## Cloudflare y otros proveedores
 
 Folio corre en Cloudflare (Workers, D1 y R2). Cloudflare recibe tu IP y
 las peticiones al conectarte, como cualquier servidor web, y las trata según su
@@ -56,6 +58,20 @@ Nunca recibe la llave del `#`, así que tampoco puede leer lo que compartes.
 La página de `folio.tisty.app` solo explica qué es Folio. Son archivos fijos: no
 guarda nada de ti, ni en el servidor ni en tu navegador. Cloudflare también
 recibe tu IP y tus peticiones al visitarla.
+
+También participan otros tres, cada uno con su propia política:
+
+- **[Migadu](https://www.migadu.com/privacy/)** lleva y guarda el correo del
+  operador, con lo que dice la tabla de arriba.
+- **[GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)**
+  guarda las copias de la base de datos, cifradas con una llave que no tiene.
+  Tisty también le pide los límites y los términos antes de compartir, así que
+  GitHub recibe la IP de quien va a compartir.
+- **[Healthchecks.io](https://healthchecks.io/privacy/)** recibe una señal cuando
+  termina cada tarea programada, para avisar si deja de llegar. No lleva datos
+  de nadie.
+
+Estos proveedores operan fuera de Chile, así que lo que reciben sale del país.
 
 ## La promesa del cifrado, dicha con honestidad
 
@@ -75,7 +91,10 @@ Bajo la Ley 21.719 puedes pedir saber qué datos tuyos hay, corregirlos,
 borrarlos u oponerte a su uso. Como no hay cuentas, lo más directo es:
 
 - **Borrar lo que compartiste:** con tu link de administración, o dejando de
-  compartirlo desde Tisty. Se borra del servidor de inmediato.
+  compartirlo desde Tisty. Deja de servirse de inmediato y se borra del servidor
+  en la siguiente limpieza, normalmente antes de una hora; durante un bloqueo por
+  gasto o una falla puede tardar más. Una denuncia seria o una orden pueden
+  obligar a conservarlo.
 - **Cualquier otra petición:** escribe a <rgdevment@tisty.app>. El resumen de
   tu IP no permite saber quién eres, así que en general no hay datos que
   puedan asociarse a ti.

@@ -46,7 +46,8 @@ There is no company behind it and nobody makes money from it. Contact:
 ## Its code
 
 It is being written again from scratch in TypeScript, on Cloudflare Workers, D1
-and R2, and the service is not running while that happens. It speaks to the
+and R2, and the service is not open yet: [folio.tisty.app](https://folio.tisty.app)
+says what it is. It speaks to the
 [Tisty app](https://github.com/rgdevment/Tisty) through a contract that the
 app's repository keeps: the formats of what travels and the style rules of a
 page. The earlier code, in Rust, stays in the `chore/rust-service-backup`
