@@ -6,7 +6,7 @@ interface Env {
   DB: D1Database;
   ACCESS_TEAM: string;
   ACCESS_AUDIENCE: string;
-  OPERATOR_EMAIL: string;
+  OPERATOR_EMAIL?: string;
 }
 
 export default {
@@ -14,7 +14,7 @@ export default {
     try {
       return await answer(request, {
         moderation: new CloudModeration(env.DB),
-        access: { team: env.ACCESS_TEAM, audience: env.ACCESS_AUDIENCE, email: env.OPERATOR_EMAIL },
+        access: { team: env.ACCESS_TEAM, audience: env.ACCESS_AUDIENCE, email: env.OPERATOR_EMAIL ?? "" },
         certs: certsFrom(env.ACCESS_TEAM),
         now: Date.now(),
       });
