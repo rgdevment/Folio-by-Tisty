@@ -1,0 +1,123 @@
+:root {
+  color-scheme: light dark;
+  --ink: #1d1d1f;
+  --soft: #57575c;
+  --line: rgb(0 0 0 / 0.16);
+  --page: #fbfbfd;
+  --sheet: #ffffff;
+  --danger: #c62f45;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #f2f2f7;
+    --soft: #adadb4;
+    --line: rgb(255 255 255 / 0.2);
+    --page: #1c1c1e;
+    --sheet: #232326;
+    --danger: #ff7a8a;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font:
+    15px / 1.5 system-ui,
+    sans-serif;
+}
+
+.panel {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+h2 {
+  margin: 28px 0 8px;
+  font-size: 16px;
+}
+
+.said {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--soft);
+}
+
+.card {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  background: var(--sheet);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.card.is-grave {
+  border-color: var(--danger);
+}
+
+.card-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.card-line {
+  margin: 0 0 4px;
+  color: var(--soft);
+  overflow-wrap: anywhere;
+}
+
+.sealed {
+  display: block;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+  font:
+    12px / 1.4 ui-monospace,
+    monospace;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+button {
+  padding: 6px 12px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.is-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.block-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+input {
+  display: block;
+  padding: 6px 8px;
+  background: var(--sheet);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  font: inherit;
+}

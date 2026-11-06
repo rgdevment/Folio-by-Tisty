@@ -30,7 +30,7 @@
     "test": "vitest run",
     "typecheck": "tsc && tsc -p tsconfig.page.json",
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && vite build --config vite.admin.config.ts",
     "budget": "node scripts/budget.mjs",
     "lint": "biome check .",
     "format": "biome check . --write",

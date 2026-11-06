@@ -23,6 +23,7 @@ import type {
   Version,
 } from "../core/store";
 import { keptVersions } from "../core/versions";
+import { acceptAppeal } from "./moderation";
 
 // Two rows by their key at most: the machine that signed the last version and its owner's, the start of owner_mark.
 const REVOCATIONS_OF_THE_LAST_VERSION = `(
@@ -689,30 +690,8 @@ export class Cloud implements Store {
     return "review";
   }
 
-  async appealAccepted(id: string, today: number): Promise<void> {
-    await this.#db.batch([
-      // Who reported it stops counting for a while, and the reports stay as a record.
-      this.#db
-        .prepare(
-          `INSERT INTO false_reporters (net, at)
-           SELECT net, ?2 FROM reports
-           WHERE doc = ?1 AND cleared = 0 AND EXISTS (SELECT 1 FROM docs WHERE id = ?1 AND blocked_at IS NOT NULL)
-           ON CONFLICT (net) DO UPDATE SET at = excluded.at`,
-        )
-        .bind(id, today),
-      this.#db
-        .prepare(
-          "UPDATE reports SET cleared = 1 WHERE doc = ?1 AND EXISTS (SELECT 1 FROM docs WHERE id = ?1 AND blocked_at IS NOT NULL)",
-        )
-        .bind(id),
-      this.#db
-        .prepare(
-          `UPDATE docs SET blocked_at = NULL, appealed_at = NULL, blocked_hour = NULL, appealed_hour = NULL, fix_by = NULL,
-             dies_on = CASE WHEN paused_at IS NULL THEN ?1 + ttl_days ELSE paused_at + ?2 END
-           WHERE id = ?3 AND blocked_at IS NOT NULL`,
-        )
-        .bind(today, this.#limits.pausedDays, id),
-    ]);
+  appealAccepted(id: string, today: number): Promise<void> {
+    return acceptAppeal(this.#db, this.#limits, id, today);
   }
 
   async pause(id: string, today: number): Promise<void> {

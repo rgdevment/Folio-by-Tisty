@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Panel de Folio</title>
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body>
+    <main id="panel" class="panel">
+      <h1>Panel de Folio</h1>
+      <p id="said" class="said" role="status">Cargando…</p>
+      <section aria-labelledby="state-title">
+        <h2 id="state-title">Estado</h2>
+        <p id="state"></p>
+      </section>
+      <section aria-labelledby="appeals-title">
+        <h2 id="appeals-title">Reclamos que esperan</h2>
+        <div id="appeals"></div>
+      </section>
+      <section aria-labelledby="reports-title">
+        <h2 id="reports-title">Denuncias</h2>
+        <div id="reports"></div>
+      </section>
+      <section aria-labelledby="blocked-title">
+        <h2 id="blocked-title">Bloqueados</h2>
+        <div id="blocked"></div>
+      </section>
+      <section aria-labelledby="block-title">
+        <h2 id="block-title">Bloquear un documento</h2>
+        <form id="block-form" class="block-form">
+          <label>Id <input id="block-id" required pattern="[A-Za-z0-9]{8}" autocomplete="off" /></label>
+          <label>Motivo <input id="block-note" required maxlength="500" autocomplete="off" /></label>
+          <button type="submit">Bloquear</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

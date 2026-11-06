@@ -48,4 +48,5 @@ jobs:
       - run: npm run budget
       # Without a token: it bundles the Worker and reads wrangler.toml as a deploy would, and uploads nothing.
       - run: npx --no-install wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker"
+      - run: npx --no-install wrangler deploy --dry-run --config wrangler.admin.toml --outdir "$RUNNER_TEMP/admin"
       - run: npm test
