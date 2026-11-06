@@ -20,7 +20,7 @@ interface Env extends Bindings, SpendBindings, MailBindings {
   FOLIO_TAG?: string;
 }
 
-const WEEKLY = "0 4 * * 0";
+const WEEKLY = "0 4 * * SUN";
 const SPEND = "*/15 * * * *";
 const DIGEST = "0 0,12 * * *";
 const dayKeys = new DayKeys();
