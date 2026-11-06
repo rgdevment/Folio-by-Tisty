@@ -3,8 +3,9 @@
 [English](SECURITY.md)
 
 Cubre el servicio Folio: sus links en tisty.cl, su API bajo
-`/api/v1/`, la página que lee un link y el formato del sobre que hablan la app y
-el servidor. La app Tisty tiene su propia [política de seguridad](https://github.com/rgdevment/Tisty/blob/main/SECURITY.md).
+`/api/v1/`, la página que lee un link, el panel del operador, la página de
+folio.tisty.app y el formato del sobre que hablan la app y el servidor.
+La app Tisty tiene su propia [política de seguridad](https://github.com/rgdevment/Tisty/blob/main/SECURITY.md).
 
 ## Reportar una vulnerabilidad
 
@@ -45,6 +46,10 @@ amenazas legales.
   compartido y leer tienen un freno de velocidad por red, y subir tiene un cupo
   por red y una espera por persona. Una red trae solo unas pocas llaves nuevas al
   día, y una llave nueva parte con los topes más bajos.
+- **El panel del operador va aparte.** Es otro Worker, en panel.tisty.cl, sin
+  acceso al almacenamiento de los documentos ni a sus llaves, así que no puede
+  abrir nada. Está detrás de Cloudflare Access, comprueba de nuevo su token y
+  rechaza a todos si falta algo. Cada acción queda registrada.
 
 ## Qué no protege
 

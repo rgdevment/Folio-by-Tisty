@@ -26,7 +26,8 @@ muestra: los documentos se editan en Tisty, nunca aquí.
 ## Qué cubren
 
 El servicio que guarda y sirve los documentos compartidos, en
-tisty.cl, y la página donde se leen en un navegador.
+tisty.cl, la página donde se leen en un navegador y la página que explica Folio,
+en folio.tisty.app.
 La app Tisty tiene sus propios [términos](https://github.com/rgdevment/Tisty/blob/main/TERMS.md).
 
 ## Cómo funciona
@@ -125,7 +126,8 @@ mientras siga compartido.
 
 Folio se ofrece «tal cual», sin garantías de ningún tipo, como también dice su
 [licencia](../LICENSE). Puede caerse, perder lo que guarda, cambiar sus
-topes o dejar de existir, avisando cuando sea posible. Por eso tu documento
+topes, dejar de aceptar documentos o de responder por un tiempo al llegar a su
+límite de gasto, o dejar de existir, avisando cuando sea posible. Por eso tu documento
 nunca deja de estar en tu Tisty.
 
 ## Responsabilidad

@@ -26,7 +26,8 @@ receives and shows: documents are edited in Tisty, never here.
 ## What they cover
 
 The service that stores and serves shared documents, at
-tisty.cl, and the page where they are read in a browser.
+tisty.cl, the page where they are read in a browser and the page that explains
+Folio, at folio.tisty.app.
 The Tisty app has [terms of its own](https://github.com/rgdevment/Tisty/blob/main/TERMS.md).
 
 ## How it works
@@ -127,7 +128,8 @@ for as long as it stays shared.
 
 Folio is provided "as is", without warranty of any kind, as its
 [licence](../LICENSE) also says. It may go down, lose what it keeps, change its
-limits or cease to exist, with notice where possible. That is why your
+limits, stop taking documents or answering for a while on reaching its spending
+limit, or cease to exist, with notice where possible. That is why your
 document never leaves your Tisty.
 
 ## Liability

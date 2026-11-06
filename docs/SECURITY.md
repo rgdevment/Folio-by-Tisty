@@ -3,8 +3,9 @@
 [Español](SEGURIDAD.md)
 
 This covers the Folio service: its links at tisty.cl, its API under
-`/api/v1/`, the page that reads a link, and the envelope format both the app and
-the server speak. The Tisty app has a [security policy of its own](https://github.com/rgdevment/Tisty/blob/main/SECURITY.md).
+`/api/v1/`, the page that reads a link, the operator's panel, the page at
+folio.tisty.app, and the envelope format both the app and the server speak.
+The Tisty app has a [security policy of its own](https://github.com/rgdevment/Tisty/blob/main/SECURITY.md).
 
 ## Reporting a vulnerability
 
@@ -44,6 +45,10 @@ be met with legal threats.
   have a speed limit per network, and uploading has a quota per network and a
   wait per person. A network brings only a few new keys a day, and a new key
   starts from the lowest limits.
+- **The operator's panel stands apart.** It is another Worker, at panel.tisty.cl,
+  with no access to where documents are stored or to their keys, so it cannot open
+  anything. It sits behind Cloudflare Access, checks its token again, and refuses
+  everyone if anything is missing. Every action is logged.
 
 ## What it does not protect
 
