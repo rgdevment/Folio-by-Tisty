@@ -3,8 +3,9 @@ const NOTE_CHARACTERS_AT_MOST = 400;
 const NOTE_LINES_AT_MOST = 6;
 const UNSEEN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/u;
 const LINK = /\[([^\]\n]*)\]\(([^)\n]*)\)/g;
-const LINK_ADDRESS = /^https:\/\/([a-z0-9.-]+)(?:[/?#][^\s\\]*)?$/i;
-const FORMATTED = /\*\*|__|<\/?[a-z]|^#{1,6}\s|^\s*(?:[-*+]|\d+\.)\s/im;
+const LINK_ADDRESS = /^https:\/\/([a-z0-9.-]+)(?:[/?#][^\s\\()]*)?$/;
+const FORMATTED =
+  /\*\*|__|~~|`|\*[^*\n]+\*|(?:^|\s)_[^_\n]+_(?:\s|$)|<\/?[a-z]|^#{1,6}\s|^\s*>\s|^\s*(?:[-*+]|\d+\.)\s/im;
 const LINE_TISTY_ADDS = /(?:conoce más en|learn more at) folio\.tisty\.app/i;
 
 const isLinkHost = (host: string): boolean =>
@@ -12,7 +13,7 @@ const isLinkHost = (host: string): boolean =>
 
 const linkFaults = (text: string): string[] =>
   [...text.matchAll(LINK)].flatMap(([, label, address]) => {
-    const host = LINK_ADDRESS.exec(address ?? "")?.[1]?.toLowerCase();
+    const host = LINK_ADDRESS.exec(address ?? "")?.[1];
     if (!label?.trim()) return [`has a link with no text: ${address}`];
     return host && isLinkHost(host) ? [] : [`links where Tisty would not: ${address}`];
   });

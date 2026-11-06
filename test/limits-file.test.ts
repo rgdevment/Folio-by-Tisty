@@ -117,7 +117,6 @@ describe("the sharing fields", () => {
     ["tisty.app", "https://tisty.app"],
     ["its subdomains", "https://folio.tisty.app/a?b=c#d"],
     ["tisty.cl", "https://tisty.cl/a"],
-    ["a name in capitals", "https://TISTY.app/"],
   ])("take a link to %s", (_where, address) => {
     expect(closedWith(`[a](${address})`)).toEqual([]);
   });
@@ -132,6 +131,9 @@ describe("the sharing fields", () => {
     ["a user", "https://user@tisty.app/"],
     ["a user hidden by a backslash", "https://tisty.app\\@example.com"],
     ["no address", ""],
+    ["a scheme in capitals", "HTTPS://tisty.app"],
+    ["a name in capitals", "https://TISTY.app/"],
+    ["parentheses in its address", "https://tisty.app/a(b)c"],
   ])("refuse a link with %s", (_what, address) => {
     expect(closedWith(`[a](${address})`)[0]).toContain("links where Tisty would not");
   });
@@ -143,6 +145,11 @@ describe("the sharing fields", () => {
 
   it.each([
     ["bold", "**a**"],
+    ["italics", "*a*"],
+    ["italics with underscores", "_a_"],
+    ["strikethrough", "~~a~~"],
+    ["code", "`a`"],
+    ["a quote", "> a"],
     ["a title", "# a"],
     ["a list", "a\n- b"],
     ["a numbered list", "1. a"],
@@ -155,6 +162,10 @@ describe("the sharing fields", () => {
 
   it("leave alone a link whose address looks like formatting", () => {
     expect(closedWith("[a](https://tisty.app/a__b)")).toEqual([]);
+  });
+
+  it("leave alone what only looks a little like formatting", () => {
+    expect(closedWith("3 * 4 = 12, a_b y 5 > 4")).toEqual([]);
   });
 
   it.each([
