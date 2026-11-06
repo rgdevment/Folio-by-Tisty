@@ -6,7 +6,7 @@ import { netDigest } from "./net";
 import type { ReadTools } from "./read";
 import { askForProof, type Refused, tooFast } from "./refused";
 import { hourEnds, hourOf, proofIsFresh, startHolds, toBase64Url, tokenHash } from "./start";
-import type { Created, Held, Uploaded } from "./store";
+import type { AcceptedTerms, Created, Held, Uploaded } from "./store";
 import { listFreesAt, uploadAllowedAt } from "./versions";
 
 export interface FirstUpload {
@@ -28,7 +28,11 @@ export interface Uploading {
 
 export interface UploadTools extends ReadTools {
   sharingOpen: boolean;
+  termsVersion: string;
 }
+
+const termsRefused = ({ terms }: Envelope, { termsVersion }: UploadTools): Refused | null =>
+  terms !== undefined && BigInt(terms) >= BigInt(termsVersion) ? null : { refused: "terms", version: termsVersion };
 
 export type UploadAnswer = { stored: true; version: number; filesWanted?: true } | Refused;
 
@@ -114,7 +118,7 @@ const share = async (
 };
 
 interface KeyAdmission {
-  admit(roots: string[]): Promise<Refused | null>;
+  admit(roots: string[], accepted: AcceptedTerms): Promise<Refused | null>;
   keep(): Promise<void>;
   giveBack(): Promise<void>;
 }
@@ -122,18 +126,21 @@ interface KeyAdmission {
 // The slot is taken first so parallel requests cannot pass the day's top, and returned unless a version is stored.
 const keyAdmission = (net: string, today: number, { store }: ReadTools): KeyAdmission => {
   let fresh: string[] = [];
+  let toWrite: AcceptedTerms | undefined;
   return {
-    admit: async (roots) => {
+    admit: async (roots, accepted) => {
       for (const root of new Set(roots)) {
-        const admitted = await store.admitKey(root, net, today);
-        if (admitted === "full") return { refused: "quota", until: (today + 1) * DAY_MS };
-        if (admitted === "new") fresh.push(root);
+        const { said, terms } = await store.admitKey(root, net, today);
+        if (said === "full") return { refused: "quota", until: (today + 1) * DAY_MS };
+        if (said === "new") fresh.push(root);
+        if (root === accepted.root && terms !== accepted.version) toWrite = accepted;
       }
       return null;
     },
     keep: async () => {
-      await store.keepKeys(fresh, today);
+      await store.keepKeys(fresh, today, toWrite);
       fresh = [];
+      toWrite = undefined;
     },
     giveBack: async () => {
       if (fresh.length > 0) await store.giveKeysBack(fresh.length, net, today);
@@ -214,9 +221,12 @@ const storeVersion = async (
     return { stored: true, version: manifest.version };
   }
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
+  const noTerms = termsRefused(manifest, tools);
+  if (noTerms) return noTerms;
+  const accepted = { root: signature.root, version: manifest.terms as string, at: now };
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
-    const full = await keys.admit([(manifest.owner as Owner).root, signature.root]);
+    const full = await keys.admit([(manifest.owner as Owner).root, signature.root], accepted);
     if (full) return full;
     const refused = await share(uploading, sharing, read, net, tools);
     if (refused) return refused;
@@ -232,7 +242,7 @@ const storeVersion = async (
   const allowedAt = uploadAllowedAt(held.versions, signature.root, now, limits);
   if (allowedAt > now) return { refused: "slow", until: allowedAt };
   if (!sharing) {
-    const full = await keys.admit([signature.root]);
+    const full = await keys.admit([signature.root], accepted);
     if (full) return full;
   }
   if (!(await store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour))) {
@@ -284,7 +294,7 @@ export const uploadDoc = async (uploading: Uploading, tools: UploadTools): Promi
   return arrived ? answer : { ...answer, filesWanted: true };
 };
 
-export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promise<FilesUploadAnswer> => {
+export const uploadFiles = async (uploading: Uploading, tools: UploadTools): Promise<FilesUploadAnswer> => {
   const { id, now } = uploading;
   const { store, limits } = tools;
   const net = await netIfOpen(uploading, tools);
@@ -303,6 +313,8 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
   const floor = limits.oldestContractTaken;
   if (floor !== null && isBelowVersion(manifest.contract, floor)) return { refused: "outdated" };
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
+  const noTerms = termsRefused(manifest, tools);
+  if (noTerms) return noTerms;
   if (!mayUpload(read, held)) return { refused: "not_yours" };
 
   const hash = toBase64Url(await sha256(manifestBytes, index));

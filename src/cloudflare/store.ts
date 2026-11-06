@@ -3,11 +3,13 @@ import { DAY_MS, LEVEL_ONE, type Limits, levelOfReport } from "../core/limits";
 import { momentOf } from "../core/moment";
 import { toBase64Url } from "../core/start";
 import type {
+  AcceptedTerms,
   Admitted,
   Appealed,
   Created,
   Held,
   KeptFiles,
+  KeyAdmitted,
   NewDoc,
   News,
   Owned,
@@ -367,9 +369,12 @@ export class Cloud implements Store {
     return taken.meta.changes > 0;
   }
 
-  async admitKey(root: string, net: string, today: number): Promise<"known" | "new" | "full"> {
-    const known = await this.#db.prepare("SELECT 1 FROM keys WHERE root = ?").bind(root).first();
-    if (known) return "known";
+  async admitKey(root: string, net: string, today: number): Promise<KeyAdmitted> {
+    const known = await this.#db
+      .prepare("SELECT terms_version FROM keys WHERE root = ?")
+      .bind(root)
+      .first<{ terms_version: string | null }>();
+    if (known) return { said: "known", terms: known.terms_version };
     const taken = await this.#db
       .prepare(
         `INSERT INTO net_day (day, net, docs, bytes, keys) VALUES (?1, ?2, 0, 0, 1)
@@ -377,16 +382,25 @@ export class Cloud implements Store {
       )
       .bind(today, net, this.#limits.newKeysADay)
       .run();
-    return taken.meta.changes === 0 ? "full" : "new";
+    return { said: taken.meta.changes === 0 ? "full" : "new", terms: null };
   }
 
-  async keepKeys(roots: string[], today: number): Promise<void> {
-    if (roots.length === 0) return;
-    await this.#db.batch(
-      roots.map((root) =>
-        this.#db.prepare("INSERT OR IGNORE INTO keys (root, first_day) VALUES (?, ?)").bind(root, today),
-      ),
+  async keepKeys(roots: string[], today: number, accepted?: AcceptedTerms): Promise<void> {
+    const others = roots.filter((root) => root !== accepted?.root);
+    const statements = others.map((root) =>
+      this.#db.prepare("INSERT OR IGNORE INTO keys (root, first_day) VALUES (?, ?)").bind(root, today),
     );
+    if (accepted) {
+      statements.push(
+        this.#db
+          .prepare(
+            `INSERT INTO keys (root, first_day, terms_version, terms_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (root) DO UPDATE SET terms_version = ?3, terms_at = ?4`,
+          )
+          .bind(accepted.root, today, accepted.version, accepted.at),
+      );
+    }
+    if (statements.length > 0) await this.#db.batch(statements);
   }
 
   async giveKeysBack(count: number, net: string, today: number): Promise<void> {

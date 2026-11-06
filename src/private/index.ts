@@ -1,3 +1,4 @@
+import SIGNED_LIMITS from "../../docs/limits.json";
 import { type MailBindings, sendMail } from "../cloudflare/mail";
 import { CloudSpend, type SpendBindings } from "../cloudflare/spend";
 import { type Bindings, Cloud } from "../cloudflare/store";
@@ -50,6 +51,7 @@ export default {
         limits: LEVEL_ONE,
         secret: env.FOLIO_SECRET,
         sharingOpen: env.SHARING_OPEN === "true",
+        termsVersion: SIGNED_LIMITS.terms.version,
         limiter: { allows: async (key) => (await env.READS.limit({ key })).success },
         syncLimiter: { allows: async (key) => (await env.SYNCS.limit({ key })).success },
         dayKey: (today) => dayKeys.of(today, (day) => store.dayKey(day)),

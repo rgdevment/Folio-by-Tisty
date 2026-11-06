@@ -251,6 +251,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BadEnvelope" }
+        "428":
+          description: |
+            Whoever signs has not accepted the terms in force: its manifest's `terms` is missing or older. Nothing was
+            kept. Accept the version it names, as `docs/limits.json` says it, and send it again.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TermsNotAccepted" }
         "426":
           description: Written under a contract older than the oldest the server takes. Tisty sends it again.
           content:
@@ -337,6 +344,13 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BadEnvelope" }
+        "428":
+          description: |
+            Whoever signs has not accepted the terms in force: its manifest's `terms` is missing or older. Nothing was
+            kept. Accept the version it names, as `docs/limits.json` says it, and send it again.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TermsNotAccepted" }
         "426":
           description: Written under a contract older than the oldest the server takes.
           content:
@@ -720,6 +734,12 @@ components:
       required: [refused]
       properties:
         refused: { const: outdated }
+    TermsNotAccepted:
+      type: object
+      required: [refused, version]
+      properties:
+        refused: { const: terms }
+        version: { type: string, pattern: "^[0-9]{1,16}$" }
     UploadsOff:
       type: object
       required: [refused]

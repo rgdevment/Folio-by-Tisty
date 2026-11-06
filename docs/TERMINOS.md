@@ -27,7 +27,8 @@ muestra: los documentos se editan en Tisty, nunca aquí.
 
 El servicio que guarda y sirve los documentos compartidos, en
 tisty.cl, la página donde se leen en un navegador y la página que explica Folio,
-en folio.tisty.app.
+en folio.tisty.app. Hoy Folio solo comparte en privado: si llega una forma
+pública, tendrá sus propias reglas, y Tisty te pedirá aceptarlas antes de usarla.
 La app Tisty tiene sus propios [términos](https://github.com/rgdevment/Tisty/blob/main/TERMS.md).
 
 ## Cómo funciona
@@ -51,7 +52,9 @@ La app Tisty tiene sus propios [términos](https://github.com/rgdevment/Tisty/bl
 ## Tu llave y tu reputación
 
 - **Aceptas estos términos** la primera vez que compartes desde Tisty, y ahí
-  Tisty te explica lo básico.
+  Tisty te explica lo básico. Lo que firmas dice qué versión aceptaste, y Folio
+  guarda esa versión y la fecha junto a tu llave. Sin eso, Folio no acepta lo que
+  subes, venga de Tisty o de otro programa.
 - **Tu llave es lo que permite a Folio distinguirte.** Tisty firma lo que
   compartes con una llave tuya, y Folio guarda su parte pública para siempre,
   aunque tus documentos ya no estén. No dice quién eres. El nombre que eliges

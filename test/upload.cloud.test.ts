@@ -37,6 +37,7 @@ const tools = {
   limits: LIMITS,
   secret: SECRET,
   sharingOpen: true,
+  termsVersion: "2",
   limiter: { allows: async () => true },
   syncLimiter: { allows: async () => true },
   dayKey: async () => "a key for the day",
@@ -659,7 +660,7 @@ describe("an appeal that says someone else uploaded it", () => {
         at: DAYS(5),
         signer: rootOf(ana),
         machine: machineOf(ana),
-        contract: "1.4.3",
+        contract: "1.5.0",
         byOwner: false,
         permit: null,
         ownerMark: "late.mark",
@@ -745,6 +746,86 @@ describe("what stops a version", () => {
     await testEnv.DB.prepare("UPDATE docs SET paused_at = NULL, blocked_at = 1 WHERE id = ?").bind(id).run();
     expect(await send(id, await sealedEnvelope({ id, version: 2, owner: mario }), LATER)).toEqual({
       refused: "blocked",
+    });
+  });
+
+  describe("without the terms in force", () => {
+    const keyRow = (root: string) =>
+      testEnv.DB.prepare("SELECT terms_version, terms_at FROM keys WHERE root = ?")
+        .bind(root)
+        .first<{ terms_version: string | null; terms_at: number | null }>();
+    const rootOf = (person: Person): string => toBase64Url(person.rootBytes);
+    const sharingWith = async (terms: string) => {
+      const first = await started();
+      const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario, terms });
+      return { id: first.id, answer: await send(first.id, bytes, NOW, first) };
+    };
+
+    it.each([
+      ["says nothing of them", ""],
+      ["accepted an older version", "1"],
+    ])("refuses a new document that %s, names the version, and keeps nothing", async (_what, terms) => {
+      const fresh = await newPerson();
+      const first = await started();
+      const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: fresh, terms });
+      expect(await send(first.id, bytes, NOW, first)).toEqual({ refused: "terms", version: "2" });
+      expect(await row(first.id)).toBeNull();
+      expect(await keyRow(rootOf(fresh))).toBeNull();
+    });
+
+    it("compares versions as numbers", async () => {
+      const { answer } = await sharingWith("10");
+      expect(answer).toEqual({ stored: true, version: 1 });
+    });
+
+    it("takes a version newer than its own, while a deploy catches up with the signed file", async () => {
+      const { answer } = await sharingWith("3");
+      expect(answer).toEqual({ stored: true, version: 1 });
+    });
+
+    it("keeps the version and the time beside a new key", async () => {
+      const fresh = await newPerson();
+      const first = await started();
+      const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: fresh, terms: "2" });
+      expect(await send(first.id, bytes, NOW, first)).toEqual({ stored: true, version: 1 });
+      expect(await keyRow(rootOf(fresh))).toEqual({ terms_version: "2", terms_at: NOW });
+    });
+
+    it("writes nothing more while the version does not change", async () => {
+      const fresh = await newPerson();
+      const first = await started();
+      await send(first.id, await sealedEnvelope({ id: first.id, version: 1, owner: fresh, terms: "2" }), NOW, first);
+      const next = await sealedEnvelope({ id: first.id, version: 2, owner: fresh, terms: "2" });
+      expect(await send(first.id, next, LATER)).toEqual({ stored: true, version: 2 });
+      expect(await keyRow(rootOf(fresh))).toEqual({ terms_version: "2", terms_at: NOW });
+    });
+
+    it("writes the new version and its time when they change", async () => {
+      const fresh = await newPerson();
+      const first = await started();
+      await send(first.id, await sealedEnvelope({ id: first.id, version: 1, owner: fresh, terms: "2" }), NOW, first);
+      const next = await sealedEnvelope({ id: first.id, version: 2, owner: fresh, terms: "3" });
+      expect(await send(first.id, next, LATER)).toEqual({ stored: true, version: 2 });
+      expect(await keyRow(rootOf(fresh))).toEqual({ terms_version: "3", terms_at: LATER });
+    });
+
+    it("refuses the next version of what is shared when the terms moved on", async () => {
+      const id = await shared();
+      const next = await sealedEnvelope({ id, version: 2, owner: mario, terms: "1" });
+      expect(await send(id, next, LATER)).toEqual({ refused: "terms", version: "2" });
+    });
+
+    it("refuses a files envelope being sent without them, and does not store it", async () => {
+      const id = await shared();
+      const bytes = await sealedEnvelope({ id, version: 1, owner: mario, files: [8], terms: "1" });
+      const sent = await uploadFiles({ id, now: LATER, ip: "203.0.113.9", bytes: async () => bytes }, tools);
+      expect(sent).toEqual({ refused: "terms", version: "2" });
+    });
+
+    it("keeps reading what was shared under older terms", async () => {
+      const id = await shared();
+      const moved = { ...tools, termsVersion: "1000" };
+      expect(await readDoc({ id, ip: "203.0.113.9", now: LATER }, moved)).toMatchObject({ served: true });
     });
   });
 

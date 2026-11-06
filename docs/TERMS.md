@@ -27,7 +27,9 @@ receives and shows: documents are edited in Tisty, never here.
 
 The service that stores and serves shared documents, at
 tisty.cl, the page where they are read in a browser and the page that explains
-Folio, at folio.tisty.app.
+Folio, at folio.tisty.app. Today Folio only shares privately: if a public way
+arrives, it will have rules of its own, and Tisty will ask you to accept them
+before you use it.
 The Tisty app has [terms of its own](https://github.com/rgdevment/Tisty/blob/main/TERMS.md).
 
 ## How it works
@@ -52,7 +54,9 @@ The Tisty app has [terms of its own](https://github.com/rgdevment/Tisty/blob/mai
 ## Your key and your reputation
 
 - **You accept these terms** the first time you share from Tisty, and Tisty
-  explains the basics then.
+  explains the basics then. What you sign says which version you accepted, and
+  Folio keeps that version and the date beside your key. Without it, Folio does
+  not take what you upload, from Tisty or any other program.
 - **Your key is how Folio tells you apart.** Tisty signs what you share with a
   key of yours, and Folio keeps its public part for good, even after your
   documents are gone. It does not say who you are. The name you choose to show

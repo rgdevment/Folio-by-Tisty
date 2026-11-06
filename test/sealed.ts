@@ -84,7 +84,10 @@ interface Sealing {
   firstBytes?: number;
   from?: number;
   files?: number[];
+  terms?: string;
 }
+
+export const TERMS_ACCEPTED = "99";
 
 const ownerBlock = async ({ id, owner, permit, nameTag = new Uint8Array(32).fill(7) }: Sealing) => {
   const about = words("owner");
@@ -128,6 +131,7 @@ export const sealedEnvelope = async (sealing: Sealing): Promise<Bytes> => {
     firstBytes = 16,
     from,
     files,
+    terms = TERMS_ACCEPTED,
   } = sealing;
   const sizes: [string, boolean, number][] = files
     ? files.map((size) => ["file", false, size])
@@ -144,6 +148,7 @@ export const sealedEnvelope = async (sealing: Sealing): Promise<Bytes> => {
     version,
     ...(from === undefined ? {} : { from }),
     sealed: true,
+    ...(terms === "" ? {} : { terms }),
     head: b64(random(32)),
     commitment: b64(random(32)),
     owner: await ownerBlock(sealing),
