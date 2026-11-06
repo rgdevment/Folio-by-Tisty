@@ -33,7 +33,9 @@ served() {
 
   while IFS= read -r file; do
     if [ "$file" = index.html ]; then
-      compare "$file" -H 'Sec-Fetch-Mode: navigate' "$address/AAAAAAAA"
+      # As a browser asks, because Cloudflare adds its analytics script only for one.
+      compare "$file" -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' \
+        -H 'Accept: text/html,application/xhtml+xml' -H 'Sec-Fetch-Mode: navigate' "$address/AAAAAAAA"
     else
       compare "$file" "$address/$file"
     fi

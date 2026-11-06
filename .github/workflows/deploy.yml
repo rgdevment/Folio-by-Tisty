@@ -423,6 +423,19 @@ jobs:
           }
           export -f answers
           bash scripts/wait-for.sh "$PUBLIC_URL" 20 15 answers
+      # As a browser asks, because Cloudflare adds its analytics script only for one.
+      - name: It is served as written
+        run: |
+          set -uo pipefail
+          curl -s --max-time 10 -D "$RUNNER_TEMP/written-headers" -o "$RUNNER_TEMP/written-page" \
+            -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' \
+            -H 'Accept: text/html,application/xhtml+xml' -H 'Sec-Fetch-Mode: navigate' "$PUBLIC_URL/"
+          if grep -qsi '^cf-mitigated:' "$RUNNER_TEMP/written-headers"; then
+            echo "::warning::$PUBLIC_URL challenged this runner, so it was not compared"
+            exit 0
+          fi
+          cmp -s "$RUNNER_TEMP/written-page" src/public/page/index.html \
+            || { echo "::error::$PUBLIC_URL serves something else than src/public/page/index.html"; exit 1; }
 
   rollback:
     name: Put a version back

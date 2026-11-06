@@ -40,6 +40,10 @@ describe("the page's headers", () => {
 
   it("keep tisty.cl out of every search (decision 63)", () => {
     expect(HEADERS).toContain("X-Robots-Tag: noindex");
+    expect(HEADERS.match(/^ {2}Cache-Control: /gm)?.length).toBe(
+      HEADERS.match(/^ {2}Cache-Control: .*no-transform/gm)?.length,
+    );
+    expect(HEADERS).toContain("! Cache-Control");
     expect(read("src/page/public/robots.txt")).toContain("Disallow: /");
   });
 });

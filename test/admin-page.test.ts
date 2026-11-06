@@ -183,5 +183,6 @@ describe("the panel", () => {
     expect(headers).toContain("default-src 'none'");
     expect(headers).toContain("script-src 'self'");
     expect(headers).not.toContain("unsafe");
+    expect(headers).toContain("no-transform");
   });
 });
