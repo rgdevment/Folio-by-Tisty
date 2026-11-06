@@ -73,7 +73,10 @@ responsibility. You may not use Folio for:
 - **With three reports** of phishing, malware, a scam or something serious, from
   different places, the document is blocked: it is no longer served, but it is
   not deleted. Whoever shared it sees the block in their management link and
-  can appeal there.
+  can appeal there. If someone they let edit signed every version reported, the
+  appeal is accepted on its own, unless there is a report of child abuse: the
+  edit link stops working, the reports stay on record, and it stays blocked
+  until they send a version of their own.
 - **Reports of crimes go where they belong:** to the PDI (Chile's
   investigations police) or the public prosecutor, and phishing and malware
   also to Google Safe Browsing and Cloudflare. Copyright claims are made by the

@@ -45,6 +45,8 @@ export interface KeptFiles {
   net: string;
 }
 
+export type Appealed = "accepted" | "review";
+
 export interface Held {
   owner: string;
   permit: string | null;
@@ -54,6 +56,7 @@ export interface Held {
   versions: Version[];
   blocked: boolean;
   paused: boolean;
+  correctable: boolean;
 }
 
 export interface Reading {
@@ -103,6 +106,7 @@ export interface DocStatus {
   pausedAt: number | null;
   blockedAt: number | null;
   appealedAt: number | null;
+  mayCorrect: boolean;
   fixBy: number | null;
   readTotal: number;
   days: unknown;
@@ -145,7 +149,7 @@ export interface Store {
   takeHourly(net: string, action: string, hour: number, atMost: number, taking?: number): Promise<boolean>;
   report(report: Report, today: number, hour: number): Promise<Reported>;
   owned(id: string, today: number): Promise<Owned | null>;
-  appeal(id: string, today: number, hour: number): Promise<void>;
+  appeal(id: string, today: number, hour: number): Promise<Appealed>;
   appealAccepted(id: string, today: number): Promise<void>;
   pause(id: string, today: number): Promise<void>;
   resume(id: string, today: number): Promise<void>;

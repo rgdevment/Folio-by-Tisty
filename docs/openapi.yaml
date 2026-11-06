@@ -550,12 +550,23 @@ paths:
       operationId: appeal
       summary: Appeals a block, once per block.
       description: |
-        The operator is told. The block stays until the operator decides. If telling fails the answer
-        is `failed`, and the appeal can be sent again. Once it went, sending it again answers 409.
+        When someone other than the owner signed every version that counts toward the block, and no report
+        of child abuse stands, the appeal is accepted with nothing opened, and `claim` says `accepted`. The
+        edit link stops working, the reports stay on record, and the block stays until the owner uploads a
+        version with no permit, signed by the owner, which lifts it. Reports of earlier versions no longer
+        count toward a new block.
+
+        Anything else says `review`, and the operator is told. That block stays until the operator decides.
+        If telling fails the answer is `failed`, and the appeal can be sent again. Once it went, sending it
+        again answers 409.
       parameters:
         - $ref: "#/components/parameters/Admin"
       responses:
-        "200": { $ref: "#/components/responses/Done" }
+        "200":
+          description: The appeal was taken, and `claim` says how.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appealed" }
         "404": { $ref: "#/components/responses/Missing" }
         "409":
           description: Nothing is blocked, or this block was already appealed.
@@ -705,6 +716,12 @@ components:
       required: [done]
       properties:
         done: { const: true }
+    Appealed:
+      type: object
+      required: [done, claim]
+      properties:
+        done: { const: true }
+        claim: { type: string, enum: [accepted, review] }
     Report:
       type: object
       required: [category]
@@ -731,13 +748,16 @@ components:
       properties:
         status:
           type: object
-          required: [latest, diesOn, pausedAt, blockedAt, appealedAt, fixBy, readTotal, days]
+          required: [latest, diesOn, pausedAt, blockedAt, appealedAt, mayCorrect, fixBy, readTotal, days]
           properties:
             latest: { type: integer, description: The number of its latest version. }
             diesOn: { type: integer, description: "The last day it lives, in days since 1970." }
             pausedAt: { type: [integer, "null"] }
             blockedAt: { type: [integer, "null"] }
             appealedAt: { type: [integer, "null"] }
+            mayCorrect:
+              type: boolean
+              description: An appeal was accepted, and a version signed by the owner, with no permit, lifts the block.
             fixBy:
               type: [integer, "null"]
               description: "With light reports, the last day to send a new version. Past it the document is not served until one arrives."

@@ -402,18 +402,18 @@ describe("appealing", () => {
   it("is taken once per block", async () => {
     await share();
     await block();
-    expect(await appeal()).toEqual({ done: true });
+    expect(await appeal()).toEqual({ done: true, claim: "review" });
     expect(await appeal()).toEqual({ refused: "appealed" });
   });
 
   it("can appeal a new block on the same day an appeal was accepted", async () => {
     await share();
     await block();
-    expect(await appeal()).toEqual({ done: true });
+    expect(await appeal()).toEqual({ done: true, claim: "review" });
     await store.appealAccepted(ID, TODAY);
     expect(await appeal()).toEqual({ refused: "not_blocked" });
     await block();
-    expect(await appeal()).toEqual({ done: true });
+    expect(await appeal()).toEqual({ done: true, claim: "review" });
     expect(await appeal()).toEqual({ refused: "appealed" });
   });
 

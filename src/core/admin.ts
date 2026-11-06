@@ -3,7 +3,7 @@ import { netDigest } from "./net";
 import { type Refused, tooFast } from "./refused";
 import type { ReportTools } from "./report";
 import { hourOf, sameText, tokenHash } from "./start";
-import type { DocStatus, Store } from "./store";
+import type { Appealed, DocStatus, Store } from "./store";
 
 export type AdminAction = "status" | "pause" | "resume" | "stop" | "appeal" | "permit";
 
@@ -17,7 +17,7 @@ export interface Administering {
 }
 
 export type AdminTools = Pick<ReportTools, "store" | "limiter" | "dayKey">;
-export type AdminAnswer = { done: true } | { status: DocStatus } | Refused;
+export type AdminAnswer = { done: true; claim?: Appealed } | { status: DocStatus } | Refused;
 
 const CHANGES: Record<"pause" | "resume" | "stop", (store: Store, id: string, today: number) => Promise<void>> = {
   pause: (store, id, today) => store.pause(id, today),
@@ -34,8 +34,7 @@ const appeal = async (
 ): Promise<AdminAnswer> => {
   if (blockedAt === null) return { refused: "not_blocked" };
   if (appealedAt !== null) return { refused: "appealed" };
-  await store.appeal(id, today, hourOf(now));
-  return { done: true };
+  return { done: true, claim: await store.appeal(id, today, hourOf(now)) };
 };
 
 export const setPermitHolds = (said: unknown): said is { permit: string | null } => {
