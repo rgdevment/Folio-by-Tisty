@@ -23,6 +23,7 @@ import type {
   Version,
 } from "../core/store";
 import { keptVersions } from "../core/versions";
+import { acceptAppeal, mayCorrect } from "./moderation";
 
 // Two rows by their key at most: the machine that signed the last version and its owner's, the start of owner_mark.
 const REVOCATIONS_OF_THE_LAST_VERSION = `(
@@ -48,6 +49,7 @@ interface DocRow {
   blocked_at: number | null;
   paused_at: number | null;
   counts_from: number;
+  blocked_by_operator: number;
 }
 
 // A document being forgotten: nothing can move it on from here, and the sweep finishes it even after failing halfway.
@@ -205,7 +207,7 @@ export class Cloud implements Store {
              active_day = MAX(active_day, ?1),
              blocked_at = NULL, blocked_hour = NULL, appealed_at = NULL, appealed_hour = NULL
            WHERE id = ?5 AND latest = ?6 AND permit IS ?9
-             AND ((blocked_at IS NULL AND paused_at IS NULL) OR (?7 AND blocked_at IS NOT NULL AND counts_from = ?2))`,
+             AND ((blocked_at IS NULL AND paused_at IS NULL) OR (?7 AND blocked_at IS NOT NULL AND blocked_by_operator = 0 AND counts_from = ?2))`,
         )
         .bind(
           today,
@@ -274,7 +276,7 @@ export class Cloud implements Store {
       versions: JSON.parse(row.versions) as Version[],
       blocked: row.blocked_at !== null,
       paused: row.paused_at !== null,
-      correctable: row.blocked_at !== null && row.counts_from > row.latest,
+      correctable: mayCorrect(row),
     };
   }
 
@@ -346,7 +348,7 @@ export class Cloud implements Store {
   #row(id: string): Promise<DocRow | null> {
     return this.#db
       .prepare(
-        "SELECT owner, admin_hash, permit, owner_mark, anchor, latest, versions, blocked_at, paused_at, counts_from FROM docs WHERE id = ?",
+        "SELECT owner, admin_hash, permit, owner_mark, anchor, latest, versions, blocked_at, paused_at, counts_from, blocked_by_operator FROM docs WHERE id = ?",
       )
       .bind(id)
       .first<DocRow>();
@@ -638,7 +640,7 @@ export class Cloud implements Store {
   async owned(id: string, today: number): Promise<Owned | null> {
     const row = await this.#db
       .prepare(
-        `SELECT d.admin_hash, d.latest, d.dies_on, d.paused_at, d.blocked_at, d.appealed_at, d.counts_from, d.fix_by, d.read_total, d.days
+        `SELECT d.admin_hash, d.latest, d.dies_on, d.paused_at, d.blocked_at, d.appealed_at, d.counts_from, d.blocked_by_operator, d.fix_by, d.read_total, d.days
          FROM docs d LEFT JOIN docs a ON a.id = d.anchor
          WHERE d.id = ?1 AND d.latest <> ${CLAIMED} AND (d.blocked_at IS NOT NULL OR d.dies_on >= ?2
            OR (d.paused_at IS NULL AND a.latest <> ${CLAIMED} AND a.dies_on >= ?2))`,
@@ -652,6 +654,7 @@ export class Cloud implements Store {
         blocked_at: number | null;
         appealed_at: number | null;
         counts_from: number;
+        blocked_by_operator: number;
         fix_by: number | null;
         read_total: number;
         days: string;
@@ -665,7 +668,7 @@ export class Cloud implements Store {
         pausedAt: row.paused_at,
         blockedAt: row.blocked_at,
         appealedAt: row.appealed_at,
-        mayCorrect: row.blocked_at !== null && row.counts_from > row.latest,
+        mayCorrect: mayCorrect(row),
         fixBy: row.fix_by,
         readTotal: row.read_total,
         days: JSON.parse(row.days),
@@ -678,7 +681,7 @@ export class Cloud implements Store {
     const cleared = await this.#db
       .prepare(
         `UPDATE docs SET appealed_at = ?2, permit = NULL, counts_from = latest + 1
-         WHERE id = ?1 AND blocked_at IS NOT NULL AND appealed_at IS NULL
+         WHERE id = ?1 AND blocked_at IS NOT NULL AND appealed_at IS NULL AND blocked_by_operator = 0
            AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND r.category = 'csam' AND ${COUNTED_REPORT})
            AND EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND ${COUNTS_NOW})
            AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND ${COUNTS_NOW} AND ${SIGNED_BY_OWNER})`,
@@ -696,30 +699,8 @@ export class Cloud implements Store {
     return "review";
   }
 
-  async appealAccepted(id: string, today: number): Promise<void> {
-    await this.#db.batch([
-      // Who reported it stops counting for a while, and the reports stay as a record.
-      this.#db
-        .prepare(
-          `INSERT INTO false_reporters (net, at)
-           SELECT net, ?2 FROM reports
-           WHERE doc = ?1 AND cleared = 0 AND EXISTS (SELECT 1 FROM docs WHERE id = ?1 AND blocked_at IS NOT NULL)
-           ON CONFLICT (net) DO UPDATE SET at = excluded.at`,
-        )
-        .bind(id, today),
-      this.#db
-        .prepare(
-          "UPDATE reports SET cleared = 1 WHERE doc = ?1 AND EXISTS (SELECT 1 FROM docs WHERE id = ?1 AND blocked_at IS NOT NULL)",
-        )
-        .bind(id),
-      this.#db
-        .prepare(
-          `UPDATE docs SET blocked_at = NULL, appealed_at = NULL, blocked_hour = NULL, appealed_hour = NULL, fix_by = NULL,
-             dies_on = CASE WHEN paused_at IS NULL THEN ?1 + ttl_days ELSE paused_at + ?2 END
-           WHERE id = ?3 AND blocked_at IS NOT NULL`,
-        )
-        .bind(today, this.#limits.pausedDays, id),
-    ]);
+  appealAccepted(id: string, today: number): Promise<void> {
+    return acceptAppeal(this.#db, this.#limits, id, today);
   }
 
   async pause(id: string, today: number): Promise<void> {
@@ -778,6 +759,11 @@ export class Cloud implements Store {
              AND doc NOT IN (SELECT id FROM docs WHERE legal_until >= ?2)`,
           )
           .bind(today - this.#limits.evidenceDays, today),
+        ...["moderation", "openings"].map((log) =>
+          this.#db
+            .prepare(`DELETE FROM ${log} WHERE at < ?1 AND doc NOT IN (SELECT id FROM docs WHERE legal_until >= ?2)`)
+            .bind((today - this.#limits.evidenceDays) * DAY_MS, today),
+        ),
       ]);
     } catch (error) {
       failed += 1;

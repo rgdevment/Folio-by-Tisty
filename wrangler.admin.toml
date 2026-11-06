@@ -1,0 +1,32 @@
+name = "folio-admin"
+main = "src/admin/index.ts"
+compatibility_date = "2026-08-01"
+workers_dev = false
+
+# Cloudflare Access stands in front of this whole address, and the Worker checks its token again.
+routes = [{ pattern = "panel.tisty.cl", custom_domain = true }]
+
+[assets]
+directory = "./dist/admin"
+run_worker_first = ["/api/*"]
+
+[placement]
+region = "aws:us-east-1"
+
+# The same database as folio-private, and no bucket: nothing here can read an envelope or the keys beside them.
+[[d1_databases]]
+binding = "DB"
+database_name = "folio-private"
+database_id = "767d0dce-dff0-41b0-9857-b3ddcf2d36ad"
+migrations_dir = "migrations"
+
+[vars]
+ACCESS_TEAM = ""
+ACCESS_AUDIENCE = ""
+OPERATOR_EMAIL = ""
+
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false
