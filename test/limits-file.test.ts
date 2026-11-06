@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,6 +20,8 @@ const NOW = Date.UTC(2026, 10, 6);
 const NOW_SECONDS = NOW / 1000;
 const SERVER = publishedLimits(LEVEL_ONE);
 const DAY_SECONDS = 86_400;
+
+const sha256 = (said: string | Buffer): string => createHash("sha256").update(said).digest("hex");
 
 describe("a signature of the limits", () => {
   const { secret, publicKey } = newKeys();
@@ -87,7 +90,14 @@ describe("signing the limits", () => {
 
   beforeEach(() => {
     place = mkdtempSync(join(tmpdir(), "limits-"));
-    files = { limits: join(place, "limits.json"), publicKey: join(place, "limits.pub") };
+    files = {
+      limits: join(place, "limits.json"),
+      publicKey: join(place, "limits.pub"),
+      termsEs: join(place, "TERMINOS.md"),
+      termsEn: join(place, "TERMS.md"),
+    };
+    writeFileSync(files.termsEs, "términos\n");
+    writeFileSync(files.termsEn, "terms\n");
     keyFile = join(place, "the.key");
     createKeys(keyFile, files);
   });
@@ -108,6 +118,29 @@ describe("signing the limits", () => {
         "limits.json",
       ),
     ).toBe(true);
+  });
+
+  it("names the terms by the hash of their exact bytes", () => {
+    signing();
+    expect(read().terms).toEqual({ version: "1", es: sha256("términos\n"), en: sha256("terms\n") });
+  });
+
+  it("keeps the version of the terms while neither text changes", () => {
+    signing();
+    signing();
+    expect((read().terms as { version: string }).version).toBe("1");
+  });
+
+  it.each([
+    ["Spanish", "termsEs"],
+    ["English", "termsEn"],
+  ] as const)("raises the version of the terms when the %s text changes", (_language, text) => {
+    signing();
+    writeFileSync(files[text], "otro texto\r\n");
+    signing();
+    const terms = read().terms as { version: string; es: string; en: string };
+    expect(terms.version).toBe("2");
+    expect(terms[text === "termsEs" ? "es" : "en"]).toBe(sha256("otro texto\r\n"));
   });
 
   it("does not replace the key copies are built with", () => {
@@ -185,6 +218,13 @@ describe("the limits Folio publishes", () => {
     const signature = readFileSync("docs/limits.json.minisig", "utf8");
     const publicKey = readFileSync("docs/limits.pub", "utf8");
     expect(holdsSignature(file, signature, publicKey, "limits.json")).toBe(true);
+  });
+
+  it("name the terms exactly as they are published", () => {
+    const terms = published.terms as { version: string; es: string; en: string };
+    expect(terms.es).toBe(sha256(readFileSync("docs/TERMINOS.md")));
+    expect(terms.en).toBe(sha256(readFileSync("docs/TERMS.md")));
+    expect(terms.version).toMatch(/^[1-9][0-9]*$/);
   });
 
   it("fit in what a reader of a signed file takes", () => {

@@ -17,10 +17,23 @@ type Published = ReturnType<typeof publishedLimits>;
 export interface LimitsFiles {
   limits: string;
   publicKey: string;
+  termsEs: string;
+  termsEn: string;
+}
+
+interface Terms {
+  version: string;
+  es: string;
+  en: string;
 }
 
 const inDocs = (name: string): string => resolve(fileURLToPath(new URL(`../docs/${name}`, import.meta.url)));
-const PUBLISHED: LimitsFiles = { limits: inDocs("limits.json"), publicKey: inDocs("limits.pub") };
+const PUBLISHED: LimitsFiles = {
+  limits: inDocs("limits.json"),
+  publicKey: inDocs("limits.pub"),
+  termsEs: inDocs("TERMINOS.md"),
+  termsEn: inDocs("TERMS.md"),
+};
 const USAGE = "node scripts/limits-key.ts new <file> | sign <file> [days uploads halt, 0 to lift a pause]";
 const SECONDS_IN_A_DAY = 86_400;
 const HALTED_DAYS_AT_MOST = 7;
@@ -99,7 +112,7 @@ const holdsTo = (name: string, said: unknown, server: unknown): boolean => {
 // The file may ask for less than the server takes, never for more: a number there that it would refuse fails its reader.
 export const pastTheServer = (said: Record<string, unknown>, server: Published): string[] => {
   const held = server as Record<string, unknown>;
-  const { serial: _serial, uploads_halted_until: _halted, ...numbers } = said;
+  const { serial: _serial, uploads_halted_until: _halted, terms: _terms, ...numbers } = said;
   const unknown = Object.keys(numbers).filter((name) => !Object.hasOwn(held, name));
   const wrong = Object.keys(held).filter((name) => !holdsTo(name, said[name], held[name]));
   return [...unknown, ...wrong];
@@ -112,6 +125,15 @@ const haltedUntil = (haltedDays: string | undefined, kept: unknown, nowSeconds: 
     throw new Error(`uploads halt for 0 to ${HALTED_DAYS_AT_MOST} whole days`);
   }
   return days === 0 ? null : nowSeconds + days * SECONDS_IN_A_DAY;
+};
+
+const sha256Of = (file: string): string => createHash("sha256").update(readFileSync(file)).digest("hex");
+
+const termsOf = (files: LimitsFiles, held: Terms | undefined): Terms => {
+  const es = sha256Of(files.termsEs);
+  const en = sha256Of(files.termsEn);
+  if (held?.es === es && held.en === en) return held;
+  return { version: String(Number(held?.version ?? 0) + 1), es, en };
 };
 
 export const createKeys = (keyFile: string, files: LimitsFiles = PUBLISHED): string => {
@@ -136,12 +158,13 @@ export const signLimits = (
   const current = existsSync(files.limits)
     ? (JSON.parse(readFileSync(files.limits, "utf8")) as Record<string, unknown>)
     : {};
-  const { serial = 0, uploads_halted_until: kept, ...numbers } = current;
+  const { serial = 0, uploads_halted_until: kept, terms, ...numbers } = current;
   const until = haltedUntil(haltedDays, kept, Math.floor(now / 1000));
   const next = {
     serial: (serial as number) + 1,
     ...server,
     ...numbers,
+    terms: termsOf(files, terms as Terms | undefined),
     ...(until === null ? {} : { uploads_halted_until: until }),
   };
   const past = pastTheServer(next, server);

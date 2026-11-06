@@ -139,7 +139,8 @@ law does not allow these limits, they apply as far as it permits.
 ## Changes
 
 Every change to these terms is committed to the public repository, with its
-date. Sharing after a change means accepting the new terms.
+date. Before you share again, Tisty shows you the new terms and asks you to
+accept them.
 
 ## Governing law
 
