@@ -7,7 +7,7 @@
 Folio keeps the least it needs to work, and nearly all of it is encrypted
 with a key it never receives. No accounts, no cookies, no analytics, no ads,
 and nothing from third parties on the page. What it keeps expires on its own,
-except your key's public part and the keys you took back.
+except your key's public part, the keys you took back and the operator's mail.
 This policy says exactly what it keeps, why, and for how long.
 
 Who answers for this data: Mario, a natural person in Chile, who runs Folio
@@ -31,9 +31,11 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 | Your public key on its own, and the day Folio first saw it, tied to no network and no document | So limits and reputation stay with it, and a new key starts from the lowest | For good, even after your documents are gone |
 | How many times it was read, counted once a day per visitor | To show you the reads in Tisty | As long as the document |
 | A line for each read served: the link's id (without its key, so it opens nothing), the country and the Cloudflare data center, never your IP | To know how much each document is read and where from, and size the service | Up to 7 days, in Cloudflare's Workers Logs |
-| A digest of your IP (an HMAC with a key that changes) | Per-IP limits and blocks against abuse | As long as the quota or the block lasts |
+| A digest of your IP (an HMAC with a key that changes) | Per-IP limits and blocks against abuse | As long as the quota or the block lasts, and up to a day more |
 | A daily copy of the database, encrypted with a key kept offline, without the day's read digests or quotas, and without the documents | To recover from a failure | 30 days, on GitHub |
 | What the operator did to a document and why, opening it included: its id, the action and the reason | To answer for it later | 180 days |
+| A summary by mail to the operator, up to twice a day: the id of the links reported, blocked or appealed, the category and how many networks reported, never a key, an IP or the content | To tell them what to review | Until they delete it from their mailbox, at Migadu |
+| What you write to the operator by mail, with your address | To answer you | Until they delete it from their mailbox, at Migadu |
 | Keys you took back, as your root signed them: the key's public part and your root's | So readers learn that a stolen or retired key no longer speaks for you | For good, since a reader must always be able to tell |
 | Reports: category, detail and the version reported, in the clear; the link if given, sealed so only the operator can open it; and a digest of the reporter's network (an HMAC with a key that changes every 180 days), so each network reports only once | To moderate and pass them where they belong | 180 days, or longer if an order asks for it. If an appeal against a report is accepted, that network's digest stays 180 days from then, so it stops counting |
 
@@ -46,7 +48,7 @@ the day ends. Its key changes every day and is not kept. The database keeps its
 own copy for up to 30 days, to recover from a failure, and the digest stays
 there until then; it never goes into the backups.
 
-## Cloudflare
+## Cloudflare and other providers
 
 Folio runs on Cloudflare (Workers, D1 and R2). Cloudflare receives your
 IP and your requests when you connect, as any web server does, and handles them
@@ -56,6 +58,17 @@ never receives the key after the `#`, so it cannot read what you share either.
 The page at `folio.tisty.app` only explains what Folio is. It is fixed files: it
 keeps nothing about you, on the server or in your browser. Cloudflare also
 receives your IP and your requests when you visit it.
+
+Three others take part, each with a policy of its own:
+
+- **[Migadu](https://www.migadu.com/privacy/)** carries and keeps the operator's
+  mail, with what the table above says.
+- **[GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)**
+  keeps the copies of the database, encrypted with a key it does not have.
+- **[Healthchecks.io](https://healthchecks.io/privacy/)** gets a signal when each
+  scheduled task ends, to warn if one stops arriving. It carries nobody's data.
+
+These providers operate outside Chile, so what they receive leaves the country.
 
 ## The promise of encryption, said honestly
 
@@ -75,7 +88,9 @@ corrected or deleted, or object to its use. Since there are no accounts, the
 most direct ways are:
 
 - **Delete what you shared:** with your management link, or by no longer
-  sharing it from Tisty. It is deleted from the server at once.
+  sharing it from Tisty. It stops being served at once and is deleted from the
+  server at the next cleanup, within an hour, unless a serious report or an order
+  requires keeping it.
 - **Anything else:** write to <rgdevment@tisty.app>. The digest of your IP does
   not reveal who you are, so in general there is no data that can be tied to
   you.

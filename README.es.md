@@ -48,7 +48,8 @@ público. No hay una empresa detrás y nadie gana dinero con él. Contacto:
 ## Su código
 
 Se está escribiendo de nuevo desde cero en TypeScript, sobre Cloudflare Workers,
-D1 y R2, y el servicio no corre mientras tanto. Se entiende con la
+D1 y R2, y el servicio todavía no está abierto: [folio.tisty.app](https://folio.tisty.app)
+dice qué es. Se entiende con la
 [app Tisty](https://github.com/rgdevment/Tisty) por un contrato que guarda el
 repositorio de la app: los formatos de lo que viaja y las reglas de estilo de la
 hoja. El código anterior, en Rust, queda en la rama
