@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "src/page/ui",
+    "src/page/ui.d.ts",
+    "test/clean.test.ts",
+    "test/ask.test.ts",
+    "test/frame.test.ts",
+    "test/limits-file.test.ts",
+    "test/files.test.ts",
+    "test/report-form.test.ts",
+    "test/report.test.ts",
+    "test/theme.test.ts",
+    "test/show.test.ts",
+    "test/jsdom.d.ts"
+  ]
+}

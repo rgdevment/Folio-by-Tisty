@@ -1,0 +1,30 @@
+{
+  "serial": 2,
+  "ttl_days": [
+    1,
+    3,
+    7,
+    15
+  ],
+  "shares_at_most": 2,
+  "envelope_bytes_at_most": 24000000,
+  "first_bytes_at_most": 2512000,
+  "rest_bytes_at_most": 15572000,
+  "pictures_at_most": 10,
+  "picture_bytes_at_most": 1000000,
+  "pictures_bytes_at_most": 5000000,
+  "files_at_most": 2,
+  "files_bytes_at_most": 5000000,
+  "uploads_of_a_root_an_hour": 10,
+  "upload_waits_minutes": [
+    1,
+    1,
+    1,
+    2,
+    4,
+    8,
+    15
+  ],
+  "oldest_contract_taken": null,
+  "oldest_contract_served": null
+}

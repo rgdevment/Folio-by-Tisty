@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <title>Folio by Tisty</title>
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <script src="/theme.js"></script>
+    <script type="module" src="./ui/main.ts"></script>
+  </head>
+  <body data-state="loading">
+    <header class="bar">
+      <a class="brand" href="https://www.tisty.app/" rel="noopener noreferrer">
+        <svg class="brand-mark" viewBox="31.5 8.5 156 156" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round">
+          <rect class="logo-back" x="70" y="22" width="104" height="128" rx="14" transform="rotate(7 120 90)" />
+          <g transform="rotate(-6 100 90)">
+            <path class="logo-front" d="M58 24h74l26 26v86a14 14 0 0 1-14 14H58a14 14 0 0 1-14-14V38a14 14 0 0 1 14-14Z" />
+            <path class="logo-fold" d="M132 24v14a12 12 0 0 0 12 12h14" />
+            <path class="logo-lines" d="M62 68h56M62 86h72M62 104h44" />
+            <path class="logo-note" d="M62 122h28" />
+          </g>
+          <circle class="logo-badge" cx="150" cy="134" r="20" />
+          <path class="logo-check" d="M140.5 134.5l6.5 6.5 12.5-13" />
+        </svg>
+        <span class="brand-name">Folio <span class="brand-by">by Tisty</span></span>
+      </a>
+      <div class="crumb" id="crumb" hidden>
+        <button class="crumb-back" id="crumb-back" type="button" aria-label="Volver al inicio del documento">
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
+          <span class="one-line crumb-title" id="crumb-title"></span>
+        </button>
+        <span class="crumb-at"><span class="crumb-word">Página </span><span id="crumb-at"></span></span>
+      </div>
+      <div class="bar-end">
+        <p class="seal" id="seal" hidden>
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 3 3.7v4c0 3 2.1 5.3 5 6.5 2.9-1.2 5-3.5 5-6.5v-4z" /><path d="m5.8 8 1.6 1.6 2.9-3" /></svg>
+          <span id="seal-text"></span>
+        </p>
+        <button class="tool" id="theme" type="button" aria-label="Cambiar el tema">
+          <svg class="icon theme-to-dark" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A6 6 0 0 1 6.4 2.5a6 6 0 1 0 7.1 7.1z" /></svg>
+          <svg class="icon theme-to-light" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.8" /><path d="M8 1.5v1.4M8 13.1v1.4M1.5 8h1.4M13.1 8h1.4M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="loading" id="loading" role="status">
+      <svg class="pen" viewBox="0 0 64 64" aria-hidden="true">
+        <path class="pen-line" d="M8 54c8-3 14-3 22 0s14 3 26-1" />
+        <path class="pen-body" d="m42 8 12 12-24 24-15 3 3-15z" />
+        <path class="pen-body" d="m36 14 12 12" />
+      </svg>
+      <span id="loading-text">Abriendo el documento…</span>
+    </div>
+
+    <main class="desk" id="desk" hidden>
+      <div class="sheet-column" id="sheet-column">
+        <div class="sheet-host" id="sheet"></div>
+        <nav class="pages-card" id="pages-card" aria-labelledby="title-pages" hidden>
+          <h2 id="title-pages">Páginas <span class="pages-count" id="pages-count"></span></h2>
+          <ol class="pages" id="pages"></ol>
+        </nav>
+      </div>
+
+      <div class="scrim" id="scrim" hidden></div>
+      <aside class="panels" id="panels" aria-label="Sobre este documento">
+        <section class="panel panel-actions">
+          <a class="action action-main" id="edit-in-tisty" href="tisty://edit">Editar en Tisty</a>
+          <button class="action" id="copy-link" type="button"><span id="copy-link-text">Copiar link</span></button>
+          <p class="actions-note">Editas tu copia; el original sigue igual.</p>
+        </section>
+
+        <section class="panel" id="panel-index" aria-labelledby="title-index">
+          <h2 id="title-index">Índice</h2>
+          <ol class="index outline" id="index"></ol>
+        </section>
+
+        <section class="panel paper" id="panel-paper" aria-label="Papel">
+          <fieldset class="leaves" id="leaves" aria-label="Tamaño del papel">
+            <button class="leaf" type="button" data-paper="a4">A4</button>
+            <button class="leaf" type="button" data-paper="letter">Carta</button>
+            <button class="leaf" type="button" data-paper="folio">Oficio</button>
+            <button class="leaf" type="button" data-paper="tabloid" hidden>Tabloide</button>
+          </fieldset>
+          <button class="tool" id="sheets" type="button" aria-pressed="false" aria-label="Hojas" title="Hojas">
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="1.5" width="9" height="5.5" rx="1" /><rect x="3.5" y="9" width="9" height="5.5" rx="1" /></svg>
+          </button>
+          <button class="tool" id="landscape" type="button" aria-pressed="false" aria-label="Horizontal" title="Horizontal" hidden>
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="4" width="13" height="8" rx="1" /></svg>
+          </button>
+        </section>
+
+        <section class="panel" id="panel-details" aria-labelledby="title-details">
+          <h2 id="title-details">Detalles</h2>
+          <dl class="facts">
+            <div><dt>Esta versión la firmó</dt><dd><bdi id="signer"></bdi></dd></div>
+            <div><dt>Huella</dt><dd class="fingerprint" id="fingerprint"></dd></div>
+          </dl>
+          <dl class="facts facts-next" id="owner-facts" hidden>
+            <div><dt>Dueño</dt><dd><bdi id="owner"></bdi></dd></div>
+            <div><dt>Huella del dueño</dt><dd class="fingerprint" id="owner-fingerprint"></dd></div>
+          </dl>
+          <details class="explain">
+            <summary>Cómo comprobarla</summary>
+            <p>Pídele la huella a quien te lo mandó, por otro canal, y compárala. La firma dice quién lo escribió, no que el contenido sea seguro. Si esa llave se retiró, aquí se avisa, según lo que dice el servidor.</p>
+          </details>
+          <dl class="facts" id="details"></dl>
+          <dl class="facts facts-next">
+            <div><dt>Acceso</dt><dd>Solo con el link</dd></div>
+            <div><dt>Caduca</dt><dd id="dies-on"></dd></div>
+          </dl>
+        </section>
+
+        <section class="foot">
+          <button class="report" id="report" type="button" disabled>Denunciar este documento</button>
+          <dialog class="report-dialog" id="report-dialog" aria-labelledby="report-title">
+            <form id="report-form">
+              <h2 id="report-title">Denunciar este documento</h2>
+              <fieldset>
+                <legend>Molesto, sin ser delito</legend>
+                <label><input type="radio" name="category" value="spam" required /> Spam</label>
+                <label><input type="radio" name="category" value="offensive" /> Contenido molesto u ofensivo</label>
+              </fieldset>
+              <fieldset>
+                <legend>Engaño</legend>
+                <label><input type="radio" name="category" value="phishing" /> Phishing: imita a alguien para robar datos</label>
+                <label><input type="radio" name="category" value="malware" /> Malware</label>
+                <label><input type="radio" name="category" value="scam" /> Estafa</label>
+              </fieldset>
+              <fieldset>
+                <legend>Grave</legend>
+                <label><input type="radio" name="category" value="threat" /> Amenazas, violencia o incitación concreta</label>
+                <label><input type="radio" name="category" value="doxxing" /> Datos personales de alguien, publicados para dañarlo</label>
+                <label><input type="radio" name="category" value="intimate" /> Imágenes íntimas sin consentimiento</label>
+                <label><input type="radio" name="category" value="csam" /> Abuso sexual infantil</label>
+              </fieldset>
+              <label class="report-detail">Por qué lo denuncias (opcional)
+                <textarea name="detail" rows="3" maxlength="2000"></textarea>
+              </label>
+              <p class="report-note">Esto se guarda sin cifrar: no pegues aquí el link ni partes del documento.</p>
+              <div id="report-consent">
+                <label><input type="checkbox" id="report-hand-over" /> Entrego el link para que una persona lo revise</label>
+                <p>Lo cifras aquí, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar. Una denuncia grave sin el link queda registrada, pero no bloquea nada, porque nadie podría revisarla.</p>
+              </div>
+              <p class="report-note">Los derechos de autor los reclama su titular, en <a href="mailto:abuso@tisty.app">abuso@tisty.app</a>.</p>
+              <p class="report-said" id="report-said" role="status"></p>
+              <div class="report-actions">
+                <button type="button" id="report-cancel">Cerrar</button>
+                <button type="submit" id="report-send">Enviar denuncia</button>
+              </div>
+            </form>
+          </dialog>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="page-foot">
+      <img class="mascot" src="/tisto.svg" alt="" width="362" height="302" loading="lazy" />
+      <div class="page-foot-words">
+        <p><strong>Tisty</strong>. Notas, documentos y tareas. El historial de lo que aprendiste resolviendo.</p>
+        <p class="page-foot-promise">Este documento se abre en tu navegador: el servidor nunca recibe su llave. Sin cookies ni analítica.</p>
+      </div>
+      <a class="page-foot-link" href="https://www.tisty.app/" rel="noopener noreferrer">
+        Conoce Tisty
+        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9M8.5 4l4 4-4 4" /></svg>
+      </a>
+    </footer>
+
+    <p class="said-aloud" id="file-said" role="status"></p>
+    <div class="opening-tisty" id="opening-tisty" role="status" hidden>
+      <p>
+        <span>Abriendo Tisty… ¿No lo tienes?</span>
+        <a href="https://www.tisty.app/" target="_blank" rel="noopener noreferrer">Conócelo e instálalo</a>
+      </p>
+      <button class="tool" id="opening-tisty-close" type="button" aria-label="Cerrar" title="Cerrar">
+        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg>
+      </button>
+    </div>
+
+    <nav class="dock" id="dock" aria-label="Paneles" hidden>
+      <button type="button" data-panel="panel-index">Índice</button>
+      <button type="button" data-panel="panel-paper">Papel</button>
+      <button type="button" data-panel="panel-details">Detalles</button>
+    </nav>
+  </body>
+</html>

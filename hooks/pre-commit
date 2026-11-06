@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)" || exit 0
+status=0
+
+# What is about to be committed, not what the working tree happens to hold beside it.
+staged=$(mktemp -d)
+trap 'rm -rf "$staged"' EXIT
+git checkout-index --all --prefix="$staged/" || {
+  echo "x  the staged tree could not be written out, so nothing was looked at"
+  exit 1
+}
+
+bash "$staged/scripts/rules.sh" < /dev/null || status=1
+bash "$staged/scripts/branches.sh" "$(git rev-parse --abbrev-ref HEAD)" || status=1
+
+exit $status

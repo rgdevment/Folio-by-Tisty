@@ -1,0 +1,88 @@
+name: Backup
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+env:
+  DATABASE: folio-private
+
+jobs:
+  database:
+    name: The database, sealed and out of Cloudflare
+    if: github.ref == 'refs/heads/main'
+    environment: prod-private
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+    steps:
+      - name: The account, its token and the recipient are there
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.BACKUP_CLOUDFLARE_API_TOKEN }}
+        run: |
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "::error::the prod-private environment has no BACKUP_CLOUDFLARE_API_TOKEN secret"; exit 1; }
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || { echo "::error::the prod-private environment has no CLOUDFLARE_ACCOUNT_ID variable"; exit 1; }
+          case "$RECIPIENT" in
+            age1pq1*) ;;
+            *) echo "::error::BACKUP_AGE_RECIPIENT must be a post-quantum key, from age-keygen -pq: anyone can download these copies and keep them for years"; exit 1 ;;
+          esac
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      # Not from apt: Ubuntu's age is too old to know a post-quantum recipient.
+      - name: The age this recipient needs
+        env:
+          AGE_RELEASE: https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz
+          AGE_SHA256: cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/age.tar.gz" "$AGE_RELEASE"
+          echo "$AGE_SHA256  $RUNNER_TEMP/age.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/age.tar.gz" -C "$RUNNER_TEMP" age/age
+          echo "$RUNNER_TEMP/age" >> "$GITHUB_PATH"
+
+      - name: Export, check and seal
+        id: sealed
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.BACKUP_CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          plain="$RUNNER_TEMP/folio.sql"
+          day=$(date -u +%F)
+          mkdir -p "$RUNNER_TEMP/sealed"
+          bash scripts/backup.sh "$DATABASE" "$plain" --remote
+          node scripts/backup-check.mjs "$plain"
+          age --recipient "$RECIPIENT" --output "$RUNNER_TEMP/sealed/folio-$day.sql.age" "$plain"
+          rm -f "$plain"
+          echo "day=$day" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backup-${{ steps.sealed.outputs.day }}
+          path: ${{ runner.temp }}/sealed
+          if-no-files-found: error
+          retention-days: 30
+
+      # GitHub stops the schedule of a quiet repository without a word, and this stops arriving when it does.
+      - name: It went
+        env:
+          HEARTBEAT: ${{ secrets.BACKUP_HEARTBEAT_URL }}
+        run: |
+          if [ -n "$HEARTBEAT" ]; then
+            curl -fsS --retry 3 -o /dev/null "$HEARTBEAT"
+          fi

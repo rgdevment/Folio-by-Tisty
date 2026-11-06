@@ -1,0 +1,845 @@
+/* The sheet looks the same wherever it opens: these numbers are the style contract's (decision 113). */
+:host {
+  display: block;
+}
+
+.sheet {
+  padding: 36px 40px;
+  background: var(--tisty-sheet);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px var(--tisty-cast);
+  color: var(--tisty-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+:host([data-sheets="true"]) .sheet {
+  min-height: var(--page-height);
+  padding: var(--margin-y) var(--margin-x);
+}
+
+@media (max-width: 640px) {
+  .sheet {
+    padding: 24px 18px;
+  }
+
+  :host([data-sheets="true"]) .sheet {
+    padding: 24px 18px;
+  }
+}
+
+/* The properties travel in the HTML, hidden on the sheet: the frame shows them in its details. */
+.front {
+  display: none;
+}
+
+/* It takes the focus only so a keyboard goes on from the page it turned to. */
+.sheet:focus {
+  outline: none;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+  color: var(--tisty-soft);
+  font-size: 13px;
+}
+
+.tags span {
+  padding: 1px 8px;
+  background: var(--tisty-mark-tag);
+  border-radius: 6px;
+}
+
+/* The frame's bar stays on top, so neither the index nor an anchor leaves what it reached under it. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+[id] {
+  scroll-margin-top: calc(var(--bar-edge, 80px) + 8px);
+}
+
+h1 {
+  margin: 26px 0 8px;
+  font-size: 1.65em;
+  font-weight: 640;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.sheet > h1:first-of-type {
+  margin: 0 0 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--tisty-hair);
+}
+
+h2 {
+  margin: 22px 0 6px;
+  font-size: 1.3em;
+  font-weight: 640;
+}
+
+h3 {
+  margin: 18px 0 4px;
+  font-size: 1.13em;
+  font-weight: 640;
+}
+
+h4,
+h5,
+h6 {
+  margin: 16px 0 4px;
+  font-size: 1em;
+  font-weight: 640;
+}
+
+p {
+  margin: 10px 0;
+}
+
+ul,
+ol {
+  margin: 10px 0;
+  padding-left: 22px;
+}
+
+strong {
+  font-weight: 600;
+}
+
+li::marker {
+  color: var(--tisty-faint);
+}
+
+li > p {
+  margin: 2px 0;
+}
+
+li.task {
+  position: relative;
+  list-style: none;
+}
+
+.check {
+  position: absolute;
+  top: 0.32em;
+  left: -23px;
+  box-sizing: border-box;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid var(--tisty-faint);
+  border-radius: 5px;
+}
+
+.check[data-done="true"] {
+  background: var(--tisty-accent);
+  border-color: var(--tisty-accent);
+}
+
+.check[data-done="true"]::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  width: 3px;
+  height: 7px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+li.task:has(> .check[data-done="true"]) {
+  color: var(--tisty-soft);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--tisty-soft) 60%, transparent);
+}
+
+blockquote {
+  margin: 12px 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--tisty-line);
+  color: var(--tisty-soft);
+}
+
+blockquote.callout {
+  --said: var(--tisty-hue-blue);
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--said) 7%, transparent);
+  border-left: 3px solid var(--said);
+  border-radius: 0 8px 8px 0;
+  color: var(--tisty-ink);
+}
+
+blockquote.callout::before {
+  content: attr(data-said);
+  display: block;
+  margin-bottom: 2px;
+  color: var(--said);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+blockquote.callout > :first-child {
+  margin-top: 0;
+}
+
+blockquote.callout > :last-child {
+  margin-bottom: 0;
+}
+
+blockquote[data-callout="tip"] {
+  --said: var(--tisty-hue-green);
+}
+
+blockquote[data-callout="important"] {
+  --said: var(--tisty-hue-indigo);
+}
+
+blockquote[data-callout="warning"] {
+  --said: var(--tisty-hue-amber);
+}
+
+blockquote[data-callout="caution"] {
+  --said: var(--tisty-hue-red);
+}
+
+mark {
+  padding: 0 2px;
+  background: var(--tisty-pen-yellow);
+  border-radius: 3px;
+  color: inherit;
+}
+
+mark[data-pen="green"] {
+  background: var(--tisty-pen-green);
+}
+
+mark[data-pen="blue"] {
+  background: var(--tisty-pen-blue);
+}
+
+mark[data-pen="pink"] {
+  background: var(--tisty-pen-pink);
+}
+
+mark[data-pen="red"] {
+  background: color-mix(in srgb, var(--tisty-hue-red) 28%, transparent);
+}
+
+mark[data-pen="orange"] {
+  background: color-mix(in srgb, var(--tisty-hue-orange) 28%, transparent);
+}
+
+mark[data-pen="amber"] {
+  background: color-mix(in srgb, var(--tisty-hue-amber) 28%, transparent);
+}
+
+mark[data-pen="teal"] {
+  background: color-mix(in srgb, var(--tisty-hue-teal) 28%, transparent);
+}
+
+mark[data-pen="indigo"] {
+  background: color-mix(in srgb, var(--tisty-hue-indigo) 28%, transparent);
+}
+
+mark[data-pen="purple"] {
+  background: color-mix(in srgb, var(--tisty-hue-purple) 28%, transparent);
+}
+
+mark[data-pen="brown"] {
+  background: color-mix(in srgb, var(--tisty-hue-brown) 28%, transparent);
+}
+
+mark[data-pen="gray"] {
+  background: color-mix(in srgb, var(--tisty-hue-gray) 28%, transparent);
+}
+
+.tag {
+  padding: 0 2px;
+  background: var(--tisty-mark-tag);
+  border-radius: 4px;
+}
+
+.ref {
+  padding: 0 5px 0 3px;
+  background: var(--tisty-mark-doc);
+  border-radius: 4px;
+  color: var(--tisty-ink);
+}
+
+.ico {
+  display: inline-flex;
+  align-items: center;
+  color: var(--tisty-soft);
+  vertical-align: -0.18em;
+}
+
+.ico svg {
+  width: 1.05em;
+  height: 1.05em;
+}
+
+.ico[data-hue="red"] {
+  color: var(--tisty-hue-red);
+}
+
+.ico[data-hue="orange"] {
+  color: var(--tisty-hue-orange);
+}
+
+.ico[data-hue="amber"] {
+  color: var(--tisty-hue-amber);
+}
+
+.ico[data-hue="green"] {
+  color: var(--tisty-hue-green);
+}
+
+.ico[data-hue="teal"] {
+  color: var(--tisty-hue-teal);
+}
+
+.ico[data-hue="blue"] {
+  color: var(--tisty-hue-blue);
+}
+
+.ico[data-hue="indigo"] {
+  color: var(--tisty-hue-indigo);
+}
+
+.ico[data-hue="purple"] {
+  color: var(--tisty-hue-purple);
+}
+
+.ico[data-hue="pink"] {
+  color: var(--tisty-hue-pink);
+}
+
+.ico[data-hue="brown"] {
+  color: var(--tisty-hue-brown);
+}
+
+.ico[data-hue="gray"] {
+  color: var(--tisty-hue-gray);
+}
+
+details {
+  margin: 14px 0;
+  background: color-mix(in srgb, var(--tisty-hover) 45%, transparent);
+  border: 1px solid var(--tisty-hair);
+  border-radius: 10px;
+}
+
+details[open] {
+  background: transparent;
+}
+
+summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-right: 1.75px solid var(--tisty-soft);
+  border-bottom: 1.75px solid var(--tisty-soft);
+  transform: rotate(-45deg);
+}
+
+details[open] > summary::before {
+  transform: rotate(45deg) translate(-2px, -1px);
+}
+
+summary:hover {
+  background: var(--tisty-hover);
+}
+
+details[open] > summary {
+  border-bottom: 1px solid var(--tisty-hair);
+  border-radius: 10px 10px 0 0;
+}
+
+details > :not(summary) {
+  margin-right: 14px;
+  margin-left: 14px;
+}
+
+details > summary + * {
+  margin-top: 12px;
+}
+
+details > :last-child:not(summary) {
+  margin-bottom: 12px;
+}
+
+sup.fnref {
+  line-height: 0;
+}
+
+sup.fnref a {
+  padding: 0 1px;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.footnote {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0;
+  color: var(--tisty-soft);
+  font-size: 0.9em;
+}
+
+.footnote > .fn-label {
+  flex: none;
+  min-width: 1.2em;
+  font-weight: 600;
+}
+
+.footnote > p {
+  margin: 0;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--tisty-line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.82em;
+}
+
+div.math {
+  margin: 12px 0;
+  padding: 4px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+figure {
+  margin: 12px 0;
+}
+
+img {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  height: auto;
+  max-height: 28rem;
+  margin: 16px auto;
+  padding: 8px;
+  background: var(--tisty-rail);
+  border: 1px solid var(--tisty-hair);
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+figure.diagram {
+  text-align: center;
+}
+
+figure.diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* A diagram travels drawn twice, and the reader shows the one of its theme (decision 129). */
+svg[data-theme="dark"],
+:host([data-theme="dark"]) svg[data-theme="light"] {
+  display: none;
+}
+
+:host([data-theme="dark"]) svg[data-theme="dark"] {
+  display: inline;
+}
+
+/* Paper is light, whichever theme the screen was in. */
+@media print {
+  :host([data-theme="dark"]) svg[data-theme="dark"] {
+    display: none;
+  }
+
+  :host([data-theme="dark"]) svg[data-theme="light"] {
+    display: inline;
+  }
+}
+
+code {
+  padding: 1px 5px;
+  background: var(--tisty-hover);
+  border-radius: 4px;
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.88em;
+}
+
+pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 0.88em;
+  line-height: 1.55;
+}
+
+pre code {
+  padding: 0;
+  background: none;
+  font-size: 1em;
+}
+
+figure.code {
+  overflow: hidden;
+  background: var(--tisty-hover);
+  border: 1px solid var(--tisty-hair);
+  border-radius: 10px;
+}
+
+figure.code figcaption {
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--tisty-hair);
+  color: var(--tisty-soft);
+  font-size: 12px;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--tisty-faint);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-name {
+  color: var(--tisty-hue-purple);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: var(--tisty-hue-green);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--tisty-hue-orange);
+}
+
+.hljs-title,
+.hljs-section {
+  color: var(--tisty-hue-blue);
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-property {
+  color: var(--tisty-hue-teal);
+}
+
+.hljs-type,
+.hljs-built_in,
+.hljs-class .hljs-title {
+  color: var(--tisty-hue-amber);
+}
+
+.hljs-deletion {
+  color: var(--tisty-hue-red);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}
+
+div.table {
+  margin: 14px 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+div.table > table {
+  margin: 0;
+}
+
+table {
+  width: 100%;
+  margin: 14px 0;
+  border-spacing: 0;
+  border-collapse: separate;
+  border-top: 1px solid var(--tisty-line);
+  border-left: 1px solid var(--tisty-line);
+  font-size: 0.92em;
+}
+
+th,
+td {
+  padding: 6px 10px;
+  border-right: 1px solid var(--tisty-line);
+  border-bottom: 1px solid var(--tisty-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+th,
+tfoot td {
+  background: var(--tisty-hover);
+  font-weight: 600;
+}
+
+table:has(th[data-type]) td {
+  font-variant-numeric: tabular-nums;
+}
+
+td.whole {
+  white-space: nowrap;
+}
+
+tr {
+  height: calc(1lh + 13px);
+}
+
+td[data-amiss] {
+  text-decoration: underline wavy color-mix(in srgb, var(--tisty-hue-amber) 70%, transparent);
+  text-underline-offset: 3px;
+}
+
+hr {
+  margin: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--tisty-line);
+}
+
+a {
+  color: var(--tisty-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* A word that leads nowhere yet must not promise a click. */
+a:not([href]) {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* A page or a document named inside a sentence stays a word of it. */
+a.card {
+  padding: 0 5px;
+  background: var(--tisty-mark-doc);
+  border-radius: 4px;
+  color: var(--tisty-ink);
+  text-decoration: none;
+}
+
+a.card:hover {
+  background: var(--tisty-mark-doc-lit);
+}
+
+a.card:not(.doc-card)::before,
+.ref::before {
+  content: "▤";
+  margin-right: 4px;
+  color: var(--tisty-faint);
+  font-size: 0.86em;
+}
+
+a[data-file] {
+  cursor: pointer;
+}
+
+a[data-file]:not(.card) {
+  color: var(--tisty-accent);
+  text-decoration: underline dotted;
+}
+
+.file-said {
+  margin-left: 6px;
+  color: var(--tisty-faint);
+  font-size: 0.86em;
+}
+
+audio.file-player,
+video.file-player {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+}
+
+/* Alone in its paragraph it is drawn whole, as Tisty draws it. */
+a.doc-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 14px;
+  padding: 12px 14px;
+  background: none;
+  border: 1px solid var(--tisty-hair);
+  border-radius: 10px;
+  color: inherit;
+  cursor: pointer;
+}
+
+a.doc-card:hover {
+  background: var(--tisty-hover);
+  border-color: var(--tisty-line);
+}
+
+a.doc-card:focus-visible {
+  outline: 2px solid var(--tisty-accent);
+  outline-offset: 2px;
+}
+
+.card-tile {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  background: var(--tisty-mark-doc);
+  border-radius: 8px;
+  color: var(--tisty-soft);
+}
+
+.is-page .card-tile {
+  background: var(--tisty-accent-soft);
+  color: var(--tisty-accent);
+}
+
+.card-glyph {
+  display: inline;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.card-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-name:has(+ .card-blurb:empty) {
+  grid-row: 1 / span 2;
+}
+
+.card-blurb {
+  grid-column: 2;
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--tisty-faint);
+  font-size: 0.86em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.card-blurb:empty {
+  display: none;
+}
+
+.card-meta {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tisty-faint);
+  font-size: 0.76em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.card-go {
+  font-size: 1.4em;
+  line-height: 1;
+}
+
+.chip {
+  padding: 1px 8px;
+  background: var(--tisty-accent-soft);
+  border-radius: 999px;
+  color: var(--tisty-accent);
+  font-weight: 550;
+}
+
+/* On a phone the page's number goes under its words, so they keep the width. */
+@media (max-width: 640px) {
+  .card-tile,
+  .card-go {
+    grid-row: 1 / span 3;
+  }
+
+  .card-meta {
+    display: contents;
+  }
+
+  .card-go {
+    grid-column: 3;
+    color: var(--tisty-faint);
+  }
+
+  .chip {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 4px;
+    font-size: 0.76em;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+figure.widget {
+  margin: 16px 0;
+}
+
+figure.widget figcaption {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  color: var(--tisty-faint);
+}
+
+figure.widget iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+}
+
+.widget-said {
+  margin: 12px 0 6px;
+  font-size: 12.5px;
+  color: var(--tisty-soft);
+}

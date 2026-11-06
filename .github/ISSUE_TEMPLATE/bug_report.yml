@@ -1,0 +1,67 @@
+name: Something is wrong
+description: A shared link, the reading page or the service did something it should not, or did not do what it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. English or Spanish, whichever you prefer.
+
+        **Never paste a whole link here.** What goes after the `#` is the key that opens the document, and an issue is public. The part before the `#` is enough, or none of it.
+
+        A security problem goes to [a private advisory](https://github.com/rgdevment/Folio-by-Tisty/security/advisories/new), never here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected to see instead.
+      placeholder: I opened a link I had just shared and the page said it was still being uploaded.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      description: The fewest steps that bring it back. «It happened once» helps too.
+      placeholder: |
+        1. Share a document with two pictures from Tisty
+        2. Open the reading link in another browser
+        3. Wait for the pictures
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Reading a link in the browser
+        - Sharing or putting up a new version from Tisty
+        - Editing or managing a shared document
+        - A password, a pause, a removal or the expiry
+        - Opening a link in Tisty
+        - Somewhere else
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome, Edge or another Chromium
+        - Firefox
+        - Safari
+        - Inside Tisty
+        - Another one
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Tisty version
+      description: If it happened while sharing from Tisty, the version it runs.
+      placeholder: "1.31.0"
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: A screenshot, a short video, or what the browser's console said. Leave out the key after the `#` and anything private.

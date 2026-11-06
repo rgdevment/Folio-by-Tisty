@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)" || exit 0
+
+written=$(sed '/^# -* >8 -*$/,$d' "$1" | git stripspace --strip-comments)
+[ -n "$written" ] || exit 0
+
+first=$(printf '%s\n' "$written" | head -n 1)
+case $first in
+  "Merge "* | "fixup! "* | "squash! "* | "amend! "*) exit 0 ;;
+esac
+
+if [ "$(printf '%s\n' "$written" | grep -c .)" -gt 1 ]; then
+  echo "x  a commit is one line, with nothing under it"
+  exit 1
+fi
+
+exec bash scripts/commits.sh --subject "$first"

@@ -1,0 +1,38 @@
+name: An idea
+description: Something the service or the reading page could do, or do better.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The service keeps promises about what it stores and for how long, so every idea is weighed against them and against what it would add to everyone's day. An issue first, before any code, saves both of us work. English or Spanish, whichever you prefer.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What gets in your way today
+      description: The situation, in your own words, before any solution.
+      placeholder: The person I share with cannot tell when the link will stop working.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+    validations:
+      required: true
+  - type: textarea
+    id: instead
+    attributes:
+      label: What you do instead now
+      description: A workaround, another tool, or nothing at all.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where it belongs
+      options:
+        - Reading a link
+        - Sharing, editing or managing a shared document
+        - Privacy, expiry or limits
+        - Somewhere else
+    validations:
+      required: true

@@ -1,0 +1,58 @@
+name = "folio-private"
+main = "src/private/index.ts"
+compatibility_date = "2026-08-01"
+workers_dev = false
+
+routes = [{ pattern = "tisty.cl", custom_domain = true }]
+
+# Free and uncounted (decision 109): only the API wakes the Worker, and any other path gets the page.
+[assets]
+directory = "./dist/page"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# Beside D1 and R2 in eastern North America, so a read's queries in a row cross the continent once (decision 94 bis).
+[placement]
+region = "aws:us-east-1"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "folio-private"
+database_id = "767d0dce-dff0-41b0-9857-b3ddcf2d36ad"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "ENVELOPES"
+bucket_name = "folio-private-envelopes"
+
+[[ratelimits]]
+name = "READS"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
+
+# Its window is not exact, so 2 here holds the button's one a minute without refusing a press on time (decision 125).
+[[ratelimits]]
+name = "SYNCS"
+namespace_id = "1002"
+simple = { limit = 2, period = 60 }
+
+# BILLING_DAY is the plan's renewal day, or 28 if it falls later (decision 118).
+[vars]
+BILLING_DAY = "1"
+CF_ACCOUNT_ID = "239d64b3f31b26a9da33dd5b68209970"
+CF_ZONE_ID = "56530808856fabd50bb1489615f3a031"
+CF_RULESET_ID = "fd140f2bc4e8460cb16cbf882f79c2fc"
+CF_RULE_ID = "49cfba980c6f46639cc6b9cb0960ee40"
+CF_DATABASE_ID = "767d0dce-dff0-41b0-9857-b3ddcf2d36ad"
+CF_SCRIPT_NAME = "folio-private"
+CF_BUCKET_NAME = "folio-private-envelopes"
+
+[triggers]
+crons = ["*/15 * * * *", "0 * * * *", "0 0,12 * * *", "0 4 * * 0"]
+
+# What the code logs is kept, and the request itself never is (decision 98).
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false

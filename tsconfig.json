@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types", "node"]
+  },
+  "include": ["src", "test", "vitest.config.ts", "vite.config.ts"],
+  "exclude": [
+    "src/page/ui",
+    "src/page/ui.d.ts",
+    "test/clean.test.ts",
+    "test/ask.test.ts",
+    "test/frame.test.ts",
+    "test/limits-file.test.ts",
+    "test/files.test.ts",
+    "test/report-form.test.ts",
+    "test/report.test.ts",
+    "test/theme.test.ts",
+    "test/show.test.ts"
+  ]
+}

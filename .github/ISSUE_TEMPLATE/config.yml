@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: A security problem
+    url: https://github.com/rgdevment/Folio-by-Tisty/security/advisories/new
+    about: Report it privately, never in a public issue.
+  - name: Something in the Tisty app
+    url: https://github.com/rgdevment/Tisty/issues/new/choose
+    about: Tasks, documents, syncing and everything else that happens inside the app.
+  - name: Abuse or a document that should come down
+    url: https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/TERMS.md
+    about: Reports and removal follow the terms of use, never a public issue.

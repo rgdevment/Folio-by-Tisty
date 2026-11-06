@@ -1,0 +1,71 @@
+name: Newer versions
+
+# Tisty publishes each version of the contract as a pre-release, and Dependabot does not follow a link to a .tgz.
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CONTRACT_REPO: rgdevment/Tisty
+
+jobs:
+  newer:
+    name: A newer contract gets an issue
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # An issue and not a pull request: one made with this token would not run the CI, and the samples are the point.
+      - name: Say it once
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          newest=$(gh release list --repo "$CONTRACT_REPO" --limit 1000 --json tagName --jq '.[].tagName' | bash scripts/contract.sh) || exit 1
+          if [ -z "$newest" ]; then
+            echo "the contract installed here is the newest"
+            exit 0
+          fi
+          title="The contract $newest is out"
+          body="Tisty published the contract $newest: https://github.com/$CONTRACT_REPO/releases/tag/contracts-v$newest
+
+          - Change the link in \`package.json\` and run \`npm install\`, in a pull request, so its samples run in CI.
+          - A new major version: Folio is deployed first and Tisty after, or the server refuses what Tisty uploads."
+          bash scripts/say-once.sh "$title" "$body"
+
+  age:
+    name: A newer age gets an issue
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Say it once
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          pinned=$(grep -oE 'download/v[0-9.]+' .github/workflows/backup.yml | cut -d/ -f2)
+          newest=$(gh release view --repo FiloSottile/age --json tagName --jq .tagName) || exit 1
+          [ -n "$pinned" ] || { echo "::error::backup.yml names no version of age"; exit 1; }
+          if [ "$newest" = "$pinned" ]; then
+            echo "age $pinned is the newest"
+            exit 0
+          fi
+          bash scripts/say-once.sh "age $newest is out" "The daily backup uses age $pinned. Change \`AGE_RELEASE\` and \`AGE_SHA256\` in \`backup.yml\`, in a pull request."

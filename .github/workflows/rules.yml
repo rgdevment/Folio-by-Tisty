@@ -1,0 +1,97 @@
+name: Rules
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  conventions:
+    name: Project conventions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+
+      - name: The workflows parse
+        run: |
+          set -euo pipefail
+          for one in .github/workflows/*.yml; do
+            if ! npx --no-install js-yaml "$one" > /dev/null; then
+              echo "::error::$one is not valid YAML, so whatever it runs will not run"
+              exit 1
+            fi
+          done
+          echo "every workflow parses"
+
+      # Parsing says nothing of a needs that names a job that is gone, or of input expanded into a shell.
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: zizmor@1.30.1
+      # Offline, so a pull request is judged on its own lines and never on whether GitHub's API answered.
+      - name: The workflows mean what they say
+        env:
+          SHELLCHECK_OPTS: --severity=warning
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint"
+          zizmor --offline --min-severity medium .github
+
+      - name: No action pinned here has a known vulnerability
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          # zizmor exits 1 only when it could not finish; findings exit 10 or more and are not retried.
+          for try in 1 2 3; do
+            code=0
+            zizmor --min-severity medium .github || code=$?
+            [ "$code" -ne 1 ] && exit "$code"
+            echo "::warning::try $try did not finish; asking GitHub again in a minute"
+            sleep 60
+          done
+          exit 1
+
+      # One implementation for the conventions a person can break in a second: the hook runs
+      # the same file, so local and CI can never drift into saying different things.
+      - name: The conventions the script keeps
+        run: bash scripts/rules.sh
+
+      # markdownlint only reads this repository's own Markdown, and npm's only fix for it is going back a version.
+      - name: No dependency has a serious known vulnerability
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          set -uo pipefail
+          npm audit --json > "$RUNNER_TEMP/audit.json" || true
+          [ "$(jq -r 'has("vulnerabilities")' "$RUNNER_TEMP/audit.json")" = true ] || { echo "::error::npm audit gave no report"; exit 1; }
+          serious=$(jq -r '[.vulnerabilities[] | select(.severity == "high" or .severity == "critical")
+            | select(.name | test("^(markdownlint|markdownlint-cli2|re2js)$") | not) | .name] | join(", ")' "$RUNNER_TEMP/audit.json")
+          if [ -n "$serious" ]; then
+            echo "::error::npm audit names $serious"
+            exit 1
+          fi
+
+      # Nothing else looks at a subject that reached main without a pull request.
+      - name: The subject that landed
+        if: github.event_name == 'push'
+        run: |
+          bash scripts/commits.sh --title "$(git log -1 --format=%s)"

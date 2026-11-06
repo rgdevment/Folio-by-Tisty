@@ -1,0 +1,1352 @@
+/* The frame is Folio's own (decision 113): quiet, with Tisty's orange only where it tells the reader something. */
+:root {
+  color-scheme: light dark;
+  --orange: #f97c3d;
+  --good: light-dark(#0b6b53, #4fc3a1);
+  --warn: light-dark(#a35a00, #e0a24d);
+  --bad: light-dark(#c62f45, #ff7a8a);
+  --desk: light-dark(#f5f5f7, #161618);
+  --desk-glow: light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.045));
+  --glass: light-dark(rgb(250 250 252 / 0.8), rgb(36 36 39 / 0.74));
+  --glass-thick: light-dark(rgb(250 250 252 / 0.84), rgb(44 44 48 / 0.8));
+  --glass-solid: light-dark(#fbfbfd, #242427);
+  --lift: light-dark(#ffffff, rgb(255 255 255 / 0.15));
+  --track: light-dark(rgb(0 0 0 / 0.055), rgb(255 255 255 / 0.07));
+  --shade-near: light-dark(rgb(0 0 0 / 0.06), rgb(0 0 0 / 0.3));
+  --shade-far: light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.5));
+  --bar-height: 52px;
+  --bar-float: calc(10px + env(safe-area-inset-top));
+  /* Where what is under the bar starts, down here so the panels, the fade and a heading jumped to agree. */
+  --bar-edge: calc(var(--bar-float) + var(--bar-height) + 18px);
+  --panels-foot: 16px;
+  --sheet-width: 820px;
+  --panels-width: 268px;
+  --desk-gap: 28px;
+  --layout-width: calc(var(--sheet-width) + var(--desk-gap) + var(--panels-width));
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --quick: 140ms;
+  --calm: 280ms;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Every movement takes its time from these two, so asking for none stops them all at once. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --quick: 0ms;
+    --calm: 0ms;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--desk);
+  scroll-behavior: smooth;
+  scrollbar-color: var(--tisty-line) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  /* The page reaches the whole screen (viewport-fit), so it keeps clear of a notch on its own. */
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  background: radial-gradient(1100px 520px at 50% -160px, var(--desk-glow), transparent) no-repeat;
+  color: var(--tisty-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--tisty-accent);
+  outline-offset: 2px;
+}
+
+.icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--calm);
+  animation-timing-function: ease;
+}
+
+/* The bar: a pane of glass floating over the page, as wide as what it heads. */
+.bar {
+  position: sticky;
+  top: var(--bar-float);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(var(--layout-width), 100% - 2 * var(--desk-gap));
+  height: var(--bar-height);
+  margin: var(--bar-float) auto 0;
+  padding: 0 10px 0 12px;
+  overflow: clip;
+  background: var(--glass-thick);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px var(--tisty-hair),
+    0 10px 30px -18px var(--shade-far);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+}
+
+/* What scrolls away melts into the desk before it reaches the bar, so no letters show around the glass. */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  height: var(--bar-edge);
+  background: linear-gradient(var(--desk) 55%, transparent);
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  -webkit-mask-image: linear-gradient(#000 70%, transparent);
+  mask-image: linear-gradient(#000 70%, transparent);
+}
+
+/* How far the reader has gone: a border follows the corners of the glass, and a fading mask keeps it from ending in a cut. */
+@supports (animation-timeline: scroll()) {
+  [data-state="open"] .bar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-bottom: 2px solid var(--orange);
+    border-radius: inherit;
+    pointer-events: none;
+    mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+    mask-repeat: no-repeat;
+    animation: read-on linear both;
+    animation-timeline: scroll(root);
+  }
+
+  @keyframes read-on {
+    from {
+      mask-size: 0 100%;
+    }
+
+    to {
+      mask-size: calc(100% + 32px) 100%;
+    }
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--tisty-ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brand-name {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.brand-by {
+  color: var(--tisty-faint);
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* Tisty's own icon, drawn here so it paints with the first byte, and white in both themes. */
+.brand-mark {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  transition: transform var(--calm) var(--ease);
+}
+
+.brand:hover .brand-mark {
+  transform: rotate(-4deg) scale(1.04);
+}
+
+.logo-back,
+.logo-front,
+.logo-fold {
+  stroke: #b3ab9e;
+  stroke-width: 2;
+}
+
+.logo-back,
+.logo-fold {
+  fill: #f1ede6;
+}
+
+.logo-front {
+  fill: #ffffff;
+}
+
+.logo-lines {
+  fill: none;
+  stroke: rgb(110 104 96 / 0.4);
+  stroke-width: 6;
+}
+
+.logo-note {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 6;
+}
+
+.logo-badge {
+  fill: var(--orange);
+}
+
+.logo-check {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 4.5;
+}
+
+/* The way back from a page to its document, always in reach. */
+.crumb {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 1px solid var(--tisty-hair);
+  color: var(--tisty-faint);
+  font-size: 12.5px;
+}
+
+.crumb-back {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 10px 0 4px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--tisty-soft);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--quick),
+    color var(--quick);
+}
+
+.crumb-back:hover {
+  background: var(--track);
+  color: var(--tisty-ink);
+}
+
+.crumb-at {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bar-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.seal {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  padding: 5px 10px 5px 7px;
+  background: color-mix(in srgb, var(--seal) 11%, transparent);
+  border-radius: 999px;
+  color: var(--seal);
+  font-size: 12.5px;
+  font-weight: 550;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.seal[data-tone="good"] {
+  --seal: var(--good);
+}
+
+.seal[data-tone="warn"] {
+  --seal: var(--warn);
+}
+
+.seal[data-tone="bad"] {
+  --seal: var(--bad);
+}
+
+.tool {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  color: var(--tisty-soft);
+  cursor: pointer;
+  transition:
+    background var(--quick),
+    color var(--quick);
+}
+
+.tool:hover {
+  background: var(--track);
+  color: var(--tisty-ink);
+}
+
+.tool[aria-pressed="true"] {
+  background: var(--track);
+  color: var(--tisty-ink);
+}
+
+/* Both drawings lie one on the other, and the color scheme alone says which one has ink: it needs no script to wake. */
+.tool .icon {
+  grid-area: 1 / 1;
+  transition: stroke var(--calm);
+}
+
+.tool .theme-to-dark {
+  stroke: light-dark(currentColor, transparent);
+}
+
+.tool .theme-to-light {
+  stroke: light-dark(transparent, currentColor);
+}
+
+/* While it opens, and when it does not: a blank sheet where the document will be, so nothing moves when it arrives. */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: min(var(--sheet-width), 100% - 2 * var(--desk-gap));
+  min-height: min(68vh, 640px);
+  margin: var(--desk-gap) auto;
+  padding: 24px;
+  background: var(--tisty-sheet);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--tisty-hair),
+    0 18px 50px -24px var(--shade-far),
+    0 4px 14px -8px var(--shade-near);
+  color: var(--tisty-soft);
+  font-size: 14px;
+  text-align: center;
+  text-wrap: balance;
+}
+
+[data-state="closed"] .loading {
+  width: min(480px, 100% - 2 * var(--desk-gap));
+  min-height: 300px;
+  margin-top: 12vh;
+  line-height: 1.55;
+}
+
+.pen {
+  width: 40px;
+  height: 40px;
+  fill: none;
+  stroke: var(--tisty-faint);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pen-line {
+  stroke: var(--tisty-ink);
+  stroke-dasharray: 60;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-state="loading"] .pen-line {
+    animation: write 1.6s var(--ease) infinite;
+  }
+}
+
+[data-state="closed"] .pen-line {
+  stroke: var(--tisty-faint);
+}
+
+@keyframes write {
+  from {
+    stroke-dashoffset: 60;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.desk {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--desk-gap);
+  padding: var(--desk-gap) var(--desk-gap) 64px;
+  animation: arrive var(--calm) ease;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+  }
+}
+
+.sheet-column {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.one-line {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The document's pages, after it and on a card of their own, as Tisty shows them. */
+.pages-card {
+  width: var(--page-width, var(--sheet-width));
+  max-width: 100%;
+  margin: 28px auto 0;
+  padding: 26px 40px 30px;
+  background: var(--tisty-sheet);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--tisty-hair),
+    0 18px 50px -24px var(--shade-far),
+    0 4px 14px -8px var(--shade-near);
+}
+
+.pages-card h2 {
+  margin: 0 0 10px;
+  color: var(--tisty-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pages-count {
+  margin-left: 4px;
+  color: var(--tisty-faint);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.pages {
+  margin: 0 -10px;
+  padding: 0;
+  list-style: none;
+  counter-reset: page;
+}
+
+.pages li {
+  counter-increment: page;
+}
+
+.pages button {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--tisty-ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--quick);
+}
+
+.pages button::before {
+  content: counter(page, decimal-leading-zero);
+  flex: none;
+  color: var(--tisty-faint);
+  font-size: 12.5px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+
+.pages button:hover {
+  background: var(--tisty-hover);
+}
+
+.pages [aria-current="page"] {
+  background: var(--track);
+}
+
+.pages [aria-current="page"]::before {
+  color: var(--orange);
+  font-weight: 600;
+}
+
+.sheet-host {
+  display: block;
+  width: var(--page-width, var(--sheet-width));
+  max-width: 100%;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--tisty-hair),
+    0 18px 50px -24px var(--shade-far),
+    0 4px 14px -8px var(--shade-near);
+  transition: width var(--calm) var(--ease);
+}
+
+/* Taller than the window, it stops with its foot in view, so the page's one scrollbar reaches all of it. */
+.panels {
+  position: sticky;
+  top: min(var(--bar-edge), 100vh - var(--panels-height, 0px) - var(--panels-foot));
+  flex: 0 0 var(--panels-width);
+  display: flex;
+  flex-direction: column;
+  background: var(--glass);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px var(--tisty-hair),
+    0 10px 30px -18px var(--shade-far);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+}
+
+.panel {
+  padding: 14px;
+  border-top: 1px solid var(--tisty-hair);
+}
+
+/* It takes the focus only so a keyboard lands inside it, and the panel itself is no control. */
+.panel:focus {
+  outline: none;
+}
+
+.panel h2 {
+  margin: 0 0 6px;
+  color: var(--tisty-faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-top: 0;
+}
+
+.actions-note {
+  flex: 0 0 100%;
+  margin: 2px 0 0;
+  color: var(--tisty-faint);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+/* Over everything and away from the words, because it appears when the reader has just asked to leave them. */
+.opening-tisty {
+  position: fixed;
+  right: 0;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  left: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: calc(100% - 2 * var(--desk-gap));
+  margin-inline: auto;
+  padding: 8px 8px 8px 16px;
+  background: var(--glass-thick);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px var(--tisty-hair),
+    0 12px 32px -10px var(--shade-far);
+  color: var(--tisty-soft);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  animation: rise var(--calm) var(--ease);
+}
+
+.opening-tisty p {
+  margin: 0;
+}
+
+.opening-tisty a {
+  color: var(--tisty-ink);
+  white-space: nowrap;
+  font-weight: 550;
+}
+
+.action {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  background: var(--track);
+  border: 0;
+  border-radius: 8px;
+  color: var(--tisty-ink);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    opacity var(--quick),
+    transform var(--quick) var(--ease);
+}
+
+.action:hover {
+  opacity: 0.82;
+}
+
+.action:active {
+  transform: scale(0.98);
+}
+
+.action-main {
+  background: var(--tisty-ink);
+  color: var(--tisty-sheet);
+}
+
+.paper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.leaves {
+  flex: 1 1 auto;
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  min-width: 0;
+  margin: 0;
+  padding: 2px;
+  background: var(--track);
+  border: 0;
+  border-radius: 8px;
+}
+
+.leaf {
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  color: var(--tisty-soft);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color var(--quick);
+}
+
+.leaf:hover {
+  color: var(--tisty-ink);
+}
+
+.leaf[aria-pressed="true"] {
+  background: var(--lift);
+  box-shadow:
+    0 0 0 1px var(--shade-near),
+    0 1px 2px var(--shade-near);
+  color: var(--tisty-ink);
+  font-weight: 500;
+}
+
+/* A long list is a window on itself, so the page keeps the only scrollbar anyone sees, and fading edges show there is more. */
+.index {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* What the rest of the panel leaves free in the window, so all of it fits when it can. */
+  max-height: max(168px, 100vh - var(--bar-edge) - var(--panels-foot) - var(--panels-rest, 564px));
+  margin: 0 0 -6px;
+  padding: 6px 0;
+  overflow-y: auto;
+  list-style: none;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(transparent, #000 6px, #000 calc(100% - 10px), transparent);
+  mask-image: linear-gradient(transparent, #000 6px, #000 calc(100% - 10px), transparent);
+}
+
+.index::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .index {
+    scroll-behavior: auto;
+  }
+}
+
+.index button {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 100%;
+  padding: 4px 8px 4px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 0 6px 6px 0;
+  color: var(--tisty-soft);
+  font-size: 12.5px;
+  line-height: 1.35;
+  text-align: left;
+  text-wrap: pretty;
+  cursor: pointer;
+  transition: color var(--quick);
+}
+
+.index button:hover {
+  color: var(--tisty-ink);
+}
+
+.outline {
+  border-left: 1px solid var(--tisty-hair);
+}
+
+/* Where the reader is: a mark on the rail. */
+.outline [aria-current] {
+  color: var(--tisty-ink);
+  font-weight: 500;
+}
+
+.outline [aria-current]::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 2px;
+  background: var(--orange);
+  border-radius: 1px;
+}
+
+.outline [data-level="3"] button {
+  padding-left: 24px;
+}
+
+.outline [data-level="4"] button,
+.outline [data-level="5"] button,
+.outline [data-level="6"] button {
+  padding-left: 36px;
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.facts + .facts,
+.explain + .facts {
+  margin-top: 12px;
+}
+
+.facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.facts dt {
+  flex: none;
+  color: var(--tisty-soft);
+}
+
+/* A property is named as it was written, and it should not look unfinished for it. */
+.facts dt::first-letter {
+  text-transform: uppercase;
+}
+
+.facts dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.facts .fingerprint {
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.explain {
+  margin: 6px 0 0;
+  color: var(--tisty-soft);
+  font-size: 12px;
+}
+
+.explain summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  list-style: none;
+  cursor: pointer;
+  transition: color var(--quick);
+}
+
+.explain summary::-webkit-details-marker {
+  display: none;
+}
+
+.explain summary:hover {
+  color: var(--tisty-ink);
+}
+
+.explain summary::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-top: 1.25px solid currentColor;
+  border-right: 1.25px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--quick) var(--ease);
+}
+
+.explain[open] summary::before {
+  transform: translateY(-1px) rotate(135deg);
+}
+
+.explain p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.foot {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--tisty-hair);
+}
+
+.report {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--tisty-faint);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color var(--quick);
+}
+
+.report:hover:enabled {
+  color: var(--bad);
+}
+
+.report:disabled {
+  cursor: not-allowed;
+}
+
+.report-dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 20px;
+  overflow-y: auto;
+  background: var(--tisty-sheet);
+  border: 1px solid var(--tisty-hair);
+  border-radius: 12px;
+  color: var(--tisty-ink);
+  font-size: 14px;
+  text-align: left;
+}
+
+.report-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.report-dialog h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.report-dialog fieldset {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
+.report-dialog legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--tisty-soft);
+  font-size: 12px;
+}
+
+.report-dialog label {
+  display: block;
+  padding: 3px 0;
+}
+
+.report-dialog textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px;
+  background: transparent;
+  border: 1px solid var(--tisty-line);
+  border-radius: 6px;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.report-detail {
+  margin-bottom: 12px;
+}
+
+#report-consent p,
+.report-note {
+  margin: 4px 0 12px;
+  color: var(--tisty-soft);
+  font-size: 12px;
+}
+
+.report-note a {
+  color: inherit;
+}
+
+.said-aloud {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.report-said:empty {
+  display: none;
+}
+
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.report-actions button {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--tisty-line);
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.report-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* The foot of the page: who made this, and what happened to the document on its way here. */
+.page-foot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  width: min(var(--layout-width), 100% - 2 * var(--desk-gap));
+  margin: 0 auto;
+  padding: 24px 0 32px;
+  border-top: 1px solid var(--tisty-hair);
+  color: var(--tisty-faint);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+[data-state="loading"] .page-foot {
+  display: none;
+}
+
+[data-state="closed"] .page-foot {
+  margin-top: 12vh;
+}
+
+/* It speaks of the document open above it, so without one it has nothing to say. */
+[data-state="closed"] .page-foot-promise {
+  display: none;
+}
+
+.mascot {
+  width: 52px;
+  height: auto;
+  transform-origin: 50% 85%;
+  transition: transform var(--calm) var(--ease);
+}
+
+/* Tisto looks up when someone comes close. */
+.page-foot:hover .mascot {
+  transform: rotate(-7deg);
+}
+
+.page-foot-words p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.page-foot-words strong {
+  color: var(--tisty-ink);
+  font-weight: 600;
+}
+
+.page-foot-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px 0 14px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--tisty-line);
+  color: var(--tisty-ink);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--quick);
+}
+
+.page-foot-link:hover {
+  background: var(--track);
+}
+
+.page-foot-link .icon {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--quick) var(--ease);
+}
+
+.page-foot-link:hover .icon {
+  transform: translateX(2px);
+}
+
+.scrim,
+.dock {
+  display: none;
+}
+
+/* While it opens, the sheet waits exactly where it will stay once the panels are beside it. */
+@media (min-width: 1181px) {
+  [data-state="loading"] .loading {
+    margin-left: calc((100% - var(--sheet-width) - var(--desk-gap) - var(--panels-width)) / 2);
+  }
+}
+
+/* Below this the panels no longer fit beside the sheet, so they rise from below (whitepaper, «Leer en la web»). */
+@media (max-width: 1180px) {
+  :root {
+    --desk-gap: 16px;
+    --layout-width: var(--sheet-width);
+  }
+
+  .desk {
+    display: block;
+    padding-bottom: 40px;
+  }
+
+  /* The dock floats over this, so it leaves the room. */
+  .page-foot {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .sheet-host {
+    margin: 0 auto;
+  }
+
+  .panels {
+    position: static;
+    max-width: var(--sheet-width);
+    margin: 14px auto 0;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .panel-actions {
+    padding: 0;
+  }
+
+  .actions-note {
+    font-size: 12.5px;
+  }
+
+  /* Above the dock, which stays where it is. */
+  .opening-tisty {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
+  .action {
+    min-height: 42px;
+    border-radius: 11px;
+    font-size: 14px;
+  }
+
+  .panel:not(.panel-actions) {
+    display: none;
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 5;
+    max-height: 72vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 28px calc(20px + env(safe-area-inset-right)) calc(88px + env(safe-area-inset-bottom))
+      calc(20px + env(safe-area-inset-left));
+    background: var(--glass-solid);
+    border: 0;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -12px 40px var(--shade-far);
+  }
+
+  .panel[data-open] {
+    display: block;
+    animation: rise var(--calm) var(--ease);
+  }
+
+  .paper[data-open] {
+    display: flex;
+  }
+
+  /* The grabber a sheet from below is known by. */
+  .panel:not(.panel-actions)::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    background: var(--tisty-line);
+    border-radius: 2px;
+  }
+
+  .panel h2 {
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+
+  .leaf {
+    height: 34px;
+    font-size: 14px;
+  }
+
+  .paper .tool {
+    width: 40px;
+    height: 40px;
+  }
+
+  .index {
+    max-height: 52vh;
+  }
+
+  .index button {
+    padding: 8px 10px 8px 14px;
+    font-size: 15px;
+  }
+
+  .pages-card {
+    margin-top: 16px;
+    padding: 22px 18px 24px;
+  }
+
+  .facts {
+    gap: 10px;
+    font-size: 14px;
+  }
+
+  .facts .fingerprint {
+    font-size: 13px;
+  }
+
+  .explain {
+    margin-top: 10px;
+    font-size: 14px;
+  }
+
+  .foot {
+    padding: 18px 2px 0;
+    border: 0;
+    text-align: center;
+  }
+
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    background: rgb(0 0 0 / 0.28);
+    animation: arrive var(--calm) ease;
+  }
+
+  .dock {
+    display: flex;
+    position: fixed;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    left: 50%;
+    z-index: 6;
+    gap: 2px;
+    padding: 4px;
+    background: var(--glass-thick);
+    border-radius: 999px;
+    box-shadow:
+      0 0 0 1px var(--tisty-hair),
+      0 12px 32px -10px var(--shade-far);
+    transform: translateX(-50%);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+  }
+
+  .dock button {
+    min-height: 40px;
+    padding: 0 16px;
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    color: var(--tisty-soft);
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background var(--quick),
+      color var(--quick);
+  }
+
+  .dock button:hover,
+  .dock [aria-expanded="true"] {
+    background: var(--track);
+    color: var(--tisty-ink);
+  }
+}
+
+@media (max-width: 480px) {
+  /* The rest of the name gives way to a verdict that needs the room, which wraps before it is ever cut. */
+  .bar:has(.seal:not([data-tone="good"])) .brand-by {
+    display: none;
+  }
+
+  /* On a page, the bar keeps the mark, the way back and where the reader is. */
+  .bar:has(.crumb:not([hidden])) .brand-name,
+  .crumb-title,
+  .crumb-word {
+    display: none;
+  }
+
+  .crumb {
+    padding-left: 8px;
+  }
+
+  .crumb-back {
+    padding-right: 2px;
+  }
+
+  .page-foot {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+/* Paper is light, whichever theme the screen was in. */
+@media print {
+  :root,
+  :root[data-theme] {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background: none;
+  }
+
+  body::before {
+    display: none;
+  }
+
+  .bar,
+  .loading,
+  .pages-card,
+  .panels,
+  .page-foot,
+  .opening-tisty,
+  .dock,
+  .scrim {
+    display: none;
+  }
+
+  .desk {
+    display: block;
+    padding: 0;
+  }
+
+  .sheet-host {
+    box-shadow: none;
+  }
+}
+
+/* Last and doubled, so no display above can show what the page hid. */
+[hidden][hidden] {
+  display: none;
+}

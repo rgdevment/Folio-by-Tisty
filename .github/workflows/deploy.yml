@@ -1,0 +1,351 @@
+name: Deploy
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      back_to:
+        description: "The Worker version to put back, as `wrangler versions list` names it. Deploys nothing new."
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  FOLIO_URL: https://tisty.cl
+  DATABASE: folio-private
+
+jobs:
+  tested:
+    name: Tested when it landed
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      # Before anything ships: the release's notes are the tag's words, and a plain tag has none.
+      - name: The tag says what it brings
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          kind=$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq .object.type)
+          if [ "$kind" != tag ]; then
+            echo "::error::$TAG has no message: tag it with git tag -a, saying what the version brings"
+            exit 1
+          fi
+      - name: This commit passed CI on main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for attempt in $(seq 1 100); do
+            if ! said=$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --event push \
+              --limit 1 --json status,conclusion \
+              --jq 'if length == 0 then "" else .[0] | "\(.status) \(.conclusion)" end' \
+              2>"$RUNNER_TEMP/gh.err"); then
+              echo "::error::the run history could not be read: $(cat "$RUNNER_TEMP/gh.err")"
+              exit 1
+            fi
+            case "$said" in
+              "completed success")
+                echo "the commit this tag names passed CI on main"
+                exit 0
+                ;;
+              "completed "*)
+                echo "::error::CI on ${GITHUB_SHA:0:8} ended ${said#completed }, so this tag ships nothing"
+                exit 1
+                ;;
+              "")
+                echo "no CI run for ${GITHUB_SHA:0:8} yet (${attempt}/100)"
+                ;;
+              *)
+                echo "CI on ${GITHUB_SHA:0:8} is still running (${attempt}/100)"
+                ;;
+            esac
+            sleep 30
+          done
+          echo "::error::fifty minutes and CI on ${GITHUB_SHA:0:8} has not finished, or never ran: a tag belongs on a commit tested on main"
+          exit 1
+
+  # Built apart from the token: building runs the code of every npm package the page bundles.
+  page:
+    name: Build the page
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm run budget
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: page
+          path: dist/page
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+      - name: What the release publishes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/release
+          bash scripts/page-code.sh sums dist/page > dist/release/SHA256SUMS
+          # npm cannot name a package with no version, and the tag is the only version Folio has.
+          npm pkg set "version=${TAG#v}"
+          npm sbom --sbom-format spdx --package-lock-only > dist/release/folio.spdx.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: dist/release
+          if-no-files-found: error
+          retention-days: 7
+
+  # Apart from the build, so the code of an npm package never holds the identity that signs.
+  attest:
+    name: Attest the page
+    needs: [tested, page]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: dist/release
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: dist/release/SHA256SUMS
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: dist/release/SHA256SUMS
+          sbom-path: dist/release/folio.spdx.json
+
+  deploy:
+    name: Deploy the Worker
+    needs: [tested, page, attest]
+    if: github.event_name == 'push'
+    # Its deployment rules let only v* tags and main reach the Cloudflare token.
+    environment: prod-private
+    # On the jobs that touch the Worker, or a rollback would wait for a tag that is still waiting for CI.
+    concurrency:
+      group: worker
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: The account and its token are there
+        run: |
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "::error::the prod-private environment has no CLOUDFLARE_API_TOKEN secret"; exit 1; }
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || { echo "::error::the prod-private environment has no CLOUDFLARE_ACCOUNT_ID variable"; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The settings were filled in
+        run: |
+          if grep -qE '^database_id = "[0-]+"$' wrangler.toml; then
+            echo "::error::wrangler.toml still holds the placeholder D1 id"
+            exit 1
+          fi
+          if grep -qE '^[A-Z_]+ = ""$' wrangler.toml; then
+            echo "::error::wrangler.toml still has empty settings: $(grep -E '^[A-Z_]+ = ""$' wrangler.toml | cut -d' ' -f1 | tr '\n' ' ')"
+            exit 1
+          fi
+      # A Worker route answers only on a name with a proxied DNS record, and without one the check below says nothing useful.
+      - name: The domain resolves
+        run: |
+          if ! getent hosts "${FOLIO_URL#https://}" > /dev/null; then
+            echo "::error::${FOLIO_URL#https://} does not resolve: it needs a proxied DNS record in Cloudflare"
+            exit 1
+          fi
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      # From the lockfile and with no scripts, so nothing runs by surprise with the token in reach.
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: page
+          path: dist/page
+
+      # Before anything changes, so nothing goes up that would answer without them.
+      - name: The secrets are there
+        run: |
+          set -euo pipefail
+          npx --no-install wrangler secret list --format json > "$RUNNER_TEMP/secrets.json"
+          for name in FOLIO_SECRET CF_API_TOKEN MAIL_USER MAIL_PASSWORD ALERT_TO HEARTBEAT_URL SPEND_HEARTBEAT_URL DIGEST_HEARTBEAT_URL; do
+            jq -e --arg name "$name" 'any(.[]; .name == $name)' "$RUNNER_TEMP/secrets.json" > /dev/null \
+              || { echo "::error::the Worker has no $name secret: put it with wrangler secret put"; exit 1; }
+          done
+
+      # Read before anything changes, so a deploy that goes wrong knows what to go back to.
+      - name: What runs now
+        id: before
+        run: |
+          set -uo pipefail
+          # Stopping here, or a failed deploy would have nothing to go back to. The very first one goes up by hand.
+          if ! npx --no-install wrangler deployments status --json > "$RUNNER_TEMP/status.json"; then
+            echo "::error::what runs now could not be read, so nothing changed. If this Worker never ran, deploy it once by hand"
+            exit 1
+          fi
+          if [ "$(jq '.versions | length' "$RUNNER_TEMP/status.json")" -gt 1 ]; then
+            echo "::error::a gradual deployment is under way; finish it or roll it back before tagging"
+            exit 1
+          fi
+          version=$(jq -r '.versions[0].version_id // empty' "$RUNNER_TEMP/status.json")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "running now: ${version:-nothing yet}"
+
+      # The tables change first and only ever grow (rules.sh holds the migrations to it), so the version running now still reads them.
+      - name: The tables, before the code that reads them
+        run: npx --no-install wrangler d1 migrations apply "$DATABASE" --remote
+
+      # It goes by file name, so it says nothing of a migration changed after it was applied.
+      - name: The tables are what the migrations make
+        run: bash scripts/same-schema.sh "$DATABASE" --remote
+
+      - name: Deploy
+        id: deploy
+        run: npx --no-install wrangler deploy --var "FOLIO_TAG:$TAG" --tag "$TAG" --message "$TAG ${GITHUB_SHA:0:8}"
+
+      # The tag it says proves the new version answers, and a document asked for proves it reaches D1 and R2.
+      - name: It answers as it should
+        run: |
+          set -uo pipefail
+          # The spending rule answers before the Worker, so a fix sent during a block could never pass this.
+          stage=$(npx --no-install wrangler d1 execute "$DATABASE" --remote --json \
+            --command "SELECT stage FROM service_stage WHERE id = 1" | jq -r '.[0].results[0].stage // "open"')
+          if [ "$stage" = blocked ]; then
+            echo "::warning::the spending rule is on, so $TAG stays deployed without being checked"
+            exit 0
+          fi
+          answers() {
+            local status said
+            status=$(curl -s -D "$RUNNER_TEMP/headers" -o "$RUNNER_TEMP/body" -w '%{http_code}' "$FOLIO_URL/api/v1/docs/AAAAAAAA") || return 1
+            if grep -qi '^cf-mitigated:' "$RUNNER_TEMP/headers"; then
+              return 2
+            fi
+            said=$(grep -i '^folio-worker:' "$RUNNER_TEMP/headers" | cut -d' ' -f2 | tr -d '\r')
+            [ "$said" = "$TAG" ] || return 1
+            [ "$status" = 404 ] || return 1
+            jq -e '.refused == "missing"' "$RUNNER_TEMP/body" > /dev/null || return 1
+            grep -qi '^x-robots-tag: noindex' "$RUNNER_TEMP/headers" || return 1
+            # Asked as a browser opens a link, so anything but the page means its assets did not ship.
+            status=$(curl -s -D "$RUNNER_TEMP/page-headers" -o "$RUNNER_TEMP/page" -w '%{http_code}' \
+              -H 'Sec-Fetch-Mode: navigate' "$FOLIO_URL/AAAAAAAA") || return 1
+            [ "$status" = 200 ] || return 1
+            grep -qi '^content-security-policy:.*script-src .self.' "$RUNNER_TEMP/page-headers" || return 1
+            grep -q 'id="sheet"' "$RUNNER_TEMP/page" || return 1
+            [ "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$FOLIO_URL/")" = "301 https://www.tisty.app/" ] || return 1
+            curl -s "$FOLIO_URL/robots.txt" | grep -qx 'Disallow: /' || return 1
+          }
+          for attempt in $(seq 1 10); do
+            verdict=0
+            answers || verdict=$?
+            case $verdict in
+              0)
+                echo "$FOLIO_URL answers as $TAG should"
+                exit 0
+                ;;
+              2)
+                echo "::warning::$FOLIO_URL challenged this runner, so $TAG stays deployed without being checked"
+                exit 0
+                ;;
+            esac
+            echo "not yet ($attempt/10)"
+            sleep 6
+          done
+          echo "::error::$FOLIO_URL does not answer as $TAG should after the deploy"
+          exit 1
+
+      - name: Back to what ran before
+        if: (failure() || cancelled()) && steps.deploy.outcome != 'skipped' && steps.before.outputs.version != ''
+        env:
+          BACK_TO: ${{ steps.before.outputs.version }}
+        run: |
+          npx --no-install wrangler rollback "$BACK_TO" --yes --message "$TAG did not hold after its deploy"
+          echo "::error::$TAG was rolled back to $BACK_TO"
+
+      # After the step that goes back: a working version stays up, and a difference is for a person to read.
+      - name: What it serves is what was attested
+        run: bash scripts/page-code.sh served dist/page "$FOLIO_URL"
+
+  release:
+    name: Publish the release
+    needs: deploy
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: dist/release
+      - name: Publish it
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "$TAG is already published"
+            exit 0
+          fi
+          set -euo pipefail
+          tag_object=$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq .object.sha)
+          gh api "repos/$GH_REPO/git/tags/$tag_object" --jq .message \
+            | sed '/-----BEGIN SSH SIGNATURE-----/,$d' > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" dist/release/SHA256SUMS dist/release/folio.spdx.json --verify-tag --notes-file "$RUNNER_TEMP/notes.md"
+
+  rollback:
+    name: Put a version back
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    environment: prod-private
+    concurrency:
+      group: worker
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      BACK_TO: ${{ inputs.back_to }}
+    steps:
+      - name: The version reads as one
+        run: |
+          [[ "$BACK_TO" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] \
+            || { echo "::error::'$BACK_TO' is not a Worker version id"; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      # Migrations stay as they are: the tables only ever grow, so an older version still reads them.
+      - name: Put it back
+        run: npx --no-install wrangler rollback "$BACK_TO" --yes --message "put back by hand"
