@@ -229,7 +229,6 @@ describe("a card in the words", () => {
 
 describe("a link that lets someone edit", () => {
   const EDIT_ADDRESS = "https://tisty.cl/k7Qm2xPa#THEKEY.THETOKEN";
-  const copied = vi.fn(async (_said: string) => {});
 
   beforeEach(() => {
     const dom = new JSDOM(readFileSync("src/page/index.html", "utf8"), { url: EDIT_ADDRESS });
@@ -242,15 +241,12 @@ describe("a link that lets someone edit", () => {
     vi.stubGlobal("window", place);
     vi.stubGlobal("document", place.document);
     vi.stubGlobal("location", place.location);
-    vi.stubGlobal("navigator", { clipboard: { writeText: copied } });
-    copied.mockClear();
     draw(HELD);
   });
 
-  it("copies the link to read it, and never its token", async () => {
-    place.document.getElementById("copy-link")?.click();
-    await vi.waitFor(() => expect(copied).toHaveBeenCalled());
-    expect(copied).toHaveBeenCalledExactlyOnceWith("https://tisty.cl/k7Qm2xPa#THEKEY");
+  it("offers no button to pass the link on, which is its author's to share", () => {
+    expect(place.document.getElementById("copy-link")).toBeNull();
+    expect(place.document.body.textContent).not.toContain("Copiar link");
   });
 
   it("hands Tisty the token, which is the one place it goes", () => {

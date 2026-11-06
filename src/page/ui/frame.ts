@@ -1,5 +1,4 @@
 import type { Document, Orientation, Page, Paper, Verdict } from "@tisty/contracts";
-import { readingLink } from "../link";
 import { cardsFor, referenceOf } from "./cards";
 import { bareUrl } from "./clean";
 import sheetStyles from "./sheet.css?url";
@@ -259,15 +258,6 @@ const drawActions = (): void => {
   const edit = element<HTMLAnchorElement>("edit-in-tisty");
   edit.href = `tisty://edit?link=${encodeURIComponent(location.href)}`;
   offerTisty(edit);
-  const label = element("copy-link-text");
-  const said = label.textContent;
-  element("copy-link").addEventListener("click", async () => {
-    await navigator.clipboard.writeText(readingLink(location));
-    label.textContent = "Copiado";
-    setTimeout(() => {
-      label.textContent = said;
-    }, 1500);
-  });
 };
 
 let opener: HTMLElement | null = null;
