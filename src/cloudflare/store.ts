@@ -4,6 +4,7 @@ import { momentOf } from "../core/moment";
 import { toBase64Url } from "../core/start";
 import type {
   Admitted,
+  Appealed,
   Created,
   Held,
   KeptFiles,
@@ -46,6 +47,7 @@ interface DocRow {
   versions: string;
   blocked_at: number | null;
   paused_at: number | null;
+  counts_from: number;
 }
 
 // A document being forgotten: nothing can move it on from here, and the sweep finishes it even after failing halfway.
@@ -74,6 +76,16 @@ const REPORT_REPLACES = `(reports.cleared = 1 OR ${REPORT_RISES})`;
 // What keeps a document past its days, not served and not deleted (decision 42). Reports leave once their days pass.
 const HELD_AS_EVIDENCE = (doc: string, today: string): string =>
   `(COALESCE(${doc}.legal_until, 0) >= ${today} OR EXISTS (SELECT 1 FROM reports r WHERE r.doc = ${doc}.id AND ${REPORT_AS_EVIDENCE}))`;
+
+const LIVES_ON = "CASE WHEN paused_at IS NULL THEN MAX(dies_on, ?1 + ttl_days) ELSE dies_on END";
+
+// What can block now: an appeal that cleared its owner leaves earlier versions on record and out of the count.
+const COUNTS_NOW = `${REPORT_THAT_BLOCKS} AND r.version >= docs.counts_from`;
+// A version no longer listed, or a report with none, is not proof that someone else signed it.
+const SIGNED_BY_OWNER = `COALESCE(
+  (SELECT json_extract(j.value, '$.signer') FROM json_each(docs.versions) j WHERE json_extract(j.value, '$.n') = r.version),
+  docs.owner
+) = docs.owner`;
 
 const HOURS_IN_A_DAY = 24;
 
@@ -152,8 +164,9 @@ export class Cloud implements Store {
   async upload(upload: Upload, today: number, known?: Held): Promise<Uploaded> {
     const held = known ?? (await this.held(upload.id));
     if (!held) return "missing";
-    if (held.blocked) return "blocked";
-    if (held.paused) return "paused";
+    const correcting = held.correctable && upload.byOwner;
+    if (held.blocked && !correcting) return "blocked";
+    if (held.paused && !correcting) return "paused";
     const { versions } = held;
     if (held.latest === upload.n && versions.at(-1)?.hash === upload.hash) return "same";
     if (upload.n !== held.latest + 1) return "behind";
@@ -183,14 +196,16 @@ export class Cloud implements Store {
       throw error;
     }
 
-    const alive = `dies_on = CASE WHEN paused_at IS NULL THEN MAX(dies_on, ?1 + ttl_days) ELSE dies_on END,
-                   active_day = MAX(active_day, ?1)`;
     const [moved] = await this.#db.batch([
       this.#db
         .prepare(
           `UPDATE docs SET latest = ?2, versions = ?3, bytes = ?4,
-             owner_mark = CASE WHEN ?7 THEN ?8 ELSE owner_mark END, fix_by = NULL, ${alive}
-           WHERE id = ?5 AND latest = ?6 AND blocked_at IS NULL AND paused_at IS NULL AND permit IS ?9`,
+             owner_mark = CASE WHEN ?7 THEN ?8 ELSE owner_mark END, fix_by = NULL,
+             dies_on = CASE WHEN blocked_at IS NULL THEN ${LIVES_ON} WHEN paused_at IS NULL THEN ?1 + ttl_days ELSE paused_at + ?10 END,
+             active_day = MAX(active_day, ?1),
+             blocked_at = NULL, blocked_hour = NULL, appealed_at = NULL, appealed_hour = NULL
+           WHERE id = ?5 AND latest = ?6 AND permit IS ?9
+             AND ((blocked_at IS NULL AND paused_at IS NULL) OR (?7 AND blocked_at IS NOT NULL AND counts_from = ?2))`,
         )
         .bind(
           today,
@@ -202,13 +217,14 @@ export class Cloud implements Store {
           upload.byOwner ? 1 : 0,
           upload.ownerMark,
           upload.permit,
+          this.#limits.pausedDays,
         ),
       // A new version of a language is activity of the whole group (decisions 50 and 69 bis).
       ...(held.anchor
         ? [
             this.#db
               .prepare(
-                `UPDATE docs SET ${alive}
+                `UPDATE docs SET dies_on = ${LIVES_ON}, active_day = MAX(active_day, ?1)
                  WHERE id = ?2 AND latest >= 0 AND EXISTS (SELECT 1 FROM docs l WHERE l.id = ?3 AND l.latest = ?4)`,
               )
               .bind(today, held.anchor, upload.id, upload.n),
@@ -258,6 +274,7 @@ export class Cloud implements Store {
       versions: JSON.parse(row.versions) as Version[],
       blocked: row.blocked_at !== null,
       paused: row.paused_at !== null,
+      correctable: row.blocked_at !== null && row.counts_from > row.latest,
     };
   }
 
@@ -329,7 +346,7 @@ export class Cloud implements Store {
   #row(id: string): Promise<DocRow | null> {
     return this.#db
       .prepare(
-        "SELECT owner, admin_hash, permit, owner_mark, anchor, latest, versions, blocked_at, paused_at FROM docs WHERE id = ?",
+        "SELECT owner, admin_hash, permit, owner_mark, anchor, latest, versions, blocked_at, paused_at, counts_from FROM docs WHERE id = ?",
       )
       .bind(id)
       .first<DocRow>();
@@ -575,8 +592,8 @@ export class Cloud implements Store {
       .prepare(
         `UPDATE docs SET blocked_at = ?1, blocked_hour = ?6, dies_on = ?1 + ?2
          WHERE id = ?3 AND blocked_at IS NULL
-           AND (SELECT COUNT(*) FROM reports r WHERE r.doc = ?3 AND ${REPORT_THAT_BLOCKS}) >= ?4
-           AND (SELECT COUNT(DISTINCT r.asn) FROM reports r WHERE r.doc = ?3 AND ${REPORT_THAT_BLOCKS}) >= ?5`,
+           AND (SELECT COUNT(*) FROM reports r WHERE r.doc = ?3 AND ${COUNTS_NOW}) >= ?4
+           AND (SELECT COUNT(DISTINCT r.asn) FROM reports r WHERE r.doc = ?3 AND ${COUNTS_NOW}) >= ?5`,
       )
       .bind(
         today,
@@ -592,7 +609,7 @@ export class Cloud implements Store {
   async owned(id: string, today: number): Promise<Owned | null> {
     const row = await this.#db
       .prepare(
-        `SELECT d.admin_hash, d.latest, d.dies_on, d.paused_at, d.blocked_at, d.appealed_at, d.fix_by, d.read_total, d.days
+        `SELECT d.admin_hash, d.latest, d.dies_on, d.paused_at, d.blocked_at, d.appealed_at, d.counts_from, d.fix_by, d.read_total, d.days
          FROM docs d LEFT JOIN docs a ON a.id = d.anchor
          WHERE d.id = ?1 AND d.latest <> ${CLAIMED} AND (d.blocked_at IS NOT NULL OR d.dies_on >= ?2
            OR (d.paused_at IS NULL AND a.latest <> ${CLAIMED} AND a.dies_on >= ?2))`,
@@ -605,6 +622,7 @@ export class Cloud implements Store {
         paused_at: number | null;
         blocked_at: number | null;
         appealed_at: number | null;
+        counts_from: number;
         fix_by: number | null;
         read_total: number;
         days: string;
@@ -618,6 +636,7 @@ export class Cloud implements Store {
         pausedAt: row.paused_at,
         blockedAt: row.blocked_at,
         appealedAt: row.appealed_at,
+        mayCorrect: row.blocked_at !== null && row.counts_from > row.latest,
         fixBy: row.fix_by,
         readTotal: row.read_total,
         days: JSON.parse(row.days),
@@ -625,7 +644,19 @@ export class Cloud implements Store {
     };
   }
 
-  async appeal(id: string, today: number, hour: number): Promise<void> {
+  // Nobody needs to read anything to see who signed, so only what that cannot settle goes to the operator (decision 146).
+  async appeal(id: string, today: number, hour: number): Promise<Appealed> {
+    const cleared = await this.#db
+      .prepare(
+        `UPDATE docs SET appealed_at = ?2, permit = NULL, counts_from = latest + 1
+         WHERE id = ?1 AND blocked_at IS NOT NULL AND appealed_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND r.category = 'csam' AND ${COUNTED_REPORT})
+           AND EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND ${COUNTS_NOW})
+           AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND ${COUNTS_NOW} AND ${SIGNED_BY_OWNER})`,
+      )
+      .bind(id, today)
+      .run();
+    if (cleared.meta.changes > 0) return "accepted";
     await this.#db
       .prepare(
         `UPDATE docs SET appealed_at = ?2, appealed_hour = ?3
@@ -633,6 +664,7 @@ export class Cloud implements Store {
       )
       .bind(id, today, hour)
       .run();
+    return "review";
   }
 
   async appealAccepted(id: string, today: number): Promise<void> {

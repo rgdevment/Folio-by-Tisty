@@ -115,13 +115,14 @@ const mayUpload = ({ manifest, signature }: ReadEnvelope, held: Held): boolean =
   return signature.root === held.owner || ownerMarkOf(owner) === held.ownerMark;
 };
 
-const stopped = (held: Held): Refused | null => {
+const stopped = (held: Held, byOwner = false): Refused | null => {
+  if (held.correctable && byOwner) return null;
   if (held.blocked) return { refused: "blocked" };
   return held.paused ? { refused: "paused" } : null;
 };
 
-const notNext = (held: Held, version: number): Refused | null =>
-  stopped(held) ?? (version === held.latest + 1 ? null : { refused: "behind" });
+const notNext = (held: Held, version: number, byOwner: boolean): Refused | null =>
+  stopped(held, byOwner) ?? (version === held.latest + 1 ? null : { refused: "behind" });
 
 const netIfOpen = async ({ ip, now }: Uploading, { store, limiter, dayKey }: ReadTools): Promise<string | Refused> => {
   const net = await netDigest(await dayKey(dayOf(now)), ip);
@@ -185,8 +186,8 @@ const uploadVersion = async (uploading: Uploading, tools: ReadTools): Promise<Up
   }
   if (!held) return { refused: "missing" };
   if (!mayUpload(read, held)) return { refused: "not_yours" };
-  const stopped = notNext(held, manifest.version);
-  if (stopped) return stopped;
+  const refusedNext = notNext(held, manifest.version, signature.root === held.owner);
+  if (refusedNext) return refusedNext;
   const listFreed = listFreesAt(held.versions, now, limits);
   if (listFreed !== null) return { refused: "quota", until: listFreed };
 

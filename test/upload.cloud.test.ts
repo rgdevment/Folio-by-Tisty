@@ -2,6 +2,7 @@ import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Cloud } from "../src/cloudflare/store";
+import { administer } from "../src/core/admin";
 import type { Bytes } from "../src/core/bytes";
 import { DAY_MS, dayOf, LEVEL_ONE, type Limits } from "../src/core/limits";
 import { latestVersion, readDoc, readFiles } from "../src/core/read";
@@ -348,6 +349,194 @@ describe("the files a version names", () => {
     await testEnv.DB.prepare("UPDATE docs SET dies_on = 0 WHERE id = ?").bind(id).run();
     await store.sweep(dayOf(LATER));
     expect(await objects(id)).toEqual([]);
+  });
+});
+
+describe("an appeal that says someone else uploaded it", () => {
+  const DAYS = (days: number) => NOW + days * DAY_MS;
+  const today = (now: number) => dayOf(now);
+
+  const sendAt = (id: string, bytes: Bytes, now: number) =>
+    uploadDoc({ id, now, ip: "203.0.113.9", bytes: async () => bytes }, tools);
+
+  const appeal = (id: string, now: number) =>
+    administer({ id, ip: "203.0.113.9", now, token: "the admin token", action: "appeal" }, tools);
+
+  const status = async (id: string, now: number) => {
+    const answer = await administer({ id, ip: "203.0.113.9", now, token: "the admin token", action: "status" }, tools);
+    return (answer as { status: { blockedAt: number | null; mayCorrect: boolean; appealedAt: number | null } }).status;
+  };
+
+  const reported = async (id: string, version: number, nets: string[], now: number, category = "phishing") => {
+    for (const [at, net] of nets.entries()) {
+      await store.report({ doc: id, net, asn: at + 1, category, version }, today(now), Math.floor(now / 3_600_000));
+    }
+  };
+
+  const THREE = ["n1", "n2", "n3"];
+
+  const editedByAna = async () => {
+    const { permit, pair } = await newToken();
+    const id = await shared({ permit });
+    const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+    expect(await sendAt(id, edited, LATER)).toEqual({ stored: true, version: 2 });
+    return { id, permit, pair };
+  };
+
+  const appealRow = (id: string) =>
+    testEnv.DB.prepare(
+      "SELECT permit, counts_from, appealed_at, appealed_hour, blocked_at, dies_on, ttl_days FROM docs WHERE id = ?",
+    )
+      .bind(id)
+      .first<{
+        permit: string | null;
+        counts_from: number;
+        appealed_at: number | null;
+        appealed_hour: number | null;
+        blocked_at: number | null;
+        dies_on: number;
+        ttl_days: number;
+      }>();
+
+  it("is accepted with nothing opened, and takes the edit link away, with the block staying", async () => {
+    const { id } = await editedByAna();
+    await reported(id, 2, THREE, LATER);
+    expect(await appeal(id, LATER)).toEqual({ done: true, claim: "accepted" });
+
+    const row = await appealRow(id);
+    expect(row?.permit).toBeNull();
+    expect(row?.counts_from).toBe(3);
+    expect(row?.blocked_at).not.toBeNull();
+    expect(row?.appealed_hour).toBeNull();
+    expect((await status(id, LATER)).mayCorrect).toBe(true);
+    expect(await appeal(id, LATER)).toEqual({ refused: "appealed" });
+  });
+
+  it("lets only a version of its owner lift the block, and gives back its days", async () => {
+    const { id, permit, pair } = await editedByAna();
+    await reported(id, 2, THREE, LATER);
+    await appeal(id, LATER);
+
+    const fromAna = await sealedEnvelope({ id, version: 3, owner: mario, signer: ana, permit, token: pair });
+    expect(await sendAt(id, fromAna, DAYS(5))).toEqual({ refused: "not_yours" });
+
+    const fromOwner = await sealedEnvelope({ id, version: 3, owner: mario });
+    expect(await sendAt(id, fromOwner, DAYS(5))).toEqual({ stored: true, version: 3 });
+    const row = await appealRow(id);
+    expect(row?.blocked_at).toBeNull();
+    expect(row?.appealed_at).toBeNull();
+    expect(row?.dies_on).toBe(today(DAYS(5)) + (row?.ttl_days ?? 0));
+    expect((await status(id, DAYS(5))).mayCorrect).toBe(false);
+  });
+
+  it("keeps what was reported, and those networks and their reports on record", async () => {
+    const { id } = await editedByAna();
+    await reported(id, 2, THREE, LATER);
+    await appeal(id, LATER);
+    const left = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE doc = ? AND cleared = 0")
+      .bind(id)
+      .first<{ n: number }>();
+    expect(left?.n).toBe(3);
+    const named = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM false_reporters").first<{ n: number }>();
+    expect(named?.n).toBe(0);
+  });
+
+  it("counts only reports of the versions after it toward a new block", async () => {
+    const { id } = await editedByAna();
+    await reported(id, 2, THREE, LATER);
+    await appeal(id, LATER);
+    await sendAt(id, await sealedEnvelope({ id, version: 3, owner: mario }), DAYS(5));
+
+    await reported(id, 2, ["old1", "old2", "old3"], DAYS(6));
+    expect((await status(id, DAYS(6))).blockedAt).toBeNull();
+    await reported(id, 3, ["new1", "new2"], DAYS(6));
+    expect((await status(id, DAYS(6))).blockedAt).toBeNull();
+    await reported(id, 3, ["new3"], DAYS(6));
+    expect((await status(id, DAYS(6))).blockedAt).not.toBeNull();
+    expect(await appeal(id, DAYS(6))).toEqual({ done: true, claim: "review" });
+  });
+
+  it("goes to the operator when its owner signed a version reported", async () => {
+    const { id, permit } = await editedByAna();
+    await reported(id, 1, ["n1"], LATER);
+    await reported(id, 2, ["n2", "n3"], LATER);
+    expect(await appeal(id, LATER)).toEqual({ done: true, claim: "review" });
+    const row = await appealRow(id);
+    expect(row?.permit).toBe(permit);
+    expect(row?.counts_from).toBe(0);
+    expect(row?.appealed_hour).not.toBeNull();
+  });
+
+  it("goes to the operator when a report of child abuse stands, even without its link", async () => {
+    const { id } = await editedByAna();
+    await reported(id, 2, THREE, LATER);
+    await reported(id, 2, ["n4"], LATER, "csam");
+    expect(await appeal(id, LATER)).toEqual({ done: true, claim: "review" });
+  });
+
+  it("takes a report of a version it no longer lists as no proof", async () => {
+    const { id } = await editedByAna();
+    await reported(id, 2, ["n1", "n2"], LATER);
+    await reported(id, 99, ["n3"], LATER);
+    await testEnv.DB.prepare("UPDATE reports SET version = 99 WHERE doc = ? AND net LIKE '%'").bind(id).run();
+    expect((await status(id, LATER)).blockedAt).not.toBeNull();
+    expect(await appeal(id, LATER)).toEqual({ done: true, claim: "review" });
+  });
+
+  it("goes to the operator when no report counts, as with a block set by hand", async () => {
+    const { id } = await editedByAna();
+    await testEnv.DB.prepare("UPDATE docs SET blocked_at = ? WHERE id = ?").bind(today(LATER), id).run();
+    expect(await appeal(id, LATER)).toEqual({ done: true, claim: "review" });
+  });
+
+  it("lets a version of its owner lift a block that came while paused, and keeps the pause", async () => {
+    const { id } = await editedByAna();
+    await store.pause(id, today(LATER));
+    await reported(id, 2, THREE, LATER);
+    await appeal(id, LATER);
+    const version = await sealedEnvelope({ id, version: 3, owner: mario });
+    expect(await sendAt(id, version, DAYS(5))).toEqual({ stored: true, version: 3 });
+    const row = await testEnv.DB.prepare("SELECT paused_at, blocked_at, dies_on FROM docs WHERE id = ?")
+      .bind(id)
+      .first<{ paused_at: number; blocked_at: number | null; dies_on: number }>();
+    expect(row?.blocked_at).toBeNull();
+    expect(row?.paused_at).toBe(today(LATER));
+    expect(row?.dies_on).toBe(today(LATER) + LIMITS.pausedDays);
+  });
+
+  it("does not let a version from someone else lift it, even if it read the document before the block", async () => {
+    const { id } = await editedByAna();
+    const before = await store.held(id);
+    await reported(id, 2, THREE, LATER);
+    await appeal(id, LATER);
+    const answer = await store.upload(
+      {
+        id,
+        n: 3,
+        hash: "late",
+        body: "sealed",
+        net: "n",
+        at: DAYS(5),
+        signer: rootOf(ana),
+        machine: machineOf(ana),
+        contract: "1.4.3",
+        byOwner: false,
+        permit: null,
+        ownerMark: "late.mark",
+      },
+      today(DAYS(5)),
+      before ?? undefined,
+    );
+    expect(answer).toBe("blocked");
+    expect((await appealRow(id))?.blocked_at).not.toBeNull();
+  });
+
+  it("still refuses its owner's version on a block not cleared this way", async () => {
+    const id = await shared();
+    await reported(id, 1, THREE, LATER);
+    expect(await appeal(id, LATER)).toEqual({ done: true, claim: "review" });
+    const version = await sealedEnvelope({ id, version: 2, owner: mario });
+    expect(await sendAt(id, version, DAYS(5))).toEqual({ refused: "blocked" });
   });
 });
 

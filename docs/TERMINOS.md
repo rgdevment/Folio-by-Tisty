@@ -71,6 +71,10 @@ responsabilidad. No se permite usar Folio para:
 - **Con tres denuncias** de phishing, malware, estafa o algo serio, desde lugares
   distintos, el documento se bloquea: deja de servirse, pero no se borra. Quien
   lo compartió ve el bloqueo en su link de administración y puede reclamar ahí.
+  Si todas las versiones denunciadas las firmó alguien a quien dejó editar, el
+  reclamo se acepta solo, salvo que haya una denuncia de abuso infantil: el link
+  de edición deja de funcionar, las denuncias quedan registradas y sigue
+  bloqueado hasta que suba una versión propia.
 - **Las denuncias de delitos se envían a quien corresponde:** a la PDI o a la
   Fiscalía, y el phishing y el malware además a Google Safe Browsing y a
   Cloudflare. Los reclamos de derechos de autor los hace su titular, con orden
