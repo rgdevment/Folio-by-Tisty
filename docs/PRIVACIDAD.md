@@ -28,11 +28,11 @@ Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 | El link de administrar, guardado como resumen (hash), y la llave pública del token del link de editar, que nunca llega al servidor | Comprobar quién puede cambiar o borrar | Lo mismo que el documento |
 | Si firmas, tu llave pública y su certificado | Que quien lee sepa que es tuyo | Lo mismo que el documento |
 | Cuántas veces se leyó, contando una vez por día y por visitante | Mostrarte las lecturas en Tisty | Lo mismo que el documento |
-| Una línea por cada lectura servida: el id del link (sin su llave, así que no abre nada), el país y el centro de datos de Cloudflare, nunca tu IP | Saber cuánto se lee cada documento y desde dónde, y dimensionar el servicio | 3 días, en los registros de Workers de Cloudflare |
+| Una línea por cada lectura servida: el id del link (sin su llave, así que no abre nada), el país y el centro de datos de Cloudflare, nunca tu IP | Saber cuánto se lee cada documento y desde dónde, y dimensionar el servicio | 7 días, en los registros de Workers de Cloudflare |
 | Un resumen de tu IP (un HMAC con una llave que cambia) | Topes por IP y bloqueos ante abuso | Lo que dura la cuota o el bloqueo |
 | Una copia diaria de la base de datos, cifrada con una llave guardada fuera de línea, sin los resúmenes de lectura del día ni los cupos, y sin los documentos | Recuperarse de una falla | 30 días, en GitHub |
 | Las llaves que retiraste, como las firmó tu raíz: la parte pública de la llave y la de tu raíz | Para que quien lea sepa que una llave robada o retirada ya no habla por ti | Para siempre, porque quien lea siempre tiene que poder saberlo |
-| Las denuncias: categoría, detalle, la versión denunciada, si lo dejaron el link, sellado para que solo el operador lo abra, y un resumen de la red de quien denuncia (un HMAC con una llave que cambia cada 180 días), para que cada red denuncie una sola vez | Moderar y enviarlas a quien corresponde | 180 días, o más si una orden lo pide. Si se acepta un reclamo contra la denuncia, el resumen de esa red queda 180 días desde entonces, para que deje de contar |
+| Las denuncias: categoría, detalle y versión denunciada, en claro; si lo dejaron el link, sellado para que solo el operador lo abra; y un resumen de la red de quien denuncia (un HMAC con una llave que cambia cada 180 días), para que cada red denuncie una sola vez | Moderar y enviarlas a quien corresponde | 180 días, o más si una orden lo pide. Si se acepta un reclamo contra la denuncia, el resumen de esa red queda 180 días desde entonces, para que deje de contar |
 
 **Sobre la firma:** si firmas lo que compartes, tu llave pública permite saber
 que dos documentos firmados son de la misma persona, aunque no quién eres. En lo
