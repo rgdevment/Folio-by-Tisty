@@ -144,7 +144,8 @@ lo permita.
 
 Cada cambio a estos términos queda en el repositorio público, con su fecha.
 Antes de volver a compartir, Tisty te muestra los términos nuevos y te pide
-aceptarlos.
+aceptarlos. Mientras no lo hagas, lo que ya compartiste se sigue sirviendo, pero
+no puedes subirle versiones nuevas.
 
 ## Ley aplicable
 

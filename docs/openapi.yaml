@@ -253,8 +253,9 @@ paths:
               schema: { $ref: "#/components/schemas/BadEnvelope" }
         "428":
           description: |
-            Whoever signs has not accepted the terms in force: its manifest's `terms` is missing or older. Nothing was
-            kept. Accept the version it names, as `docs/limits.json` says it, and send it again.
+            Whoever signs has not accepted the terms in force: its manifest's `terms` is missing, older, or more than
+            one ahead. Nothing was kept. Accept the version it names, as `docs/limits.json` says it, and send it again.
+            A files envelope is not asked: the version that names it already answered for them.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TermsNotAccepted" }
@@ -344,13 +345,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BadEnvelope" }
-        "428":
-          description: |
-            Whoever signs has not accepted the terms in force: its manifest's `terms` is missing or older. Nothing was
-            kept. Accept the version it names, as `docs/limits.json` says it, and send it again.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/TermsNotAccepted" }
         "426":
           description: Written under a contract older than the oldest the server takes.
           content:

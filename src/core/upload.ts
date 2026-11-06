@@ -31,8 +31,13 @@ export interface UploadTools extends ReadTools {
   termsVersion: string;
 }
 
-const termsRefused = ({ terms }: Envelope, { termsVersion }: UploadTools): Refused | null =>
-  terms !== undefined && BigInt(terms) >= BigInt(termsVersion) ? null : { refused: "terms", version: termsVersion };
+// One ahead, for the time between publishing the signed file and deploying what reads it.
+const termsAccepted = ({ terms }: Envelope, { termsVersion }: UploadTools): string | null => {
+  if (terms === undefined) return null;
+  const said = BigInt(terms);
+  const inForce = BigInt(termsVersion);
+  return said === inForce || said === inForce + 1n ? terms : null;
+};
 
 export type UploadAnswer = { stored: true; version: number; filesWanted?: true } | Refused;
 
@@ -133,7 +138,7 @@ const keyAdmission = (net: string, today: number, { store }: ReadTools): KeyAdmi
         const { said, terms } = await store.admitKey(root, net, today);
         if (said === "full") return { refused: "quota", until: (today + 1) * DAY_MS };
         if (said === "new") fresh.push(root);
-        if (root === accepted.root && terms !== accepted.version) toWrite = accepted;
+        if (root === accepted.root && (terms === null || BigInt(accepted.version) > BigInt(terms))) toWrite = accepted;
       }
       return null;
     },
@@ -217,16 +222,19 @@ const storeVersion = async (
   if (floor !== null && isBelowVersion(manifest.contract, floor)) return { refused: "outdated" };
 
   const hash = toBase64Url(await sha256(bytes));
+  const version = termsAccepted(manifest, tools);
+  const roots = [(manifest.owner as Owner).root, signature.root];
+  const accepted = { root: signature.root, version: version ?? "", hour: hourOf(now) };
   if (held?.latest === manifest.version && held.versions.at(-1)?.hash === hash) {
+    // A retry may be all that is left of an upload whose record was lost after its version was kept.
+    if (version !== null && !(await keys.admit(roots, accepted))) await keys.keep();
     return { stored: true, version: manifest.version };
   }
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
-  const noTerms = termsRefused(manifest, tools);
-  if (noTerms) return noTerms;
-  const accepted = { root: signature.root, version: manifest.terms as string, at: now };
+  if (version === null) return { refused: "terms", version: tools.termsVersion };
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
-    const full = await keys.admit([(manifest.owner as Owner).root, signature.root], accepted);
+    const full = await keys.admit(roots, accepted);
     if (full) return full;
     const refused = await share(uploading, sharing, read, net, tools);
     if (refused) return refused;
@@ -294,7 +302,7 @@ export const uploadDoc = async (uploading: Uploading, tools: UploadTools): Promi
   return arrived ? answer : { ...answer, filesWanted: true };
 };
 
-export const uploadFiles = async (uploading: Uploading, tools: UploadTools): Promise<FilesUploadAnswer> => {
+export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promise<FilesUploadAnswer> => {
   const { id, now } = uploading;
   const { store, limits } = tools;
   const net = await netIfOpen(uploading, tools);
@@ -313,8 +321,6 @@ export const uploadFiles = async (uploading: Uploading, tools: UploadTools): Pro
   const floor = limits.oldestContractTaken;
   if (floor !== null && isBelowVersion(manifest.contract, floor)) return { refused: "outdated" };
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
-  const noTerms = termsRefused(manifest, tools);
-  if (noTerms) return noTerms;
   if (!mayUpload(read, held)) return { refused: "not_yours" };
 
   const hash = toBase64Url(await sha256(manifestBytes, index));

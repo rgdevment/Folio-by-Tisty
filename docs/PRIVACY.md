@@ -29,7 +29,7 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 | The manifest in the clear: how many parts, what each weighs, their kind and the version | To hold the limits without reading the content | As long as the document |
 | The manage link, kept as a digest (hash), and the public key of the edit link's token, which never reaches the server | To check who may change or delete it | As long as the document |
 | Your public key and its certificate, in what you share | So readers know it is yours | As long as the document |
-| Your public key on its own, the day Folio first saw it, and which version of the terms it accepted and when the server heard it, tied to no network and no document | So limits and reputation stay with it, and a new key starts from the lowest | For good, even after your documents are gone |
+| Your public key on its own, the day Folio first saw it, and which version of the terms it accepted and in what hour the server heard it, tied to no network and no document | So limits and reputation stay with it, and a new key starts from the lowest | For good, even after your documents are gone |
 | How many times it was read, counted once a day per visitor | To show you the reads in Tisty | As long as the document |
 | A line for each read served: the link's id (without its key, so it opens nothing), the country and the Cloudflare data center, never your IP | To know how much each document is read and where from, and size the service | Up to 7 days, in Cloudflare's Workers Logs |
 | A digest of your IP (an HMAC with a key that changes) | Per-IP limits and blocks against abuse | As long as the quota or the block lasts, and up to a day more |

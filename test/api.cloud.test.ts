@@ -253,14 +253,6 @@ const FILES: Scenario[] = [
   { method: "GET", path: NAMED_FILES_PATH, status: 429, refused: "slow", braked: true },
   { method: "GET", path: NAMED_FILES_PATH, status: 429, refused: "proof", ready: pastTheFreeReaders },
   { method: "GET", path: NAMED_FILES_PATH, status: 500, refused: "failed", broken: true },
-  {
-    method: "PUT",
-    path: FILES_PATH,
-    status: 428,
-    refused: "terms",
-    upload: () => sealedEnvelope({ id: ID, version: 1, owner, files: [8], terms: "0" }),
-    ready: shareNamingSentFiles,
-  },
   { method: "PUT", path: FILES_PATH, status: 200, upload: filesEnvelope, ready: shareNamingSentFiles },
   {
     method: "PUT",

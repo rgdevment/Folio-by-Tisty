@@ -394,10 +394,11 @@ export class Cloud implements Store {
       statements.push(
         this.#db
           .prepare(
-            `INSERT INTO keys (root, first_day, terms_version, terms_at) VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT (root) DO UPDATE SET terms_version = ?3, terms_at = ?4`,
+            `INSERT INTO keys (root, first_day, terms_version, terms_hour) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (root) DO UPDATE SET terms_version = ?3, terms_hour = ?4
+             WHERE terms_version IS NULL OR CAST(terms_version AS INTEGER) < CAST(?3 AS INTEGER)`,
           )
-          .bind(accepted.root, today, accepted.version, accepted.at),
+          .bind(accepted.root, today, accepted.version, accepted.hour),
       );
     }
     if (statements.length > 0) await this.#db.batch(statements);

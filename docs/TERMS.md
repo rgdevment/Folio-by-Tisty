@@ -146,7 +146,8 @@ law does not allow these limits, they apply as far as it permits.
 
 Every change to these terms is committed to the public repository, with its
 date. Before you share again, Tisty shows you the new terms and asks you to
-accept them.
+accept them. Until you do, what you already shared keeps being served, but you
+cannot upload new versions of it.
 
 ## Governing law
 

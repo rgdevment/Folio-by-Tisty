@@ -139,7 +139,7 @@ export interface KeyAdmitted {
 export interface AcceptedTerms {
   root: string;
   version: string;
-  at: number;
+  hour: number;
 }
 
 export interface Store {

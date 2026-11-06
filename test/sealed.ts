@@ -1,4 +1,5 @@
 import { VERSION } from "@tisty/contracts";
+import SIGNED_LIMITS from "../docs/limits.json";
 import { type Bytes, bigEndian, joined, sha256, words } from "../src/core/bytes";
 import { toBase64Url } from "../src/core/start";
 import { readEnvelope } from "../src/rules/envelope";
@@ -87,7 +88,7 @@ interface Sealing {
   terms?: string;
 }
 
-export const TERMS_ACCEPTED = "99";
+export const TERMS_ACCEPTED = SIGNED_LIMITS.terms.version;
 
 const ownerBlock = async ({ id, owner, permit, nameTag = new Uint8Array(32).fill(7) }: Sealing) => {
   const about = words("owner");
