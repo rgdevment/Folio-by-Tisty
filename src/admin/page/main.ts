@@ -5,20 +5,31 @@ import { drawQueue } from "./draw";
 const said = document.getElementById("said") as HTMLElement;
 const COULD_NOT = "No se pudo. Recarga la página para ver cómo quedó.";
 
+// A session of Access that ended redirects to its login, and the browser refuses that: the fetch rejects.
+const answered = async (asking: () => Promise<Response>): Promise<Response | null> => {
+  try {
+    return await asking();
+  } catch {
+    return null;
+  }
+};
+
 const asked = async (path: string, note?: string): Promise<boolean> => {
-  const response = await fetch(`/api/docs/${path}`, {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Folio-Operator": "1", "Content-Type": "application/json" },
-    ...(note === undefined ? {} : { body: JSON.stringify({ note }) }),
-  });
-  return response.ok;
+  const response = await answered(() =>
+    fetch(`/api/docs/${path}`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Folio-Operator": "1", "Content-Type": "application/json" },
+      ...(note === undefined ? {} : { body: JSON.stringify({ note }) }),
+    }),
+  );
+  return response?.ok ?? false;
 };
 
 const load = async (): Promise<void> => {
-  const response = await fetch("/api/queue", { credentials: "same-origin", cache: "no-store" });
-  if (!response.ok) {
-    said.textContent = "No se pudo traer el panel. Revisa tu acceso.";
+  const response = await answered(() => fetch("/api/queue", { credentials: "same-origin", cache: "no-store" }));
+  if (!response?.ok) {
+    said.textContent = "No se pudo traer el panel. Recarga la página, quizá debas volver a entrar.";
     return;
   }
   drawQueue(document, (await response.json()) as Queue, {
@@ -31,9 +42,15 @@ const load = async (): Promise<void> => {
       if (reason?.trim()) void doing(`${id}/opened`, reason);
     },
     copy: (command) => {
-      void navigator.clipboard.writeText(command).then(() => {
-        said.textContent = "Copiado. Reemplaza <llave> por la ruta de tu llave y ábrelo en tu equipo.";
-      });
+      void navigator.clipboard.writeText(command).then(
+        () => {
+          said.textContent = "Copiado. Reemplaza <llave> por la ruta de tu llave y ábrelo en tu equipo.";
+        },
+        () => {
+          said.textContent = "No se pudo copiar. El comando es este:";
+          said.append(" ", command);
+        },
+      );
     },
   });
   said.textContent = "";

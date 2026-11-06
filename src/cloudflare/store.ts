@@ -759,6 +759,11 @@ export class Cloud implements Store {
              AND doc NOT IN (SELECT id FROM docs WHERE legal_until >= ?2)`,
           )
           .bind(today - this.#limits.evidenceDays, today),
+        ...["moderation", "openings"].map((log) =>
+          this.#db
+            .prepare(`DELETE FROM ${log} WHERE at < ?1 AND doc NOT IN (SELECT id FROM docs WHERE legal_until >= ?2)`)
+            .bind((today - this.#limits.evidenceDays) * DAY_MS, today),
+        ),
       ]);
     } catch (error) {
       failed += 1;

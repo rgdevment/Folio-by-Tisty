@@ -1,6 +1,6 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AccessSettings, type Certs, isOperator, issuerOf } from "../src/admin/access";
 import { answer } from "../src/admin/api";
 import { CloudModeration } from "../src/cloudflare/moderation";
@@ -214,6 +214,36 @@ describe("what it shows", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
+  it("keeps showing what a network marked false reports, marked, while it stops counting", async () => {
+    await share();
+    await reported("phishing", ["n1"]);
+    await store.create({ id: "OtherDoc", owner: "o2", adminHash: "a", ttlDays: 3, net: "n" }, TODAY);
+    await store.report({ doc: "OtherDoc", net: "n1", asn: 1, category: "csam", version: 1 }, TODAY, HOUR);
+    await store.report({ doc: "OtherDoc", net: "n2", asn: 2, category: "malware", version: 1 }, TODAY, HOUR);
+    expect((await acting(`/api/docs/${ID}/reports/n1/false`)).status).toBe(200);
+    const { reports, reportsTotal } = await moderation.queue(NOW);
+    expect(reportsTotal).toBe(2);
+    expect(reports.map(({ doc, category, fromFalseNet }) => [doc, category, fromFalseNet])).toEqual([
+      ["OtherDoc", "csam", true],
+      ["OtherDoc", "malware", false],
+    ]);
+  });
+
+  it("shows the newest of the same weight first, and says when some did not fit", async () => {
+    const rows = Array.from({ length: 200 }, (_, at) =>
+      testEnv.DB.prepare(
+        "INSERT INTO reports (doc, net, at, at_hour, category, asn, level, version) VALUES ('AaOldDoc', ?, ?, 0, 'phishing', 1, 'medium', 1)",
+      ).bind(`old${at}`, TODAY - 10),
+    );
+    await testEnv.DB.batch(rows);
+    await store.create({ id: "ZzNewDoc", owner: "o2", adminHash: "a", ttlDays: 3, net: "n" }, TODAY);
+    await store.report({ doc: "ZzNewDoc", net: "fresh", asn: 1, category: "phishing", version: 1 }, TODAY, HOUR);
+    const { reports, reportsTotal } = await moderation.queue(NOW);
+    expect(reports).toHaveLength(200);
+    expect(reports[0]?.doc).toBe("ZzNewDoc");
+    expect(reportsTotal).toBe(201);
+  });
+
   it("puts what waits for the operator apart, and says who signed each version", async () => {
     await share("someone else");
     await reported();
@@ -367,12 +397,51 @@ describe("what it can do", () => {
     expect(await logged()).toEqual([]);
   });
 
-  it("forgets its log once its days pass", async () => {
+  const openings = async () =>
+    (await testEnv.DB.prepare("SELECT doc FROM openings").all<{ doc: string }>()).results.map((one) => one.doc);
+
+  it("forgets what it logged and the openings once their days pass, with the daily sweep", async () => {
     await share();
     await acting(`/api/docs/${ID}/block`, "x");
-    await moderation.forgetOldLog(NOW + 179 * 86_400_000);
+    await acting(`/api/docs/${ID}/opened`, "y");
+    await store.sweep(TODAY + 180);
     expect(await logged()).toHaveLength(1);
-    await moderation.forgetOldLog(NOW + 181 * 86_400_000);
+    expect(await openings()).toEqual([ID]);
+    await store.sweep(TODAY + 181);
     expect(await logged()).toEqual([]);
+    expect(await openings()).toEqual([]);
+  });
+
+  it("keeps them while an order holds the document", async () => {
+    await share();
+    await acting(`/api/docs/${ID}/block`, "x");
+    await acting(`/api/docs/${ID}/opened`, "y");
+    await testEnv.DB.prepare("UPDATE docs SET legal_until = ? WHERE id = ?")
+      .bind(TODAY + 400, ID)
+      .run();
+    await store.sweep(TODAY + 181);
+    expect(await logged()).toHaveLength(1);
+    expect(await openings()).toEqual([ID]);
+  });
+
+  it("writes no log for an action that changed nothing, and renews no network", async () => {
+    await share();
+    await reported("phishing", ["n1"]);
+    await testEnv.DB.prepare("UPDATE reports SET cleared = 1").run();
+    expect((await acting(`/api/docs/${ID}/reports/n1/false`)).status).toBe(404);
+    const named = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM false_reporters").first<{ n: number }>();
+    expect(named?.n).toBe(0);
+    expect(await logged()).toEqual([]);
+  });
+
+  it("does not stand without its log, nor the log without it", async () => {
+    await share();
+    const failing = vi.spyOn(testEnv.DB, "batch").mockRejectedValueOnce(new Error("no database today"));
+    await expect(moderation.block(ID, "x", NOW)).rejects.toThrow();
+    failing.mockRestore();
+    expect((await row())?.blocked_at).toBeNull();
+    expect(await logged()).toEqual([]);
+    expect(await moderation.block(ID, "x", NOW)).toBe("done");
+    expect(await logged()).toEqual([{ action: "block", note: "x" }]);
   });
 });
