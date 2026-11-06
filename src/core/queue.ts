@@ -8,6 +8,7 @@ export interface QueuedReport {
   version: number;
   at: number;
   asn: number;
+  fromFalseNet: boolean;
 }
 
 export interface QueuedDoc {
@@ -23,6 +24,7 @@ export interface QueuedDoc {
 export interface Queue {
   stage: string;
   newKeys: number;
+  reportsTotal: number;
   reports: QueuedReport[];
   docs: QueuedDoc[];
 }

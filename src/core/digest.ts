@@ -1,4 +1,4 @@
-import { LEVEL_ONE } from "./limits";
+import { DAY_MS, LEVEL_ONE } from "./limits";
 import { hourOf } from "./start";
 import type { News, Stage, Store } from "./store";
 
@@ -17,16 +17,18 @@ const listOf = (title: string, lines: string[]): string[] => {
   return [title, ...lines, ...more, ""];
 };
 
-const textOf = (stage: Stage, was: Stage, { reports, blocked, appealed }: News, keysSaid: number, panel?: string) =>
+const dateOf = (day: number): string => new Date(day * DAY_MS).toISOString().slice(0, 10);
+
+const textOf = (stage: Stage, was: Stage, news: News, keysSaid: number, panel?: string) =>
   [
     ...(stage === was ? [] : [`Gasto: ${stage} (antes: ${was})`, ""]),
-    ...(keysSaid > 0 ? [`Llaves nuevas hoy: ${keysSaid}`, ""] : []),
+    ...(keysSaid > 0 ? [`Llaves nuevas el ${dateOf(news.newKeysDay)}: ${keysSaid}`, ""] : []),
     ...listOf(
       "Denuncias nuevas:",
-      reports.map(({ doc, category, nets }) => `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}`),
+      news.reports.map(({ doc, category, nets }) => `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}`),
     ),
-    ...listOf("Bloqueados:", blocked),
-    ...listOf("Reclamos:", appealed),
+    ...listOf("Bloqueados:", news.blocked),
+    ...listOf("Reclamos:", news.appealed),
     ...(panel ? [`Panel: ${panel}`] : []),
   ]
     .join("\n")

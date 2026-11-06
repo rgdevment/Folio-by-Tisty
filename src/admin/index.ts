@@ -23,7 +23,4 @@ export default {
       return new Response('{"refused":"failed"}', { status: 500, headers: { "Content-Type": "application/json" } });
     }
   },
-  async scheduled(_controller, env): Promise<void> {
-    await new CloudModeration(env.DB).forgetOldLog(Date.now());
-  },
 } satisfies ExportedHandler<Env>;

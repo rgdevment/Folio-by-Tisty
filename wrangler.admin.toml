@@ -25,9 +25,6 @@ ACCESS_TEAM = ""
 ACCESS_AUDIENCE = ""
 OPERATOR_EMAIL = ""
 
-[triggers]
-crons = ["0 5 * * 0"]
-
 [observability]
 enabled = true
 

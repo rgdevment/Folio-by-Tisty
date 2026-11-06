@@ -389,6 +389,13 @@ export class Cloud implements Store {
     );
   }
 
+  async giveKeysBack(count: number, net: string, today: number): Promise<void> {
+    await this.#db
+      .prepare("UPDATE net_day SET keys = keys - ? WHERE day = ? AND net = ?")
+      .bind(count, today, net)
+      .run();
+  }
+
   async #giveQuotaBack(net: string, docs: number, bytes: number, today: number): Promise<void> {
     await this.#db
       .prepare("UPDATE net_day SET docs = docs - ?, bytes = bytes - ? WHERE day = ? AND net = ?")
@@ -742,7 +749,8 @@ export class Cloud implements Store {
     }
     try {
       await this.#db.batch([
-        this.#db.prepare("DELETE FROM net_day WHERE day < ?").bind(today),
+        // Yesterday's stays: the digest at 00:00 counts its new keys, on the same minute as this sweep.
+        this.#db.prepare("DELETE FROM net_day WHERE day < ?").bind(today - 1),
         this.#db.prepare("DELETE FROM net_hour WHERE hour < ?").bind(today * HOURS_IN_A_DAY),
         this.#db.prepare("DELETE FROM false_reporters WHERE at < ?").bind(today - this.#limits.evidenceDays),
         this.#db
@@ -751,6 +759,11 @@ export class Cloud implements Store {
              AND doc NOT IN (SELECT id FROM docs WHERE legal_until >= ?2)`,
           )
           .bind(today - this.#limits.evidenceDays, today),
+        ...["moderation", "openings"].map((log) =>
+          this.#db
+            .prepare(`DELETE FROM ${log} WHERE at < ?1 AND doc NOT IN (SELECT id FROM docs WHERE legal_until >= ?2)`)
+            .bind((today - this.#limits.evidenceDays) * DAY_MS, today),
+        ),
       ]);
     } catch (error) {
       failed += 1;
@@ -913,6 +926,7 @@ export class Cloud implements Store {
   }
 
   async news(after: number, before: number, atMost: number): Promise<News> {
+    const newKeysDay = Math.floor((before - 1) / HOURS_IN_A_DAY);
     const [reports, blocked, appealed, keys] = await this.#db.batch([
       this.#db
         .prepare(
@@ -927,9 +941,7 @@ export class Cloud implements Store {
       this.#db
         .prepare("SELECT id FROM docs WHERE appealed_hour > ?1 AND appealed_hour < ?2 ORDER BY id LIMIT ?3")
         .bind(after, before, atMost),
-      this.#db
-        .prepare("SELECT COALESCE(SUM(keys), 0) AS keys FROM net_day WHERE day = ?")
-        .bind(Math.floor((before - 1) / HOURS_IN_A_DAY)),
+      this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS keys FROM net_day WHERE day = ?").bind(newKeysDay),
     ]);
     const ids = (rows: typeof blocked): string[] => ((rows?.results ?? []) as { id: string }[]).map(({ id }) => id);
     return {
@@ -937,6 +949,7 @@ export class Cloud implements Store {
       blocked: ids(blocked),
       appealed: ids(appealed),
       newKeys: (keys?.results?.[0] as { keys: number } | undefined)?.keys ?? 0,
+      newKeysDay,
     };
   }
 

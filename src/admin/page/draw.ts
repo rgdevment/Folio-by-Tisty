@@ -55,6 +55,8 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
     piece(page, "p", "card-title", `${report.category} · ${report.doc}`),
     piece(page, "p", "card-line", `Versión ${report.version} · operador ${report.asn} · ${dayText(report.at)}`),
   );
+  if (report.fromFalseNet)
+    card.append(piece(page, "p", "card-line", "Esta red ya tuvo una denuncia falsa: no cuenta para bloquear."));
   if (report.detail) card.append(piece(page, "p", "card-line", report.detail));
   const buttons = [button(page, "Era falsa", () => doing.reportWasFalse(report.doc, report.net))];
   if (report.sealedLink) {
@@ -114,7 +116,19 @@ export const drawQueue = (page: Document, queue: Queue, doing: Doing): void => {
   filled(
     place("reports"),
     page,
-    queue.reports.map((one) => reportCard(page, one, doing)),
+    [
+      ...queue.reports.map((one) => reportCard(page, one, doing)),
+      ...(queue.reportsTotal > queue.reports.length
+        ? [
+            piece(
+              page,
+              "p",
+              "card-line",
+              `Se ven las ${queue.reports.length} más graves y recientes de ${queue.reportsTotal}.`,
+            ),
+          ]
+        : []),
+    ],
     "Ninguna.",
   );
   filled(
