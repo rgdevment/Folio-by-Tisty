@@ -5,6 +5,8 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 base=${1:?the commit to compare with}
 head=${2:-HEAD}
+# Against where the branch left main, or a branch would answer for what main signed after it left.
+base=$(git merge-base "$base" "$head") || exit 2
 file=docs/limits.json
 
 serial_at() {
