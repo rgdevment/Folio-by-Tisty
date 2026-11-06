@@ -30,6 +30,10 @@ info:
     seconds, says uploads are paused until then, never more than a week ahead. It may ask for less than the server
     takes and never for more, and the server holds to its own numbers whoever calls it.
 
+    **The terms in force** are named there too. In `terms`, `es` and `en` are the SHA-256, in hex, of
+    `docs/TERMINOS.md` and `docs/TERMS.md` as served from the same place, and `version`, a whole number written as a
+    string, grows with every change to either text. A text and the signed file that names it reach `main` together.
+
     **The admin link:** `Folio-Admin` carries the token whose SHA-256 is the document's `admin_hash`. A
     wrong token answers as a document that does not exist.
   license:

@@ -138,7 +138,8 @@ lo permita.
 ## Cambios
 
 Cada cambio a estos términos queda en el repositorio público, con su fecha.
-Seguir compartiendo después de un cambio es aceptar los términos nuevos.
+Antes de volver a compartir, Tisty te muestra los términos nuevos y te pide
+aceptarlos.
 
 ## Ley aplicable
 

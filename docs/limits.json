@@ -1,5 +1,5 @@
 {
-  "serial": 2,
+  "serial": 3,
   "ttl_days": [
     1,
     3,
@@ -26,5 +26,10 @@
     15
   ],
   "oldest_contract_taken": null,
-  "oldest_contract_served": null
+  "oldest_contract_served": null,
+  "terms": {
+    "version": "1",
+    "es": "d4ebe14eba7a2088a10d47f1ee1b57132c6bbddf95619ce825647ef7548539c9",
+    "en": "0ffd602a0219e2890a4483d79d6997c68e97d23ba20984cf4e5e40d9c3bb7ba6"
+  }
 }
