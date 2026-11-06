@@ -50,7 +50,7 @@ CF_DATABASE_ID = "767d0dce-dff0-41b0-9857-b3ddcf2d36ad"
 CF_BUCKET_NAME = "folio-private-envelopes"
 
 [triggers]
-crons = ["*/15 * * * *", "0 * * * *", "0 0,12 * * *", "0 4 * * 0"]
+crons = ["*/15 * * * *", "0 * * * *", "0 0,12 * * *", "0 4 * * SUN"]
 
 # What the code logs is kept, and the request itself never is (decision 98).
 [observability]
