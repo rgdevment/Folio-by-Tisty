@@ -525,7 +525,7 @@ describe("expiring", () => {
   it("does not let R2 failing stop the cleaning", async () => {
     await store.create(newDoc("d1"), DAY);
     await store.upload(upload("d1", 1), DAY);
-    await testEnv.DB.prepare("INSERT INTO net_day VALUES (?, 'old', 1, 1)").bind(DAY).run();
+    await testEnv.DB.prepare("INSERT INTO net_day (day, net, docs, bytes) VALUES (?, 'old', 1, 1)").bind(DAY).run();
     const swept = await failing({ delete: true }).sweep(DAY + 2);
     expect(swept).toMatchObject({ failed: 1, forgotten: 0 });
     expect(await quota("old")).toBeNull();

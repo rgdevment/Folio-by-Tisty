@@ -169,6 +169,9 @@ paths:
         version also brings what `POST /start` gave, its proof of work, the admin token and its days.
         After that, its owner may upload, or whoever signs with the token of the permit it holds. An
         upload never changes who owns a document or who may edit it. Sent twice, it stores it once.
+
+        A root Folio has not seen is kept for good, and a network brings only so many new ones a day. Past
+        that it answers `quota` until the next day, while a root it knows goes on.
       parameters:
         - $ref: "#/components/parameters/Proof"
         - name: Folio-Files

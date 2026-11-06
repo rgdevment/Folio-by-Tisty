@@ -12,7 +12,7 @@ const check = (sql: string): string => {
   return execFileSync(process.execPath, ["scripts/backup-check.mjs", file], { encoding: "utf8", stdio: "pipe" });
 };
 
-const TABLES = ["docs", "reports", "holds", "service_day", "service_stage", "false_reporters", "d1_migrations"]
+const TABLES = ["docs", "reports", "holds", "service_day", "service_stage", "false_reporters", "d1_migrations", "keys"]
   .map((name) => `CREATE TABLE ${name} (id TEXT);`)
   .join("\n");
 const INDEX = "CREATE INDEX docs_owner ON docs (id);";
