@@ -354,22 +354,25 @@ jobs:
       - name: It answers as it should
         run: |
           set -uo pipefail
-          for attempt in $(seq 1 20); do
+          answers() {
+            local status
             status=$(curl -s --max-time 10 -D "$RUNNER_TEMP/public-headers" -o "$RUNNER_TEMP/public-page" -w '%{http_code}' "$PUBLIC_URL/")
-            if grep -qsi '^cf-mitigated:' "$RUNNER_TEMP/public-headers"; then
-              echo "::warning::$PUBLIC_URL challenged this runner, so $TAG stays deployed without being checked"
-              exit 0
-            fi
-            if [ "$status" = 200 ] && grep -q 'Folio' "$RUNNER_TEMP/public-page" \
-              && grep -qi "^content-security-policy: default-src 'none'" "$RUNNER_TEMP/public-headers"; then
-              echo "$PUBLIC_URL answers as it should"
-              exit 0
-            fi
-            echo "not yet ($attempt/20): $status"
-            sleep 15
-          done
-          echo "::error::$PUBLIC_URL does not answer as it should after the deploy"
-          exit 1
+            grep -qsi '^cf-mitigated:' "$RUNNER_TEMP/public-headers" && return 2
+            [ "$status" = 200 ] || return 1
+            grep -q 'class="hero"' "$RUNNER_TEMP/public-page" || return 1
+            grep -qi "^content-security-policy: default-src 'none'" "$RUNNER_TEMP/public-headers" || return 1
+            case "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' "$PUBLIC_URL/site.css")" in
+              "200 text/css"*) ;;
+              *) return 1 ;;
+            esac
+            case "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' "$PUBLIC_URL/language.js")" in
+              "200 "*javascript*) ;;
+              *) return 1 ;;
+            esac
+            [ "$(curl -s --max-time 10 -o /dev/null -w '%{http_code}' "$PUBLIC_URL/not-a-page")" = 404 ] || return 1
+          }
+          export -f answers
+          bash scripts/wait-for.sh "$PUBLIC_URL" 20 15 answers
 
   rollback:
     name: Put a version back

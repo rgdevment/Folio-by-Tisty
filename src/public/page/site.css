@@ -76,6 +76,7 @@ a {
 .top,
 .hero,
 .facts,
+.caveat,
 .bottom {
   width: 100%;
   max-width: 68rem;
@@ -305,6 +306,16 @@ h1 {
 .fact p {
   margin: 0.35rem 0 0;
   font-size: 0.925rem;
+}
+
+.caveat {
+  margin-block: 1.25rem 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.lost {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .bottom {

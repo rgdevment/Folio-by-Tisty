@@ -53,6 +53,10 @@ las peticiones al conectarte, como cualquier servidor web, y las trata según su
 propia [política de privacidad](https://www.cloudflare.com/privacypolicy/).
 Nunca recibe la llave del `#`, así que tampoco puede leer lo que compartes.
 
+La página de `folio.tisty.app` solo explica qué es Folio. Son archivos fijos: no
+guarda nada de ti, ni en el servidor ni en tu navegador. Cloudflare también
+recibe tu IP y tus peticiones al visitarla.
+
 ## La promesa del cifrado, dicha con honestidad
 
 - **Entre dos Tisty**, nadie más puede leer lo compartido: ni el operador, ni
