@@ -38,6 +38,7 @@ simple = { limit = 2, period = 60 }
 
 # BILLING_DAY is the plan's renewal day, or 28 if it falls later (decision 118).
 [vars]
+ADMIN_URL = "https://panel.tisty.cl"
 BILLING_DAY = "1"
 CF_ACCOUNT_ID = "239d64b3f31b26a9da33dd5b68209970"
 CF_ZONE_ID = "56530808856fabd50bb1489615f3a031"
