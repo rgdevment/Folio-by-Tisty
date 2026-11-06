@@ -7,8 +7,8 @@
 Folio guarda lo mínimo para funcionar, y casi todo va cifrado con una
 llave que nunca recibe. No hay cuentas, ni cookies, ni analítica, ni anuncios,
 ni nada de terceros en la página. Lo que guarda caduca solo, salvo la parte
-pública de tu llave, las llaves que retiraste y los correos del operador. Esta
-política cuenta exactamente qué guarda, por qué y por cuánto tiempo.
+pública de tu llave y las llaves que retiraste; el operador borra sus correos a
+mano. Esta política cuenta exactamente qué guarda, por qué y por cuánto tiempo.
 
 Quién responde por estos datos: Mario, persona natural en Chile, que opera
 Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
@@ -34,8 +34,8 @@ Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 | Un resumen de tu IP (un HMAC con una llave que cambia) | Topes por IP y bloqueos ante abuso | Lo que dura la cuota o el bloqueo, y hasta un día más |
 | Una copia diaria de la base de datos, cifrada con una llave guardada fuera de línea, sin los resúmenes de lectura del día ni los cupos, y sin los documentos | Recuperarse de una falla | 30 días, en GitHub |
 | Lo que el operador hizo con un documento y por qué, también abrirlo: su id, la acción y el motivo | Poder responder por ello después | 180 días |
-| Un resumen por correo al operador, hasta dos veces al día: el id de los links denunciados, bloqueados o reclamados, la categoría y cuántas redes denunciaron, nunca una llave, una IP o el contenido | Avisarle qué revisar | Hasta que lo borre de su buzón, en Migadu |
-| Lo que le escribes al operador por correo, con tu dirección | Responderte | Hasta que lo borre de su buzón, en Migadu |
+| Un resumen por correo al operador, hasta dos veces al día: el id de los links denunciados, bloqueados o reclamados, la categoría y cuántas redes denunciaron, nunca una llave, una IP o el contenido | Avisarle qué revisar | Hasta 180 días, o más si una orden lo pide, en su buzón de Migadu |
+| Lo que le escribes al operador por correo, con tu dirección | Responderte | Hasta 180 días desde el último mensaje, o más si una orden lo pide, en su buzón de Migadu |
 | Las llaves que retiraste, como las firmó tu raíz: la parte pública de la llave y la de tu raíz | Para que quien lea sepa que una llave robada o retirada ya no habla por ti | Para siempre, porque quien lea siempre tiene que poder saberlo |
 | Las denuncias: categoría, detalle y versión denunciada, en claro; si lo dejaron el link, sellado para que solo el operador lo abra; y un resumen de la red de quien denuncia (un HMAC con una llave que cambia cada 180 días), para que cada red denuncie una sola vez | Moderar y enviarlas a quien corresponde | 180 días, o más si una orden lo pide. Si se acepta un reclamo contra la denuncia, el resumen de esa red queda 180 días desde entonces, para que deje de contar |
 
@@ -65,6 +65,8 @@ También participan otros tres, cada uno con su propia política:
   operador, con lo que dice la tabla de arriba.
 - **[GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)**
   guarda las copias de la base de datos, cifradas con una llave que no tiene.
+  Tisty también le pide los límites y los términos antes de compartir, así que
+  GitHub recibe la IP de quien va a compartir.
 - **[Healthchecks.io](https://healthchecks.io/privacy/)** recibe una señal cuando
   termina cada tarea programada, para avisar si deja de llegar. No lleva datos
   de nadie.
@@ -90,8 +92,9 @@ borrarlos u oponerte a su uso. Como no hay cuentas, lo más directo es:
 
 - **Borrar lo que compartiste:** con tu link de administración, o dejando de
   compartirlo desde Tisty. Deja de servirse de inmediato y se borra del servidor
-  en la siguiente limpieza, antes de una hora, salvo que una denuncia seria o una
-  orden obligue a conservarlo.
+  en la siguiente limpieza, normalmente antes de una hora; durante un bloqueo por
+  gasto o una falla puede tardar más. Una denuncia seria o una orden pueden
+  obligar a conservarlo.
 - **Cualquier otra petición:** escribe a <rgdevment@tisty.app>. El resumen de
   tu IP no permite saber quién eres, así que en general no hay datos que
   puedan asociarse a ti.
