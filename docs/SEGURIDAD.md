@@ -43,7 +43,8 @@ amenazas legales.
 - **Abusar cuesta.** Denunciar y compartir algo nuevo piden una prueba de
   trabajo, y también un lector nuevo pasado el cupo gratis del día. Iniciar un
   compartido y leer tienen un freno de velocidad por red, y subir tiene un cupo
-  por red y una espera por persona.
+  por red y una espera por persona. Una red trae solo unas pocas llaves nuevas al
+  día, y una llave nueva parte con los topes más bajos.
 
 ## Qué no protege
 

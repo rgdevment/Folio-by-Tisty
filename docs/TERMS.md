@@ -17,6 +17,12 @@ There is no company behind it and nobody makes money from it. The service's
 code is public, under the
 [Functional Source License 1.1, Apache 2.0 Future License](../LICENSE).
 
+## What Folio is
+
+Folio is a service apart from the Tisty app. Tisty writes, signs and encrypts;
+Folio keeps what arrives and hands it to whoever has the link. Folio only
+receives and shows: documents are edited in Tisty, never here.
+
 ## What they cover
 
 The service that stores and serves shared documents, at
@@ -41,6 +47,21 @@ The Tisty app has [terms of its own](https://github.com/rgdevment/Tisty/blob/mai
 - **There are limits** on size and on how many pictures and files a document carries,
   which the service may change. Tisty tells you before sharing if something
   does not fit.
+
+## Your key and your reputation
+
+- **You accept these terms** the first time you share from Tisty, and Tisty
+  explains the basics then.
+- **Your key is how Folio tells you apart.** Tisty signs what you share with a
+  key of yours, and Folio keeps its public part for good, even after your
+  documents are gone. It does not say who you are. The name you choose to show
+  travels encrypted, and only those with the link read it.
+- **Your reputation belongs to that key.** Limits start low, and reputation is
+  what will open more. How it is earned is not decided yet, and these terms will
+  say so when it is. Reports alone never take it away: only what the operator
+  confirms counts.
+- **A new key starts from the lowest limits,** and each network can bring only a
+  few new ones a day.
 
 ## What is not allowed
 

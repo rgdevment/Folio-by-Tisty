@@ -75,7 +75,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  for (const table of ["docs", "net_day", "net_hour", "service_stage", "revocations", "editors"]) {
+  for (const table of ["docs", "keys", "net_day", "net_hour", "service_stage", "revocations", "editors", "reports"]) {
     await testEnv.DB.prepare(`DELETE FROM ${table}`).run();
   }
 });
@@ -349,6 +349,84 @@ describe("the files a version names", () => {
     await testEnv.DB.prepare("UPDATE docs SET dies_on = 0 WHERE id = ?").bind(id).run();
     await store.sweep(dayOf(LATER));
     expect(await objects(id)).toEqual([]);
+  });
+});
+
+describe("a key Folio has not seen", () => {
+  const sharedBy = async (who: Person, now = NOW) => {
+    const first = await started(now);
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: who });
+    return send(first.id, bytes, now, first);
+  };
+  const keys = async () =>
+    (await testEnv.DB.prepare("SELECT root FROM keys").all<{ root: string }>()).results.map((one) => one.root);
+
+  it("is kept the first time it shares, with the day it arrived", async () => {
+    expect(await sharedBy(mario)).toEqual({ stored: true, version: 1 });
+    const row = await testEnv.DB.prepare("SELECT first_day FROM keys WHERE root = ?")
+      .bind(rootOf(mario))
+      .first<{ first_day: number }>();
+    expect(row?.first_day).toBe(dayOf(NOW));
+  });
+
+  it("takes five a day from one network, and the sixth waits for the next day and leaves no trace", async () => {
+    for (let at = 0; at < 5; at += 1) expect(await sharedBy(await newPerson())).toEqual({ stored: true, version: 1 });
+    const sixth = await newPerson();
+    const until = (dayOf(NOW) + 1) * DAY_MS;
+    expect(await sharedBy(sixth)).toEqual({ refused: "quota", until });
+    expect(await keys()).not.toContain(rootOf(sixth));
+    const docs = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM docs").first<{ n: number }>();
+    expect(docs?.n).toBe(5);
+  });
+
+  it("does not spend the day's keys on one it knows, however many times it shares", async () => {
+    await sharedBy(mario);
+    await sharedBy(mario);
+    const row = await testEnv.DB.prepare("SELECT keys FROM net_day").first<{ keys: number }>();
+    expect(row?.keys).toBe(1);
+  });
+
+  it("lets a key it knows go on past the day's five", async () => {
+    await sharedBy(mario);
+    for (let at = 0; at < 4; at += 1) await sharedBy(await newPerson());
+    expect(await sharedBy(await newPerson())).toMatchObject({ refused: "quota" });
+    expect(await sharedBy(mario)).toEqual({ stored: true, version: 1 });
+  });
+
+  it("takes five more the next day", async () => {
+    for (let at = 0; at < 5; at += 1) await sharedBy(await newPerson());
+    expect(await sharedBy(await newPerson(), NOW + DAY_MS)).toEqual({ stored: true, version: 1 });
+  });
+
+  it("counts whoever edits too, and not until their version is taken", async () => {
+    const { permit, pair } = await newToken();
+    const id = await shared({ permit });
+    const stranger = await newPerson();
+    const refused = await sealedEnvelope({ id, version: 2, owner: stranger });
+    expect(await send(id, refused, LATER)).toEqual({ refused: "not_yours" });
+    expect(await keys()).not.toContain(rootOf(stranger));
+
+    const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+    expect(await send(id, edited, LATER)).toEqual({ stored: true, version: 2 });
+    expect(await keys()).toContain(rootOf(ana));
+  });
+
+  it("counts both when a first version is not signed by its owner, so a known signer opens no way around", async () => {
+    const { permit, pair } = await newToken();
+    const fresh = await newPerson();
+    await sharedBy(ana);
+    const first = await started();
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: fresh, signer: ana, permit, token: pair });
+    expect(await send(first.id, bytes, NOW, first)).toEqual({ stored: true, version: 1 });
+    expect(await keys()).toContain(rootOf(fresh));
+  });
+
+  it("stays after its documents are forgotten", async () => {
+    const id = await shared();
+    await testEnv.DB.prepare("UPDATE docs SET dies_on = 0 WHERE id = ?").bind(id).run();
+    await store.sweep(dayOf(LATER));
+    expect(await row(id)).toBeNull();
+    expect(await keys()).toContain(rootOf(mario));
   });
 });
 

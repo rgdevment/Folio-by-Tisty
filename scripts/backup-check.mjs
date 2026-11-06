@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
-const REQUIRED = ["docs", "reports", "holds", "service_day", "service_stage", "false_reporters", "d1_migrations"];
+const REQUIRED = ["docs", "reports", "holds", "service_day", "service_stage", "false_reporters", "d1_migrations", "keys"];
 const LEFT_OUT = /^(seen_\d+|net_day|net_hour)$/;
 
 const file = process.argv[2];

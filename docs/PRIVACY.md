@@ -1,12 +1,13 @@
 # Folio by Tisty privacy policy
 
-**Draft of November 5, 2026.** Folio is not open yet.
+**Draft of November 6, 2026.** Folio is not open yet.
 
 ## The short version
 
 Folio keeps the least it needs to work, and nearly all of it is encrypted
 with a key it never receives. No accounts, no cookies, no analytics, no ads,
-and nothing from third parties on the page. What it keeps expires on its own.
+and nothing from third parties on the page. What it keeps expires on its own,
+except your key's public part and the keys you took back.
 This policy says exactly what it keeps, why, and for how long.
 
 Who answers for this data: Mario, a natural person in Chile, who runs Folio
@@ -26,7 +27,8 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 | The encrypted document and its attached files, with its last 3 versions and those replaced in the last 7 days | To serve it to whoever has the link, and so a report can reach what someone replaced | Until the time without activity you choose, 15 days at most, or until you stop sharing it. With a serious report or an order, it is no longer served and stays for up to 180 days, or for as long as the order asks |
 | The manifest in the clear: how many parts, what each weighs, their kind and the version | To hold the limits without reading the content | As long as the document |
 | The manage link, kept as a digest (hash), and the public key of the edit link's token, which never reaches the server | To check who may change or delete it | As long as the document |
-| If you sign, your public key and its certificate | So readers know it is yours | As long as the document |
+| Your public key and its certificate, in what you share | So readers know it is yours | As long as the document |
+| Your public key on its own, and the day Folio first saw it, tied to no network and no document | So limits and reputation stay with it, and a new key starts from the lowest | For good, even after your documents are gone |
 | How many times it was read, counted once a day per visitor | To show you the reads in Tisty | As long as the document |
 | A line for each read served: the link's id (without its key, so it opens nothing), the country and the Cloudflare data center, never your IP | To know how much each document is read and where from, and size the service | 3 days, in Cloudflare's Workers Logs |
 | A digest of your IP (an HMAC with a key that changes) | Per-IP limits and blocks against abuse | As long as the quota or the block lasts |
@@ -34,9 +36,8 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 | Keys you took back, as your root signed them: the key's public part and your root's | So readers learn that a stolen or retired key no longer speaks for you | For good, since a reader must always be able to tell |
 | Reports: category, detail, the version reported, the link if given, sealed so only the operator can open it, and a digest of the reporter's network (an HMAC with a key that changes every 180 days), so each network reports only once | To moderate and pass them where they belong | 180 days, or longer if an order asks for it. If an appeal against a report is accepted, that network's digest stays 180 days from then, so it stops counting |
 
-**About signing:** if you sign what you share, your public key lets anyone tell
-that two signed documents come from the same person, though not who you are.
-That is why signing is optional for unlisted documents.
+**About signing:** your public key lets anyone tell that two documents come from
+the same person, though not who you are.
 
 **About reads:** they are counted without keeping who read. Not to count the
 same person twice on one day, a short-lived digest is used and thrown away when
@@ -72,7 +73,8 @@ most direct ways are:
   sharing it from Tisty. It is deleted from the server at once.
 - **Anything else:** write to <rgdevment@tisty.app>. The digest of your IP does
   not reveal who you are, so in general there is no data that can be tied to
-  you.
+  you. The same goes for your public key, which only you can show is yours: to
+  erase it, sign the request with that key. Its reputation goes with it.
 
 ## Children
 

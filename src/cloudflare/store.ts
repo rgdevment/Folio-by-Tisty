@@ -365,6 +365,22 @@ export class Cloud implements Store {
     return taken.meta.changes > 0;
   }
 
+  // The network's cupo goes first, so a key that does not fit leaves no trace.
+  async admitKey(root: string, net: string, today: number): Promise<boolean> {
+    const known = await this.#db.prepare("SELECT 1 FROM keys WHERE root = ?").bind(root).first();
+    if (known) return true;
+    const taken = await this.#db
+      .prepare(
+        `INSERT INTO net_day (day, net, docs, bytes, keys) VALUES (?1, ?2, 0, 0, 1)
+         ON CONFLICT (day, net) DO UPDATE SET keys = keys + 1 WHERE keys < ?3`,
+      )
+      .bind(today, net, this.#limits.newKeysADay)
+      .run();
+    if (taken.meta.changes === 0) return false;
+    await this.#db.prepare("INSERT OR IGNORE INTO keys (root, first_day) VALUES (?, ?)").bind(root, today).run();
+    return true;
+  }
+
   async #giveQuotaBack(net: string, docs: number, bytes: number, today: number): Promise<void> {
     await this.#db
       .prepare("UPDATE net_day SET docs = docs - ?, bytes = bytes - ? WHERE day = ? AND net = ?")
@@ -910,7 +926,7 @@ export class Cloud implements Store {
   }
 
   async news(after: number, before: number, atMost: number): Promise<News> {
-    const [reports, blocked, appealed] = await this.#db.batch([
+    const [reports, blocked, appealed, keys] = await this.#db.batch([
       this.#db
         .prepare(
           `SELECT doc, category, COUNT(*) AS nets FROM reports
@@ -924,12 +940,16 @@ export class Cloud implements Store {
       this.#db
         .prepare("SELECT id FROM docs WHERE appealed_hour > ?1 AND appealed_hour < ?2 ORDER BY id LIMIT ?3")
         .bind(after, before, atMost),
+      this.#db
+        .prepare("SELECT COALESCE(SUM(keys), 0) AS keys FROM net_day WHERE day = ?")
+        .bind(Math.floor((before - 1) / HOURS_IN_A_DAY)),
     ]);
     const ids = (rows: typeof blocked): string[] => ((rows?.results ?? []) as { id: string }[]).map(({ id }) => id);
     return {
       reports: (reports?.results ?? []) as News["reports"],
       blocked: ids(blocked),
       appealed: ids(appealed),
+      newKeys: (keys?.results?.[0] as { keys: number } | undefined)?.keys ?? 0,
     };
   }
 
