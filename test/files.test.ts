@@ -65,6 +65,7 @@ beforeEach(() => {
   place.HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
     clicked.push({ name: this.download, href: this.href });
   };
+  vi.stubGlobal("window", place);
   vi.stubGlobal("document", place.document);
   vi.stubGlobal("DOMParser", place.DOMParser);
   vi.stubGlobal("MutationObserver", place.MutationObserver);

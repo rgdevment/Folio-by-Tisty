@@ -1,6 +1,7 @@
 import type { Document, Orientation, Page, Paper, Verdict } from "@tisty/contracts";
 import { cardsFor, referenceOf } from "./cards";
 import { bareUrl } from "./clean";
+import { offerPrinting } from "./print";
 import sheetStyles from "./sheet.css?url";
 
 export const element = <T extends HTMLElement>(id: string): T => {
@@ -38,11 +39,20 @@ export interface Seal {
   diesOn: string;
 }
 
+// Through the object model, since the page's policy lets no style be written into it.
+const printOn = (across: number, down: number): void => {
+  if (!("adoptedStyleSheets" in document)) return;
+  const size = new CSSStyleSheet();
+  size.replaceSync(`@page { size: ${across}mm ${down}mm; }`);
+  document.adoptedStyleSheets = [size];
+};
+
 const withLayout = (host: HTMLElement, sheets: boolean, paper: Paper, orientation: Orientation): void => {
   const [short, long] = PAPER_MILLIMETRES[paper];
   const across = orientation === "landscape" ? long : short;
   const down = orientation === "landscape" ? short : long;
   host.dataset.sheets = String(sheets);
+  printOn(across, down);
   // On the column, because the card of pages under the sheet keeps its width too.
   element("sheet-column").style.setProperty("--page-width", `${sheets ? pixels(across) : LONG_PAGE_WIDTH_PIXELS}px`);
   if (sheets) {
@@ -258,7 +268,6 @@ const drawActions = (): void => {
   const edit = element<HTMLAnchorElement>("edit-in-tisty");
   edit.href = `tisty://edit?link=${encodeURIComponent(location.href)}`;
   offerTisty(edit);
-  element("print").addEventListener("click", () => window.print());
 };
 
 let opener: HTMLElement | null = null;
@@ -400,7 +409,9 @@ export const drawFrame = (
   const withCards = cardsFor(held, wordsOf);
   let reading: AbortController | undefined;
   let drawing: AbortController | undefined;
+  let showing: Document | Page = held;
   const goTo = (shown: Document | Page): void => {
+    showing = shown;
     sheet.lang = shown.lang ?? held.lang ?? "";
     drawing?.abort();
     drawing = new AbortController();
@@ -425,6 +436,26 @@ export const drawFrame = (
 
   drawPages(pages, turnTo);
   goTo(held);
+  const printedPage = (page: Document | Page, side: string, signal: AbortSignal): HTMLElement => {
+    const printed = document.createElement("section");
+    printed.className = `printed-page ${side}`;
+    printed.lang = page.lang ?? held.lang ?? "";
+    printed.append(...(page.tags?.length ? [tagsOf(page.tags)] : []), withCards(wordsOf(page.html), signal));
+    return printed;
+  };
+  offerPrinting({
+    button: element("print"),
+    root,
+    sheet,
+    others: (signal) => {
+      const all: (Document | Page)[] = [held, ...pages];
+      const at = all.indexOf(showing);
+      return {
+        before: all.slice(0, at).map((page) => printedPage(page, "before", signal)),
+        after: all.slice(at + 1).map((page) => printedPage(page, "after", signal)),
+      };
+    },
+  });
   drawPaperPanel(host, held);
   drawDetails(root, held);
   drawSeal(held, seal);
