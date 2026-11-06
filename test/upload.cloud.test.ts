@@ -36,6 +36,7 @@ const tools = {
   store,
   limits: LIMITS,
   secret: SECRET,
+  sharingOpen: true,
   limiter: { allows: async () => true },
   syncLimiter: { allows: async () => true },
   dayKey: async () => "a key for the day",
@@ -744,6 +745,31 @@ describe("what stops a version", () => {
     await testEnv.DB.prepare("UPDATE docs SET paused_at = NULL, blocked_at = 1 WHERE id = ?").bind(id).run();
     expect(await send(id, await sealedEnvelope({ id, version: 2, owner: mario }), LATER)).toEqual({
       refused: "blocked",
+    });
+  });
+
+  describe("while the service has not opened", () => {
+    const closed = { ...tools, sharingOpen: false };
+
+    it("refuses a new document, and keeps nothing of it", async () => {
+      const first = await started();
+      const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+      const sent = uploadDoc({ id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => bytes, first }, closed);
+      expect(await sent).toEqual({ refused: "uploads_off" });
+      expect(await row(first.id)).toBeNull();
+    });
+
+    it("asks no proof of work for a share it would refuse anyway", async () => {
+      const first = { ...(await started()), proof: "" };
+      const sent = uploadDoc({ id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => null, first }, closed);
+      expect(await sent).toEqual({ refused: "uploads_off" });
+    });
+
+    it("takes a new version of what is already shared", async () => {
+      const id = await shared();
+      const bytes = await sealedEnvelope({ id, version: 2, owner: mario });
+      const sent = uploadDoc({ id, now: LATER, ip: "203.0.113.9", bytes: async () => bytes }, closed);
+      expect(await sent).toEqual({ stored: true, version: 2 });
     });
   });
 

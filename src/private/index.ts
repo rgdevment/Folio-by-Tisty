@@ -16,6 +16,7 @@ interface Env extends Bindings, SpendBindings, MailBindings {
   SPEND_HEARTBEAT_URL?: string;
   DIGEST_HEARTBEAT_URL?: string;
   ADMIN_URL?: string;
+  SHARING_OPEN?: string;
   FOLIO_TAG?: string;
 }
 
@@ -48,6 +49,7 @@ export default {
         store,
         limits: LEVEL_ONE,
         secret: env.FOLIO_SECRET,
+        sharingOpen: env.SHARING_OPEN === "true",
         limiter: { allows: async (key) => (await env.READS.limit({ key })).success },
         syncLimiter: { allows: async (key) => (await env.SYNCS.limit({ key })).success },
         dayKey: (today) => dayKeys.of(today, (day) => store.dayKey(day)),
