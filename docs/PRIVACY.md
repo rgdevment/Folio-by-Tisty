@@ -28,7 +28,7 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 | The manage link, kept as a digest (hash), and the public key of the edit link's token, which never reaches the server | To check who may change or delete it | As long as the document |
 | If you sign, your public key and its certificate | So readers know it is yours | As long as the document |
 | How many times it was read, counted once a day per visitor | To show you the reads in Tisty | As long as the document |
-| A line for each read served: the link's id (without its key, so it opens nothing), the country and the Cloudflare data center, never your IP | To know how much each document is read and where from, and size the service | 7 days, in Cloudflare's Workers Logs |
+| A line for each read served: the link's id (without its key, so it opens nothing), the country and the Cloudflare data center, never your IP | To know how much each document is read and where from, and size the service | Up to 7 days, in Cloudflare's Workers Logs |
 | A digest of your IP (an HMAC with a key that changes) | Per-IP limits and blocks against abuse | As long as the quota or the block lasts |
 | A daily copy of the database, encrypted with a key kept offline, without the day's read digests or quotas, and without the documents | To recover from a failure | 30 days, on GitHub |
 | Keys you took back, as your root signed them: the key's public part and your root's | So readers learn that a stolen or retired key no longer speaks for you | For good, since a reader must always be able to tell |
