@@ -1107,33 +1107,6 @@ describe("what stops a version", () => {
       const sent = uploadDoc({ id, now: LATER, ip: "203.0.113.9", bytes: async () => bytes }, closed);
       expect(await sent).toEqual({ stored: true, version: 2 });
     });
-
-    describe("for the keys that test it", () => {
-      const testing = () => ({ ...closed, testerRoots: new Set([toBase64Url(mario.rootBytes)]) });
-      const firstOf = async (owner: Person) => {
-        const first = await started();
-        const bytes = await sealedEnvelope({ id: first.id, version: 1, owner });
-        return {
-          first,
-          sent: await uploadDoc(
-            { id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => bytes, first },
-            testing(),
-          ),
-        };
-      };
-
-      it("shares as if it were open", async () => {
-        const { first, sent } = await firstOf(mario);
-        expect(sent).toEqual({ stored: true, version: 1 });
-        expect(await row(first.id)).not.toBeNull();
-      });
-
-      it("still refuses anyone else, and keeps nothing", async () => {
-        const { first, sent } = await firstOf(ana);
-        expect(sent).toEqual({ refused: "uploads_off" });
-        expect(await row(first.id)).toBeNull();
-      });
-    });
   });
 
   describe("past what new keys may store in a day", () => {

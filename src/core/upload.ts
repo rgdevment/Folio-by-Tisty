@@ -28,7 +28,6 @@ export interface Uploading {
 
 export interface UploadTools extends ReadTools {
   sharingOpen: boolean;
-  testerRoots?: ReadonlySet<string>;
   termsVersion: string;
 }
 
@@ -246,7 +245,7 @@ const storeVersion = async (
   const sharing = first && (!held || held.latest === 0) ? first : null;
   if (!held && !sharing) return { refused: "missing" };
   if (sharing) {
-    if (!tools.sharingOpen && !tools.testerRoots?.size) return { refused: "uploads_off" };
+    if (!tools.sharingOpen) return { refused: "uploads_off" };
     const refused = await mayShare(uploading, sharing, tools);
     if (refused) return refused;
   }
@@ -255,9 +254,6 @@ const storeVersion = async (
 
   const read = await readOrRefuse(id, bytes);
   if ("refused" in read) return read;
-  if (sharing && !tools.sharingOpen && !rootsOf(read).every((root) => tools.testerRoots?.has(root))) {
-    return { refused: "uploads_off" };
-  }
   const { manifest, signature } = read;
   if (!withinTops(manifest, limits)) return { refused: "too_big" };
   const floor = limits.oldestContractTaken;
