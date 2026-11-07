@@ -17,6 +17,7 @@ const QUEUE: Queue = {
       level: "grave",
       detail: HARM,
       sealedLink: "sealed1.opaque",
+      sealedContact: "sealed1.contact",
       version: 2,
       at: 20_000,
       asn: 3,
@@ -29,6 +30,7 @@ const QUEUE: Queue = {
       level: "medium",
       detail: null,
       sealedLink: null,
+      sealedContact: null,
       version: 1,
       at: 20_000,
       asn: 4,
@@ -170,6 +172,16 @@ describe("the panel", () => {
     expect(page.getElementById("reports")?.textContent).not.toContain("Se ven las");
     drawQueue(page, { ...QUEUE, reportsTotal: 900 }, doing as unknown as Doing);
     expect(page.getElementById("reports")?.textContent).toContain("Se ven las 2 más graves y recientes de 900.");
+  });
+
+  it("hands over a sealed email only as a command, on the report that brought one", () => {
+    pressing("reports", "Copiar para leer su correo");
+    expect(doing.copy).toHaveBeenCalledWith(
+      expect.stringContaining("report-key.mjs open <llave> AbCdEfGh sealed1.contact"),
+    );
+    expect(page.getElementById("reports")?.textContent).not.toContain("sealed1.contact");
+    const offered = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
+    expect(offered.filter((one) => one.textContent === "Copiar para leer su correo")).toHaveLength(1);
   });
 
   it("says when there is nothing", () => {

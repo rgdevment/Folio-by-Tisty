@@ -6,6 +6,7 @@ import written from "../docs/openapi.yaml?raw";
 import { Cloud } from "../src/cloudflare/store";
 import { type Bytes, words } from "../src/core/bytes";
 import { dayOf, LEVEL_ONE, REPORT_CATEGORIES } from "../src/core/limits";
+import { SEALED_CONTACT_AT_MOST } from "../src/core/sealed-link";
 import { hourOf, macOf, proofHolds, tokenHash } from "../src/core/start";
 import { STATUS } from "../src/private/api";
 import worker from "../src/private/index";
@@ -688,6 +689,7 @@ describe("the written API", () => {
     expect(report.category.enum).toEqual(REPORT_CATEGORIES);
     expect(report.detail.maxLength).toBe(LEVEL_ONE.reportDetailAtMost);
     expect(report.sealedLink.maxLength).toBe(LEVEL_ONE.sealedLinkAtMost);
+    expect(report.sealedContact.maxLength).toBe(SEALED_CONTACT_AT_MOST);
   });
 
   it("tells a reader what was taken back, in its header", async () => {

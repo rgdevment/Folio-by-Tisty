@@ -84,6 +84,19 @@ describe("the report form", () => {
     expect(bodySent(0).sealedLink).toMatch(/^sealed1\./);
   });
 
+  it("seals the email it was given, and sends none when it was left empty", async () => {
+    choose("spam");
+    const contact = place.document.querySelector('input[name="contact"]') as HTMLInputElement;
+    contact.value = "  quien@example.test ";
+    await submitted();
+    expect(bodySent(0).sealedContact).toMatch(/^sealed1\./);
+    expect(asked.mock.calls[0]?.[1].body).not.toContain("quien@example.test");
+    contact.value = "";
+    element<HTMLButtonElement>("report-send").disabled = false;
+    await submitted();
+    expect(bodySent(1)).not.toHaveProperty("sealedContact");
+  });
+
   it("gives the choice back when the reader moves off a grave report", () => {
     choose("threat");
     choose("phishing");

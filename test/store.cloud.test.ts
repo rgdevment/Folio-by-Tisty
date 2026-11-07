@@ -1107,6 +1107,66 @@ describe("reports", () => {
     expect((await report("f")).blocked).toBe(true);
   });
 
+  describe("the email a reporter leaves", () => {
+    const contactOf = async (net = "a") =>
+      (
+        await testEnv.DB.prepare("SELECT sealed_contact FROM reports WHERE net = ?")
+          .bind(net)
+          .first<{ sealed_contact: string | null }>()
+      )?.sealed_contact;
+    const reporting = (net: string, sealedContact?: string) =>
+      store.report(
+        { doc: "d1", net, category: "phishing", asn: 1, ...(sealedContact ? { sealedContact } : {}) },
+        DAY,
+        DAY * 24,
+      );
+
+    it("is kept sealed, at any level", async () => {
+      await store.create(newDoc("d1"), DAY);
+      await store.report(
+        { doc: "d1", net: "a", category: "spam", asn: 1, sealedContact: "sealed1.one" },
+        DAY,
+        DAY * 24,
+      );
+      expect(await contactOf()).toBe("sealed1.one");
+    });
+
+    it("can arrive on a second report, without moving anything else", async () => {
+      await store.create(newDoc("d1"), DAY);
+      await reporting("a");
+      await reporting("a", "sealed1.one");
+      expect(await contactOf()).toBe("sealed1.one");
+    });
+
+    it("stays when the same network reports again without one", async () => {
+      await store.create(newDoc("d1"), DAY);
+      await reporting("a", "sealed1.one");
+      await store.report({ doc: "d1", net: "a", category: "csam", asn: 1, sealedLink: "sealed1.link" }, DAY, DAY * 24);
+      const row = await testEnv.DB.prepare("SELECT category FROM reports WHERE net = 'a'").first<{
+        category: string;
+      }>();
+      expect(row?.category).toBe("csam");
+      expect(await contactOf()).toBe("sealed1.one");
+    });
+
+    it("does not revive a cleared report", async () => {
+      await store.create(newDoc("d1"), DAY);
+      for (const net of ["a", "b", "c"]) await report(net);
+      await store.appealAccepted("d1", DAY);
+      await reporting("a", "sealed1.one");
+      expect(await contactOf()).toBeNull();
+      const row = await testEnv.DB.prepare("SELECT cleared FROM reports WHERE net = 'a'").first<{ cleared: number }>();
+      expect(row?.cleared).toBe(1);
+    });
+
+    it("is erased with its report", async () => {
+      await store.create(newDoc("d1"), DAY);
+      await reporting("a", "sealed1.one");
+      await store.sweep(DAY + 181);
+      expect((await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports").first<{ n: number }>())?.n).toBe(0);
+    });
+  });
+
   describe("after an accepted appeal", () => {
     const lifted = async () => {
       await store.create(newDoc("d1"), DAY);

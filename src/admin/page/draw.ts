@@ -67,6 +67,10 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
       button(page, "Anotar apertura", () => doing.opened(report.doc)),
     );
   }
+  if (report.sealedContact) {
+    const contact = report.sealedContact;
+    buttons.unshift(button(page, "Copiar para leer su correo", () => doing.copy(openCommand(report.doc, contact))));
+  }
   card.append(actions(page, ...buttons));
   return card;
 };

@@ -5,7 +5,7 @@ import { toBase64Url } from "../../core/start";
 const NONCE_BYTES = 12;
 
 // Only the operator's private key opens it, and that key is not in Cloudflare (decision 42).
-export const sealLink = async (id: string, linkKey: string, operatorKey: string): Promise<string> => {
+const sealedFor = async (id: string, said: string, operatorKey: string): Promise<string> => {
   const operator = fromBase64Url(operatorKey);
   const pair = (await crypto.subtle.generateKey("X25519", false, ["deriveBits"])) as CryptoKeyPair;
   const shared = await crypto.subtle.deriveBits(
@@ -25,7 +25,13 @@ export const sealLink = async (id: string, linkKey: string, operatorKey: string)
   const sealed = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: nonce, additionalData: words(id) },
     key,
-    words(`${id}#${linkKey}`),
+    words(said),
   );
   return `${SEALED_LINK_PREFIX}${toBase64Url(joined(ephemeral, nonce, new Uint8Array(sealed)))}`;
 };
+
+export const sealLink = (id: string, linkKey: string, operatorKey: string): Promise<string> =>
+  sealedFor(id, `${id}#${linkKey}`, operatorKey);
+
+export const sealContact = (id: string, contact: string, operatorKey: string): Promise<string> =>
+  sealedFor(id, contact, operatorKey);

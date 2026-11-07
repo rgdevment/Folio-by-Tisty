@@ -211,6 +211,14 @@ describe("what it shows", () => {
     const queue = (await response.json()) as Awaited<ReturnType<CloudModeration["queue"]>>;
     expect(queue.reports.map((one) => one.category)).toEqual(["csam", "phishing"]);
     expect(queue.reports[0]?.sealedLink).toBe("sealed1.opaque");
+    expect(queue.reports[0]?.sealedContact).toBeNull();
+    await store.report(
+      { doc: ID, net: "n4", asn: 9, category: "csam", version: 1, sealedContact: "sealed1.mail" },
+      TODAY,
+      HOUR,
+    );
+    const again = await new CloudModeration(testEnv.DB).queue(NOW);
+    expect(again.reports.map((one) => one.sealedContact)).toContain("sealed1.mail");
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 

@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { LEVEL_ONE, levelOfReport } from "../src/core/limits";
 import { saidOf } from "../src/core/report";
-import { isSealedLink } from "../src/core/sealed-link";
+import { isSealedContact, isSealedLink } from "../src/core/sealed-link";
 import { OPERATOR_KEY } from "../src/page/operator-key";
-import { sealLink } from "../src/page/ui/seal";
+import { sealContact, sealLink } from "../src/page/ui/seal";
 
 const ID = "k7Qm2xPa";
 const LINK_KEY = "nlt35tFEpAhP5bWJr2p2hIFCFml15FNS5LD2AsBbd2s";
@@ -38,6 +38,15 @@ describe("a link sealed for the operator", () => {
     expect(isSealedLink(await sealLink(ID, LINK_KEY, OPERATOR_KEY))).toBe(true);
   });
 
+  it("seals an email the same way, under its own document", async () => {
+    const sealed = await sealContact(ID, "a@b.co", operatorKey);
+    expect(isSealedContact(sealed)).toBe(true);
+    expect(isSealedLink(sealed)).toBe(false);
+    expect(keyScript("open", file, ID, sealed)).toBe("a@b.co");
+    expect(() => keyScript("open", file, "another1", sealed)).toThrow();
+    expect(isSealedContact(await sealContact(ID, `${"a".repeat(244)}@example.co`, operatorKey))).toBe(true);
+  });
+
   it("does not overwrite a key already there", () => {
     expect(() => keyScript("new", file)).toThrow();
   });
@@ -57,6 +66,20 @@ describe("what a report may say", () => {
   it.each(["threat", "doxxing", "intimate", "csam"])("refuses a grave report of %s without its link", (category) => {
     expect(saidOf({ category }, LEVEL_ONE)).toBeNull();
     expect(saidOf({ category, sealedLink: sealed }, LEVEL_ONE)).not.toBeNull();
+  });
+
+  it("takes an email only sealed, at any level", () => {
+    const sealedContact = `sealed1.${"A".repeat(80)}`;
+    expect(saidOf({ category: "spam", sealedContact }, LEVEL_ONE)).toEqual({ category: "spam", sealedContact });
+    for (const said of [
+      "a@b.co",
+      `sealed1.${"A".repeat(79)}`,
+      `others1.${"A".repeat(80)}`,
+      `sealed1.${"A".repeat(505)}`,
+      7,
+    ]) {
+      expect(saidOf({ category: "spam", sealedContact: said }, LEVEL_ONE)).toBeNull();
+    }
   });
 
   it("takes a category it knows, with what it may bring", () => {

@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 6, vigente desde el 6 de noviembre de 2026.**
+**Versión 7, vigente desde el 6 de noviembre de 2026.**
 
 ## En corto
 
@@ -113,6 +113,12 @@ para denunciar: guarda un resumen de la red.
   red denuncia una vez por documento, y Folio le pide a su navegador un pequeño
   trabajo de cómputo para frenar los abusos. Quien no tenga el link puede
   escribir a <abuso@tisty.app> o acudir a la PDI o a la Fiscalía.
+- **Puedes dejar tu correo al denunciar, si quieres.** Sirve para aclarar dudas
+  y filtrar denuncias falsas. Va cifrado para que solo el operador lo lea, se
+  borra con la denuncia y no se entrega a nadie, salvo por orden de un juez. Si
+  hay dudas y no respondes, el operador puede no hacer nada con ella, pero no
+  responder no la vuelve falsa, y una denuncia de abuso infantil o de amenazas
+  se revisa igual.
 - **Una denuncia leve** (spam, o algo molesto u ofensivo sin ser delito) no
   necesita que nadie intervenga. Con tres redes de al menos dos proveedores,
   quien lo compartió ve un aviso en su link de administrar, también desde Tisty,
