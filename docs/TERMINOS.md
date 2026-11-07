@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 9, vigente desde el 6 de noviembre de 2026.**
+**Versión 10, vigente desde el 6 de noviembre de 2026.**
 
 ## En corto
 
@@ -111,8 +111,9 @@ para denunciar: guarda un resumen de la red.
 
 - **Cualquiera con el link puede denunciar** desde la página donde se lee. Cada
   red denuncia una vez por documento, y Folio le pide a su navegador un pequeño
-  trabajo de cómputo para frenar los abusos. Quien no tenga el link puede
-  escribir a <abuso@tisty.app> o acudir a la PDI o a la Fiscalía.
+  trabajo de cómputo para frenar los abusos. Una denuncia de engaño o grave debe
+  decir en una frase por qué. Quien no tenga el link puede escribir a
+  <abuso@tisty.app> o acudir a la PDI o a la Fiscalía.
 - **En una denuncia de engaño o grave puedes dejar tu correo, si quieres.**
   Sirve para aclarar dudas y filtrar denuncias falsas, y nadie comprueba que sea
   tuyo. Va cifrado para que solo el operador lo lea, y no se entrega a nadie,
@@ -123,10 +124,11 @@ para denunciar: guarda un resumen de la red.
   una denuncia de engaño, pero no responder no la vuelve falsa, y una grave se
   revisa igual.
 - **Una denuncia leve** (spam, o algo molesto u ofensivo sin ser delito) no
-  necesita que nadie intervenga. Con tres redes de al menos dos proveedores,
-  quien lo compartió ve un aviso en su link de administrar, también desde Tisty,
-  y tiene tres días para subir una versión nueva. Si no lo hace, deja de
-  servirse hasta que llegue una. Una versión nueva deja esas denuncias en cero.
+  necesita que nadie intervenga. Con diez redes de al menos dos proveedores en
+  un día, quien lo compartió ve un aviso en su link de administrar, también
+  desde Tisty, y tiene tres días para subir una versión nueva. Si no lo hace,
+  deja de servirse hasta que llegue una. Una versión nueva deja esas denuncias
+  en cero, y el operador también puede quitar el aviso.
 - **Una denuncia de engaño** (phishing, malware o estafa) puede traer el link
   para leerlo, si quien denuncia acepta. Con tres redes de al menos dos
   proveedores, el documento se bloquea: deja de servirse, pero no se borra.
@@ -137,7 +139,8 @@ para denunciar: guarda un resumen de la red.
   el operador lo decida.
 - **Una sola denuncia de engaño o grave conserva el documento:** si caduca o
   dejas de compartirlo, no se sirve, pero su copia queda hasta 180 días desde la
-  denuncia, por si una autoridad la pide. Una orden puede pedir más.
+  denuncia, por si una autoridad la pide. Una orden puede pedir más. Denunciar
+  lo que ya caducó no alarga nada.
 - **Una denuncia falsa se descarta.** Si el link que trae no abre el documento,
   o el operador comprueba que era falsa, la descarta; hasta entonces cuenta como
   cualquier otra. Desde entonces y hasta por 180 días, las denuncias de esa red

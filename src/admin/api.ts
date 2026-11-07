@@ -17,13 +17,15 @@ export interface AdminApi {
     | "handedOver"
     | "forgetContact"
     | "networkWasFalse"
+    | "clearWarning"
   >;
   access: AccessSettings;
   certs: Certs;
   now: number;
 }
 
-const ACTION_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|case|handed_over)$/;
+const ACTION_PATH =
+  /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|case|handed_over|clear_warning)$/;
 const TOKEN_HASH = /^[A-Za-z0-9_-]{43}$/;
 const REPORT_PATH =
   /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/(false|false_network|forget_contact)$/;
@@ -74,6 +76,7 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
   if (action === "accept") return answerOf(await moderation.accept(id, now));
   if (action === "reject") return answerOf(await moderation.reject(id, now));
   if (action === "handed_over") return answerOf(await moderation.handedOver(id, now));
+  if (action === "clear_warning") return answerOf(await moderation.clearWarning(id, now));
   if (action === "case") {
     const made = await newCaseOf(request);
     return made ? answerOf(await moderation.makeCase(id, made, now)) : json(400, { refused: "bad_case" });

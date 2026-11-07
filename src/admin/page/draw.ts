@@ -1,4 +1,4 @@
-import type { Queue, QueuedDoc, QueuedReport } from "../../core/queue";
+import type { Queue, QueuedDoc, QueuedReport, QueuedWarning } from "../../core/queue";
 
 export interface Doing {
   accept: (id: string) => void;
@@ -12,6 +12,7 @@ export interface Doing {
   verifyLink: (id: string, version: number) => void;
   handedOver: (id: string) => void;
   reportsPage: (from: number) => void;
+  clearWarning: (id: string) => void;
 }
 
 const STAGES: Record<string, string> = {
@@ -144,6 +145,25 @@ const filled = (place: Element, page: Document, cards: HTMLElement[], none: stri
   place.replaceChildren(...(cards.length > 0 ? cards : [piece(page, "p", "card-line", none)]));
 };
 
+const warningCard = (page: Document, warning: QueuedWarning, doing: Doing): HTMLElement => {
+  const card = page.createElement("article");
+  card.className = "card";
+  card.append(
+    piece(page, "p", "card-title", warning.id),
+    piece(
+      page,
+      "p",
+      "card-line",
+      `${warning.nets} redes. Si no corrige, deja de servirse después del ${dayText(warning.fixBy)}.`,
+    ),
+    actions(
+      page,
+      button(page, "Quitar aviso", () => doing.clearWarning(warning.id)),
+    ),
+  );
+  return card;
+};
+
 const pagesOfReports = (page: Document, queue: Queue, doing: Doing): HTMLElement[] => {
   const { reports, reportsFrom: from, reportsTotal: total } = queue;
   if (from === 0 && total <= reports.length) return [];
@@ -172,6 +192,12 @@ export const drawQueue = (page: Document, queue: Queue, doing: Doing): void => {
     page,
     [...queue.reports.map((one) => reportCard(page, one, doing)), ...pagesOfReports(page, queue, doing)],
     "Ninguna.",
+  );
+  filled(
+    place("warned"),
+    page,
+    queue.warned.map((one) => warningCard(page, one, doing)),
+    "Ninguno.",
   );
   filled(
     place("blocked"),

@@ -1,4 +1,4 @@
-import { levelOfReport } from "../../core/limits";
+import { LEVEL_ONE, levelOfReport } from "../../core/limits";
 import { holdsALink } from "../../core/sealed-link";
 import { element } from "./frame";
 import { sealContact, sealLink } from "./seal";
@@ -25,6 +25,7 @@ const SEALED = "Lo cifras aquí, para que solo el operador pueda abrirlo, y nunc
 const ALWAYS_ON_GRAVE = `Una denuncia grave siempre entrega el link, porque sin él nadie podría revisarla. ${SEALED}`;
 const CHILD_ABUSE_REVIEW =
   "Esta denuncia entrega el link cifrado, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar. El operador lo abre solo para verificarla y no puede guardar copia en su equipo. Si es falsa, la descarta; si no, bloquea el documento y lo denuncia a las autoridades pertinentes, las únicas que reciben la llave. No descargues, copies, reenvíes ni mandes por correo ese material.";
+const DETAIL_NEEDED = "Cuenta en una frase por qué lo denuncias: quien lo revisa necesita saber qué buscar.";
 const LINK_IN_DETAIL = "Quita el link de tu mensaje. Si quieres entregarlo, marca la casilla: así viaja cifrado.";
 
 const post = ({ id, body }: Sending, proof?: string): Promise<Response> =>
@@ -55,6 +56,7 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
   const form = element<HTMLFormElement>("report-form");
   const consent = element<HTMLElement>("report-consent");
   const contactBox = element<HTMLElement>("report-contact");
+  const detailOptional = element<HTMLElement>("report-detail-optional");
   const handOver = element<HTMLInputElement>("report-hand-over");
   const handingOverSaid = element<HTMLElement>("report-consent-said");
   const said = element<HTMLElement>("report-said");
@@ -87,6 +89,7 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
     const wasRequired = handOver.disabled;
     consent.hidden = level === "light" || level === null;
     contactBox.hidden = consent.hidden;
+    detailOptional.hidden = !consent.hidden;
     handOver.disabled = level === "grave";
     if (level === "grave") handOver.checked = true;
     else if (wasRequired || consent.hidden) handOver.checked = false;
@@ -98,6 +101,11 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
     const detail = detailOf();
     if (holdsALink(detail) || (linkKey !== "" && detail.includes(linkKey))) {
       said.textContent = LINK_IN_DETAIL;
+      return;
+    }
+    const level = levelOfReport(categoryOf());
+    if (level !== "light" && level !== null && detail.length < LEVEL_ONE.reportDetailAtLeast) {
+      said.textContent = DETAIL_NEEDED;
       return;
     }
     submit.disabled = true;

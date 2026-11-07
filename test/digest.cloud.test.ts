@@ -23,7 +23,7 @@ const HOUR = hourOf(NOW);
 const ID = "k7Qm2xPa";
 const OTHER = "wordsOnl";
 
-const share = (id: string) => store.create({ id, owner: "o1", adminHash: "a", ttlDays: 3, net: "n" }, TODAY - 5);
+const share = (id: string) => store.create({ id, owner: "o1", adminHash: "a", ttlDays: 15, net: "n" }, TODAY - 5);
 const report = (doc: string, net: string, category: string, hour = HOUR - 1) =>
   store.report({ doc, net, asn: 1, category }, TODAY, hour);
 

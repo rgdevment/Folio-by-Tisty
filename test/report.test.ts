@@ -10,6 +10,7 @@ import { OPERATOR_KEY } from "../src/page/operator-key";
 import { sealContact, sealLink } from "../src/page/ui/seal";
 
 const ID = "k7Qm2xPa";
+const WHY = "imita a un banco";
 const LINK_KEY = "nlt35tFEpAhP5bWJr2p2hIFCFml15FNS5LD2AsBbd2s";
 const folder = mkdtempSync(join(tmpdir(), "folio-report-"));
 const file = join(folder, "report.key");
@@ -79,13 +80,17 @@ describe("what a report may say", () => {
   });
 
   it.each(["threat", "doxxing", "intimate", "csam"])("refuses a grave report of %s without its link", (category) => {
-    expect(saidOf({ category }, LEVEL_ONE)).toBeNull();
-    expect(saidOf({ category, sealedLink: sealed }, LEVEL_ONE)).not.toBeNull();
+    expect(saidOf({ category, detail: WHY }, LEVEL_ONE)).toBeNull();
+    expect(saidOf({ category, detail: WHY, sealedLink: sealed }, LEVEL_ONE)).not.toBeNull();
   });
 
   it("takes an email only sealed, and not on a light report", () => {
     const sealedContact = `contact1.${"A".repeat(80)}`;
-    expect(saidOf({ category: "phishing", sealedContact }, LEVEL_ONE)).toEqual({ category: "phishing", sealedContact });
+    expect(saidOf({ category: "phishing", detail: WHY, sealedContact }, LEVEL_ONE)).toEqual({
+      category: "phishing",
+      detail: WHY,
+      sealedContact,
+    });
     expect(saidOf({ category: "spam", sealedContact }, LEVEL_ONE)).toBeNull();
     expect(saidOf({ category: "offensive", sealedContact }, LEVEL_ONE)).toBeNull();
     for (const said of [
@@ -96,15 +101,27 @@ describe("what a report may say", () => {
       `contact1.${"A".repeat(504)}`,
       7,
     ]) {
-      expect(saidOf({ category: "phishing", sealedContact: said }, LEVEL_ONE)).toBeNull();
+      expect(saidOf({ category: "phishing", detail: WHY, sealedContact: said }, LEVEL_ONE)).toBeNull();
     }
+  });
+
+  it.each(["phishing", "malware", "scam"])("asks %s to say why, in at least a few words", (category) => {
+    expect(saidOf({ category }, LEVEL_ONE)).toBeNull();
+    expect(saidOf({ category, detail: "corto" }, LEVEL_ONE)).toBeNull();
+    expect(saidOf({ category, detail: `   ${"x".repeat(9)}   ` }, LEVEL_ONE)).toBeNull();
+    expect(saidOf({ category, detail: 7 }, LEVEL_ONE)).toBeNull();
+    expect(saidOf({ category, detail: "x".repeat(10) }, LEVEL_ONE)).not.toBeNull();
+  });
+
+  it("does not ask a light report to say why", () => {
+    expect(saidOf({ category: "offensive" }, LEVEL_ONE)).toEqual({ category: "offensive" });
   });
 
   it("takes a category it knows, with what it may bring", () => {
     expect(saidOf({ category: "spam" }, LEVEL_ONE)).toEqual({ category: "spam" });
-    expect(saidOf({ category: "threat", detail: "x", sealedLink: sealed }, LEVEL_ONE)).toEqual({
+    expect(saidOf({ category: "threat", detail: WHY, sealedLink: sealed }, LEVEL_ONE)).toEqual({
       category: "threat",
-      detail: "x",
+      detail: WHY,
       sealedLink: sealed,
     });
   });

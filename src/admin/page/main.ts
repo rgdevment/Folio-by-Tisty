@@ -92,6 +92,8 @@ const load = async (): Promise<void> => {
   drawQueue(document, queue, {
     accept: (id) => confirmed(`¿Aceptar y desbloquear ${id}?`, `${id}/accept`),
     reject: (id) => confirmed(`¿Rechazar el reclamo de ${id}? Sigue bloqueado.`, `${id}/reject`),
+    clearWarning: (id) =>
+      confirmed(`¿Quitar el aviso de ${id}? Sus denuncias leves dejan de contar.`, `${id}/clear_warning`),
     networkWasFalse: (id, net) =>
       confirmed(
         "¿Descartar todas las denuncias de esta red? Si es compartida, puede incluir denuncias reales, y sus documentos dejarán de retenerse.",

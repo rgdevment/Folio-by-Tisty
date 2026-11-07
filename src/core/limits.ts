@@ -31,12 +31,15 @@ export interface Limits {
   newKeysToNotice: number;
   reportsAnHour: number;
   reportDetailAtMost: number;
+  reportDetailAtLeast: number;
   sealedLinkAtMost: number;
   pausedDays: number;
   evidenceDays: number;
   reportsToBlock: number;
   reportOperatorsToBlock: number;
   lightReportsToWarn: number;
+  lightOperatorsToWarn: number;
+  lightWarnHours: number;
   lightFixDays: number;
   sweptAtOnce: number;
   historyDays: number;
@@ -78,12 +81,15 @@ export const LEVEL_ONE: Limits = {
   newKeysToNotice: 100,
   reportsAnHour: 10,
   reportDetailAtMost: 2000,
+  reportDetailAtLeast: 10,
   sealedLinkAtMost: 1024,
   pausedDays: 30,
   evidenceDays: 180,
   reportsToBlock: 3,
   reportOperatorsToBlock: 2,
-  lightReportsToWarn: 3,
+  lightReportsToWarn: 10,
+  lightOperatorsToWarn: 2,
+  lightWarnHours: 24,
   lightFixDays: 3,
   sweptAtOnce: 500,
   historyDays: 90,
