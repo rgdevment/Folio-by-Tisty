@@ -247,45 +247,17 @@ describe("the files a version names", () => {
   describe("near the ceiling", () => {
     const WAITED = NOW + 30 * DAY_MS;
 
-    it("are refused from a key that has not waited", async () => {
-      const { id, bytes } = await named();
-      await store.setStage("new_keys_off");
-      expect(await sendFiles(id, bytes)).toEqual({ refused: "uploads_off" });
-    });
-
-    it("are taken from one that has", async () => {
+    it("are taken when a version already kept names them, however new the key, or it would stay without them", async () => {
       const { id, bytes, hash } = await named();
       await sendNaming(id, 2, hash, LATER);
       await store.setStage("new_keys_off");
-      expect(await sendFiles(id, bytes, WAITED)).toEqual({ stored: true, hash });
+      expect(await sendFiles(id, bytes)).toEqual({ stored: true, hash });
     });
 
-    it("are refused from a new owner, whatever old key signs", async () => {
-      await shared();
-      const { pair, permit } = await newToken();
-      const first = await started(WAITED);
-      const signing = { id: first.id, owner: ana, signer: mario, permit, token: pair };
-      const version = await sealedEnvelope({ ...signing, version: 1 });
-      expect(await send(first.id, version, WAITED, first)).toEqual({ stored: true, version: 1 });
+    it("are not taken when no version names them", async () => {
+      const { id, bytes } = await named();
       await store.setStage("new_keys_off");
-      const files = await sealedEnvelope({ ...signing, version: 2, files: [16] });
-      expect(await sendFiles(first.id, files, WAITED)).toEqual({ refused: "uploads_off" });
-    });
-
-    it("are refused from a new editor of an old owner", async () => {
-      const { pair, permit } = await newToken();
-      const id = await shared({ permit });
-      await store.setStage("new_keys_off");
-      const files = await sealedEnvelope({
-        id,
-        version: 2,
-        owner: mario,
-        signer: ana,
-        permit,
-        token: pair,
-        files: [16],
-      });
-      expect(await sendFiles(id, files, WAITED)).toEqual({ refused: "uploads_off" });
+      expect(await sendFiles(id, bytes, WAITED)).toEqual({ refused: "behind" });
     });
   });
 
@@ -874,7 +846,7 @@ describe("what stops a version", () => {
       expect(await keyRow(rootOf(fresh))).toEqual({ terms_version: "10", terms_hour: HOUR });
     });
 
-    it("reads no more and writes nothing about the key while the version does not change", async () => {
+    it("reads only the keys' age and terms, and writes nothing about the key, while the version does not change", async () => {
       const said: string[] = [];
       const watched = new Proxy(testEnv.DB, {
         get(database, name) {
@@ -892,9 +864,10 @@ describe("what stops a version", () => {
       const { id } = await sharing(fresh, "10");
       const counted = { ...UNDER, store: new Cloud({ ...testEnv, DB: watched }, LIMITS) };
       await up(id, await sealedEnvelope({ id, version: 2, owner: fresh, terms: "9" }), LATER, undefined, counted);
-      expect(said.filter((one) => /\b(FROM|INTO|UPDATE) keys\b/.test(one))).toEqual([
-        "SELECT terms_version FROM keys WHERE root = ?",
-      ]);
+      const aboutKeys = said.filter((one) => /\b(FROM|INTO|UPDATE) keys\b/.test(one));
+      expect(aboutKeys).toHaveLength(2);
+      expect(aboutKeys[0]).toContain("k.first_day <= ?2");
+      expect(aboutKeys[1]).toBe("SELECT terms_version FROM keys WHERE root = ?");
     });
 
     it("writes the record on a retry, when the first try lost it", async () => {
@@ -948,6 +921,110 @@ describe("what stops a version", () => {
       const bytes = await sealedEnvelope({ id, version: 2, owner: mario });
       const sent = uploadDoc({ id, now: LATER, ip: "203.0.113.9", bytes: async () => bytes }, closed);
       expect(await sent).toEqual({ stored: true, version: 2 });
+    });
+  });
+
+  describe("past what new keys may store in a day", () => {
+    const newKeysBytes = () =>
+      testEnv.DB.prepare("SELECT bytes FROM net_day WHERE net = '~new-keys'").first<{ bytes: number }>();
+    const limited = (bytes: number) => {
+      const few = { ...LIMITS, newKeysBytesADay: bytes };
+      return { ...tools, store: new Cloud(testEnv, few), limits: few };
+    };
+    const firstFrom = async (over: Parameters<typeof uploadDoc>[1], now = NOW) => {
+      const first = await started(now);
+      const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+      const answer = await uploadDoc({ id: first.id, now, ip: "203.0.113.9", bytes: async () => bytes, first }, over);
+      return { answer, id: first.id, size: bytes.length };
+    };
+
+    it("refuses as off, gives the network's bytes back, and takes nothing more", async () => {
+      const { size } = await firstFrom(tools);
+      expect((await newKeysBytes())?.bytes).toBe(size);
+      await testEnv.DB.prepare("DELETE FROM docs").run();
+      const tight = limited(size);
+      const { answer, id } = await firstFrom(tight);
+      expect(answer).toEqual({ refused: "uploads_off" });
+      expect((await newKeysBytes())?.bytes).toBe(size);
+      const held = await testEnv.DB.prepare("SELECT bytes FROM net_day WHERE net <> '~new-keys'").first<{
+        bytes: number;
+      }>();
+      expect(held?.bytes).toBe(size);
+      expect((await testEnv.ENVELOPES.list({ prefix: id })).objects).toEqual([]);
+    });
+
+    it("fits up to the last byte, and starts again the next day", async () => {
+      const { size } = await firstFrom(limited(1_000_000_000));
+      await testEnv.DB.prepare("DELETE FROM docs").run();
+      expect((await firstFrom(limited(2 * size + 1000))).answer).toMatchObject({ stored: true });
+      await testEnv.DB.prepare("DELETE FROM docs").run();
+      expect((await firstFrom(limited(size))).answer).toEqual({ refused: "uploads_off" });
+      await testEnv.DB.prepare("DELETE FROM docs").run();
+      expect((await firstFrom(limited(size + 1000), NOW + DAY_MS)).answer).toMatchObject({ stored: true });
+    });
+
+    it("does not count a key of 30 days, nor an owner's own correction", async () => {
+      const id = await shared();
+      const tight = limited(1);
+      const old = await sealedEnvelope({ id, version: 2, owner: mario });
+      const sendWith = (bytes: Bytes, now: number) =>
+        uploadDoc({ id, now, ip: "203.0.113.9", bytes: async () => bytes }, tight);
+      expect(await sendWith(old, LATER)).toEqual({ refused: "uploads_off" });
+      await testEnv.DB.prepare("UPDATE docs SET blocked_at = ?, counts_from = latest + 1 WHERE id = ?")
+        .bind(dayOf(NOW), id)
+        .run();
+      expect(await sendWith(old, LATER)).toEqual({ stored: true, version: 2 });
+      const before = (await newKeysBytes())?.bytes;
+      const next = await sealedEnvelope({ id, version: 3, owner: mario });
+      expect(await sendWith(next, NOW + 30 * DAY_MS)).toEqual({ stored: true, version: 3 });
+      expect((await newKeysBytes())?.bytes).toBe(before);
+    });
+
+    it("does not count the files of a version already kept, so it never stays without them", async () => {
+      const first = await started();
+      const main = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+      expect(await send(first.id, main, NOW, first)).toEqual({ stored: true, version: 1 });
+      const files = await sealedEnvelope({ id: first.id, version: 2, owner: mario, files: [16] });
+      const hash = await filesHashOf(first.id, files);
+      await testEnv.DB.prepare("UPDATE docs SET versions = json_set(versions, '$[#-1].files', ?) WHERE id = ?")
+        .bind(hash, first.id)
+        .run();
+      const before = (await newKeysBytes())?.bytes;
+      const answer = await uploadFiles(
+        { id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => files },
+        limited(1),
+      );
+      expect(answer).toEqual({ stored: true, hash });
+      expect((await newKeysBytes())?.bytes).toBe(before);
+    });
+
+    it("leaves no share behind when a first version is refused, so it holds nothing the next day", async () => {
+      const refused = await firstFrom(limited(1));
+      expect(refused.answer).toEqual({ refused: "uploads_off" });
+      expect(await row(refused.id)).toBeNull();
+      expect((await firstFrom(limited(1))).answer).toEqual({ refused: "uploads_off" });
+      expect((await firstFrom(limited(1))).answer).toEqual({ refused: "uploads_off" });
+      const docs = await testEnv.DB.prepare("SELECT docs FROM net_day WHERE net <> '~new-keys'").first<{
+        docs: number;
+      }>();
+      expect(docs?.docs).toBe(0);
+      expect((await firstFrom(tools, NOW + DAY_MS)).answer).toEqual({ stored: true, version: 1 });
+    });
+
+    it("refuses a network past its own share of the limit, and gives its bytes back", async () => {
+      const { size } = await firstFrom(tools);
+      await testEnv.DB.prepare("DELETE FROM docs").run();
+      const few = { ...LIMITS, newKeysNetBytesADay: 2 * size - 1 };
+      const tight = { ...tools, store: new Cloud(testEnv, few), limits: few };
+      expect((await firstFrom(tight)).answer).toEqual({ refused: "uploads_off" });
+      const net = await testEnv.DB.prepare("SELECT bytes FROM net_day WHERE net <> '~new-keys'").first<{
+        bytes: number;
+      }>();
+      expect(net?.bytes).toBe(size);
+      const enough = { ...LIMITS, newKeysNetBytesADay: 2 * size + 1000 };
+      expect((await firstFrom({ ...tools, store: new Cloud(testEnv, enough), limits: enough })).answer).toMatchObject({
+        stored: true,
+      });
     });
   });
 
@@ -1015,7 +1092,7 @@ describe("what stops a version", () => {
 
   it("near the ceiling, from a new owner, whatever old key signs for it", async () => {
     await shared();
-    const waited = LATER + LIMITS.keyDaysOldNearTheCeiling * DAY_MS;
+    const waited = LATER + LIMITS.daysAKeyIsNew * DAY_MS;
     await store.setStage("new_keys_off");
     const { pair, permit } = await newToken();
     const first = await started(waited);
@@ -1029,7 +1106,7 @@ describe("what stops a version", () => {
     const id = await shared({ permit });
     await store.setStage("new_keys_off");
     const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
-    const waited = LATER + LIMITS.keyDaysOldNearTheCeiling * DAY_MS;
+    const waited = LATER + LIMITS.daysAKeyIsNew * DAY_MS;
     expect(await send(id, edited, waited)).toEqual({ refused: "uploads_off" });
   });
 

@@ -184,15 +184,9 @@ const openTo = async ({ ip, now }: Uploading, { store, limiter, dayKey }: ReadTo
 
 const rootsOf = ({ manifest, signature }: ReadEnvelope): string[] => [(manifest.owner as Owner).root, signature.root];
 
-// A key costs nothing to make, so near the ceiling only old ones may fill what is left: the owner too, or one old signer opens it to all.
-const newKeyNearTheCeiling = async (
-  stage: Stage,
-  read: ReadEnvelope,
-  now: number,
-  { store, limits }: ReadTools,
-): Promise<boolean> =>
-  stage === "new_keys_off" &&
-  !(await store.allKeysSignedBy(rootsOf(read), dayOf(now) - limits.keyDaysOldNearTheCeiling));
+// A key costs nothing to make, so the owner's counts as much as the signer's, or one old signer opens the way to all.
+const keyIsNew = async (read: ReadEnvelope, now: number, { store, limits }: ReadTools): Promise<boolean> =>
+  !(await store.allKeysSignedBy(rootsOf(read), dayOf(now) - limits.daysAKeyIsNew));
 
 const takeUploadHour = async (net: string, now: number, { store, limits }: ReadTools): Promise<Refused | null> =>
   (await store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour))
@@ -212,6 +206,8 @@ const answerOf = (uploaded: Uploaded, version: number, now: number): UploadAnswe
       return { refused: uploaded };
     case "quota":
       return { refused: "quota", until: hourEnds(now) };
+    case "new_keys_full":
+      return { refused: "uploads_off" };
     case "list_full":
       return { refused: "quota", until: now + DAY_MS };
   }
@@ -257,7 +253,8 @@ const storeVersion = async (
   if (version === null) return { refused: "terms", version: tools.termsVersion };
   // The terms promise that an owner's own version lifts a block, however new the key.
   const correcting = held?.correctable && signature.root === held.owner;
-  if (!correcting && (await newKeyNearTheCeiling(stage, read, now, tools))) return { refused: "uploads_off" };
+  const newKey = !correcting && (await keyIsNew(read, now, tools));
+  if (newKey && stage === "new_keys_off") return { refused: "uploads_off" };
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
     // Before anything is written, or a refused first version could be sent again for free.
@@ -300,11 +297,13 @@ const storeVersion = async (
       byOwner: signature.root === held.owner,
       permit: held.permit,
       ownerMark: ownerMarkOf(owner),
+      newKey,
       ...(files === undefined ? {} : { files }),
     },
     today,
     held,
   );
+  if (sharing && uploaded !== "stored" && uploaded !== "same") await store.forgetUnsent(id, net, today);
   // Kept only once a version is, so a request that stores nothing leaves no key to age.
   if (uploaded === "stored") await keys.keep();
   return answerOf(uploaded, manifest.version, now);
@@ -335,7 +334,7 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
   const { store, limits } = tools;
   const open = await openTo(uploading, tools);
   if ("refused" in open) return open;
-  const { net, stage } = open;
+  const { net } = open;
   const held = await store.held(id);
   if (!held) return { refused: "missing" };
   const stoppedHere = stopped(held);
@@ -351,7 +350,6 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
   if (floor !== null && isBelowVersion(manifest.contract, floor)) return { refused: "outdated" };
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
   if (!mayUpload(read, held)) return { refused: "not_yours" };
-  if (await newKeyNearTheCeiling(stage, read, now, tools)) return { refused: "uploads_off" };
 
   const hash = toBase64Url(await sha256(manifestBytes, index));
   if (held.versions.at(-1)?.files !== hash) return { refused: "behind" };

@@ -32,6 +32,23 @@ const reportsThatFit = (reports: unknown[]): { kept: unknown[]; leftOut: number 
 };
 const REPORTS_TO_SEE = "FROM reports r WHERE r.level <> 'light' AND r.cleared = 0";
 
+export const CLAIMED = -1;
+
+// Broader than what the sweep holds: a grave report stays whoever else that network reported, and a stranger's citation stays whole.
+const MUST_STAY = (doc: string, today: string): string =>
+  `(COALESCE(${doc}.legal_until, 0) >= ${today}
+    OR EXISTS (SELECT 1 FROM reports r WHERE r.doc = ${doc}.id AND r.level = 'grave' AND r.cleared = 0)
+    OR EXISTS (SELECT 1 FROM cases c WHERE c.doc = ${doc}.id AND c.sealed_records IS NOT NULL AND c.until >= ${today})
+    OR EXISTS (SELECT 1 FROM holds h JOIN docs k ON k.id = h.holder WHERE h.held = ${doc}.id AND k.owner <> ${doc}.owner))`;
+
+// By the group: the sweep takes a language with its anchor, so one that must stay keeps them all.
+const PURGEABLE = `SELECT d.id FROM docs d
+  WHERE d.owner = (SELECT owner FROM docs WHERE id = ?1) AND d.latest >= 0
+    AND NOT EXISTS (
+      SELECT 1 FROM docs g WHERE g.owner = d.owner AND COALESCE(g.anchor, g.id) = COALESCE(d.anchor, d.id)
+        AND ${MUST_STAY("g", "?2")}
+    )`;
+
 export const mayCorrect = (row: {
   blocked_at: number | null;
   blocked_by_operator: number;
@@ -204,6 +221,44 @@ export class CloudModeration {
       )
       .bind(dayOf(now), hourOf(now), this.#limits.evidenceDays, id);
     return this.#actedAndLogged([blocking], this.#logIfChanged(id, "block", now, note));
+  }
+
+  async purgePreview(id: string, now: number): Promise<{ purged: number; kept: number } | null> {
+    const [purgeable, all] = await this.#db.batch<{ n: number }>([
+      this.#db.prepare(`SELECT COUNT(*) AS n FROM (${PURGEABLE})`).bind(id, dayOf(now)),
+      this.#db
+        .prepare("SELECT COUNT(*) AS n FROM docs WHERE owner = (SELECT owner FROM docs WHERE id = ?1) AND latest >= 0")
+        .bind(id),
+    ]);
+    const purged = purgeable?.results[0]?.n ?? 0;
+    const total = all?.results[0]?.n ?? 0;
+    return total > 0 ? { purged, kept: total - purged } : null;
+  }
+
+  // The sweep of the private Worker empties what is claimed here, since this Worker never holds the envelopes.
+  async purgeOwner(id: string, note: string, now: number): Promise<{ purged: number; kept: number } | null> {
+    const today = dayOf(now);
+    const of = (sql: string, ...more: unknown[]) => this.#db.prepare(sql).bind(id, today, ...more);
+    const [logged, , , , left] = await this.#db.batch<{ kept: number }>([
+      of(
+        `INSERT OR IGNORE INTO moderation (at, doc, action, note)
+         SELECT ?3, purgeable.id, 'purge_owner', ?4 FROM (${PURGEABLE}) purgeable`,
+        now,
+        note,
+      ),
+      of(`UPDATE reports SET cleared = 1 WHERE doc IN (${PURGEABLE})`),
+      of(`DELETE FROM cases WHERE doc IN (${PURGEABLE})`),
+      of(`UPDATE docs SET latest = ${CLAIMED} WHERE id IN (${PURGEABLE})`),
+      this.#db
+        .prepare(
+          `SELECT COUNT(*) AS kept FROM docs
+           WHERE owner = (SELECT owner FROM docs WHERE id = ?1) AND latest >= 0`,
+        )
+        .bind(id),
+    ]);
+    const purged = logged?.meta.changes ?? 0;
+    const kept = left?.results[0]?.kept ?? 0;
+    return purged + kept > 0 ? { purged, kept } : null;
   }
 
   async panic(id: string, note: string, now: number): Promise<unknown> {

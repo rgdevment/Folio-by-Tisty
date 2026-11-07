@@ -9,6 +9,7 @@ export interface Doing {
   opened: (id: string) => void;
   copy: (said: string) => void;
   panic: (id: string, version: number) => void;
+  purgeOwner: (id: string) => void;
   verifyLink: (id: string, version: number) => void;
   handedOver: (id: string) => void;
   reportsPage: (from: number) => void;
@@ -70,6 +71,7 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
     button(page, "Link para verificar", () => doing.verifyLink(report.doc, report.version)),
     button(page, "Era falsa", () => doing.reportWasFalse(report.doc, report.net)),
     button(page, "Botón de pánico", () => doing.panic(report.doc, report.version), true),
+    button(page, "Borrar todo de esta llave", () => doing.purgeOwner(report.doc), true),
   ];
   if (report.fromFalseNet) {
     buttons.push(
@@ -119,6 +121,7 @@ const docCard = (page: Document, doc: QueuedDoc, doing: Doing, waiting: boolean)
       page,
       button(page, "Link para verificar", () => doing.verifyLink(doc.id, doc.versionToOpen)),
       button(page, "Botón de pánico", () => doing.panic(doc.id, doc.versionToOpen), true),
+      button(page, "Borrar todo de esta llave", () => doing.purgeOwner(doc.id), true),
       ...(doc.mayHandOver ? [button(page, "Ya lo entregué", () => doing.handedOver(doc.id))] : []),
     ),
   );

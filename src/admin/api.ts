@@ -13,6 +13,8 @@ export interface AdminApi {
     | "reportWasFalse"
     | "opened"
     | "panic"
+    | "purgeOwner"
+    | "purgePreview"
     | "makeCase"
     | "handedOver"
     | "forgetContact"
@@ -25,7 +27,8 @@ export interface AdminApi {
 }
 
 const ACTION_PATH =
-  /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|case|handed_over|clear_warning)$/;
+  /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|purge_owner|case|handed_over|clear_warning)$/;
+const PURGE_PREVIEW_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/purge_owner$/;
 const TOKEN_HASH = /^[A-Za-z0-9_-]{43}$/;
 const REPORT_PATH =
   /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/(false|false_network|forget_contact)$/;
@@ -83,6 +86,10 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
   }
   const note = await noteOf(request);
   if (!note) return json(400, { refused: "no_reason" });
+  if (action === "purge_owner") {
+    const purged = await moderation.purgeOwner(id, note, now);
+    return purged ? json(200, purged) : json(404, { refused: "missing" });
+  }
   if (action === "panic") {
     const records = await moderation.panic(id, note, now);
     return records ? json(200, { records }) : json(404, { refused: "missing" });
@@ -102,6 +109,11 @@ export const answer = async (request: Request, api: AdminApi): Promise<Response>
   const { pathname } = new URL(request.url);
   if (request.method === "GET" && pathname === "/api/queue") {
     return json(200, await api.moderation.queue(api.now, reportsFromOf(request)));
+  }
+  const [, toPurge] = PURGE_PREVIEW_PATH.exec(pathname) ?? [];
+  if (request.method === "GET" && toPurge) {
+    const preview = await api.moderation.purgePreview(toPurge, api.now);
+    return preview ? json(200, preview) : json(404, { refused: "missing" });
   }
   if (request.method !== "POST") return json(404, { refused: "missing" });
   // A form or a link from elsewhere cannot send this header, and the preflight it needs is never answered.
