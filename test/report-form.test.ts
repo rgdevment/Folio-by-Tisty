@@ -25,6 +25,11 @@ const choose = (category: string): void => {
 };
 
 const submitted = async (): Promise<void> => {
+  const detail = place.document.querySelector('textarea[name="detail"]') as HTMLTextAreaElement;
+  const light = ["spam", "offensive"].some(
+    (one) => (place.document.querySelector(`input[value="${one}"]`) as HTMLInputElement).checked,
+  );
+  if (detail.value === "" && !light) detail.value = "imita a un banco";
   element("report-form").dispatchEvent(new place.Event("submit", { cancelable: true }));
   await vi.waitFor(() => expect(element("report-said").textContent).not.toBe("Enviando…"));
 };
@@ -82,6 +87,34 @@ describe("the report form", () => {
     expect(element<HTMLInputElement>("report-hand-over").checked).toBe(false);
     await submitted();
     expect(bodySent(0).sealedLink).toMatch(/^sealed1\./);
+  });
+
+  describe("why it is reported", () => {
+    const detail = () => place.document.querySelector('textarea[name="detail"]') as HTMLTextAreaElement;
+    const sending = () => element("report-form").dispatchEvent(new place.Event("submit", { cancelable: true }));
+
+    it("says it is optional only on a light report", () => {
+      expect(element("report-detail-optional").hidden).toBe(false);
+      choose("spam");
+      expect(element("report-detail-optional").hidden).toBe(false);
+      choose("phishing");
+      expect(element("report-detail-optional").hidden).toBe(true);
+    });
+
+    it.each(["", "corto", "   espacios   "])("asks for it before sending, with %j", (said) => {
+      choose("phishing");
+      detail().value = said;
+      sending();
+      expect(element("report-said").textContent).toContain("Cuenta en una frase");
+      expect(asked).not.toHaveBeenCalled();
+      expect(element<HTMLButtonElement>("report-send").disabled).toBe(false);
+    });
+
+    it("sends a light report without it", async () => {
+      choose("spam");
+      await submitted();
+      expect(bodySent(0)).not.toHaveProperty("detail");
+    });
   });
 
   describe("the email", () => {
@@ -149,7 +182,7 @@ describe("the report form", () => {
   it("sends no link unless the reader agrees", async () => {
     choose("phishing");
     await submitted();
-    expect(bodySent(0)).toEqual({ category: "phishing", version: 3 });
+    expect(bodySent(0)).toEqual({ category: "phishing", detail: "imita a un banco", version: 3 });
     expect(element("report-said").textContent).toContain("Recibimos");
     expect(element<HTMLButtonElement>("report-send").disabled).toBe(true);
   });

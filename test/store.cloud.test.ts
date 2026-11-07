@@ -895,6 +895,7 @@ describe("uploading", () => {
 });
 
 describe("the levels of a report", () => {
+  const TEN_NETS = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
   const SEALED = "sealed1.link";
   const report = (category: string, net: string, sealedLink?: string, day = DAY) =>
     store.report(
@@ -927,22 +928,37 @@ describe("the levels of a report", () => {
     ]);
   });
 
-  it("warns the author at three networks of light reports, and blocks nobody", async () => {
-    await report("spam", "a");
-    await report("offensive", "b");
+  it("warns the author at ten networks of light reports, and blocks nobody", async () => {
+    for (const net of TEN_NETS.slice(0, 9)) await report(net === "a" ? "offensive" : "spam", net);
     expect(await fixBy()).toBeNull();
-    expect((await report("spam", "c", undefined, DAY + 1)).blocked).toBe(false);
-    expect(await fixBy()).toBe(DAY + 1 + LEVEL_ONE.lightFixDays);
+    expect((await report("spam", "j", undefined, DAY)).blocked).toBe(false);
+    expect(await fixBy()).toBe(DAY + LEVEL_ONE.lightFixDays);
     expect((await row("d1"))?.blocked_at).toBeNull();
-    await report("spam", "d", undefined, DAY + 2);
+    await report("spam", "k", undefined, DAY + 1);
+    expect(await fixBy()).toBe(DAY + LEVEL_ONE.lightFixDays);
+  });
+
+  it("counts only the last day's light reports", async () => {
+    for (const net of TEN_NETS.slice(0, 9)) await report("spam", net, undefined, DAY);
+    await report("spam", "j", undefined, DAY + 1);
+    expect(await fixBy()).toBeNull();
+    await testEnv.DB.prepare("UPDATE reports SET at_hour = ? WHERE net = 'a'")
+      .bind((DAY + 1) * 24 - 23)
+      .run();
+    await report("spam", "k", undefined, DAY + 1);
+    expect(await fixBy()).toBeNull();
+    await testEnv.DB.prepare("UPDATE reports SET at_hour = ?")
+      .bind((DAY + 1) * 24 - 23)
+      .run();
+    await report("spam", "l", undefined, DAY + 1);
     expect(await fixBy()).toBe(DAY + 1 + LEVEL_ONE.lightFixDays);
   });
 
-  it("does not warn for three networks of one operator, as with what blocks", async () => {
+  it("does not warn for ten networks of one operator, as with what blocks", async () => {
     const sameOperator = (net: string) => store.report({ doc: "d1", net, category: "spam", asn: 7 }, DAY, DAY * 24);
-    for (const net of ["a", "b", "c"]) await sameOperator(net);
+    for (const net of TEN_NETS) await sameOperator(net);
     expect(await fixBy()).toBeNull();
-    await report("spam", "d");
+    await report("spam", "k");
     expect(await fixBy()).toBe(DAY + LEVEL_ONE.lightFixDays);
   });
 
@@ -1005,14 +1021,13 @@ describe("the levels of a report", () => {
   });
 
   it("clears light reports with a new version, on record, and they can come again", async () => {
-    for (const net of ["a", "b", "c"]) await report("spam", net);
+    for (const net of TEN_NETS) await report("spam", net);
     expect(await store.upload(upload("d1", 2), DAY + 9)).toBe("stored");
     expect(await fixBy()).toBeNull();
-    expect((await reportRows()).results.map((one) => one.cleared)).toEqual([1, 1, 1]);
-    await report("spam", "a");
-    await report("spam", "b");
+    expect((await reportRows()).results.every((one) => one.cleared === 1)).toBe(true);
+    for (const net of TEN_NETS.slice(0, 9)) await report("spam", net);
     expect(await fixBy()).toBeNull();
-    await report("spam", "c");
+    await report("spam", "j");
     expect(await fixBy()).toBe(DAY + LEVEL_ONE.lightFixDays);
   });
 
@@ -1188,6 +1203,9 @@ describe("reports", () => {
 
     it("moves nothing else when it arrives alone", async () => {
       await store.create(newDoc("d1"), DAY);
+      await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'd1'")
+        .bind(DAY + 200)
+        .run();
       await store.report({ doc: "d1", net: "a", category: "phishing", asn: 1, detail: "first" }, DAY, DAY * 24);
       await store.report(
         { doc: "d1", net: "a", category: "phishing", asn: 2, detail: "second", sealedContact: "contact1.one" },
@@ -1306,7 +1324,7 @@ describe("reports", () => {
     for (const net of ["a", "b", "c"]) await report(net);
     await foundFalse("a");
 
-    await store.create(newDoc("d2"), DAY);
+    await store.create(newDoc("d2"), DAY + 100);
     await store.report({ doc: "d2", net: "a", category: "phishing", asn: 1 }, DAY + 100, (DAY + 100) * 24);
     await foundFalse("a", "d2", DAY + 100);
 
