@@ -102,6 +102,7 @@ const LANGUAGES_OF = (owner: string, anchor: string, today: string): string =>
 
 // Not a network's digest, which is base64url, so the day's sum of new keys has its own row that the sweep clears too.
 const NEW_KEYS_NET = "~new-keys";
+const NEW_KEYS_NOTICED_AT = 0.9;
 
 const LIVES_ON = "CASE WHEN paused_at IS NULL THEN MAX(dies_on, ?1 + ttl_days) ELSE dies_on END";
 
@@ -465,20 +466,22 @@ export class Cloud implements Store {
       .run();
   }
 
-  async #takeRoom(
-    net: string,
-    bytes: number,
-    today: number,
-    newKey = false,
-  ): Promise<"stored" | "quota" | "new_keys_full"> {
+  // A first version refused leaves nothing behind, or each try would hold a share until its days pass.
+  async forgetUnsent(id: string, net: string, today: number): Promise<void> {
+    const forgotten = await this.#db.prepare("DELETE FROM docs WHERE id = ? AND latest = 0").bind(id).run();
+    if (forgotten.meta.changes > 0) await this.#giveQuotaBack(net, 1, 0, today);
+  }
+
+  async #takeRoom(net: string, bytes: number, today: number, newKey = false): Promise<Uploaded> {
     if (!(await this.#takeQuota(net, 0, bytes, today))) return "quota";
     if (!newKey) return "stored";
     const taken = await this.#db
       .prepare(
-        `INSERT INTO net_day (day, net, docs, bytes) SELECT ?1, ?2, 0, ?3 WHERE ?3 <= ?4
+        `INSERT INTO net_day (day, net, docs, bytes)
+         SELECT ?1, ?2, 0, ?3 WHERE ?3 <= ?4 AND (SELECT bytes FROM net_day WHERE day = ?1 AND net = ?5) <= ?6
          ON CONFLICT (day, net) DO UPDATE SET bytes = bytes + excluded.bytes WHERE bytes + excluded.bytes <= ?4`,
       )
-      .bind(today, NEW_KEYS_NET, bytes, this.#limits.newKeysBytesADay)
+      .bind(today, NEW_KEYS_NET, bytes, this.#limits.newKeysBytesADay, net, this.#limits.newKeysNetBytesADay)
       .run();
     if (taken.meta.changes > 0) return "stored";
     await this.#giveQuotaBack(net, 0, bytes, today);
@@ -626,16 +629,12 @@ export class Cloud implements Store {
     return (await this.#envelopes.head(filesKey(id, hash))) !== null;
   }
 
-  async keepFiles(
-    { id, hash, body, net, newKey }: KeptFiles,
-    today: number,
-  ): Promise<"stored" | "quota" | "new_keys_full"> {
-    const room = await this.#takeRoom(net, body.length, today, newKey);
-    if (room !== "stored") return room;
+  async keepFiles({ id, hash, body, net }: KeptFiles, today: number): Promise<"stored" | "quota"> {
+    if (!(await this.#takeQuota(net, 0, body.length, today))) return "quota";
     try {
       await this.#envelopes.put(filesKey(id, hash), body);
     } catch (error) {
-      await this.#giveRoomBack(net, body.length, today, newKey);
+      await this.#giveQuotaBack(net, 0, body.length, today);
       throw error;
     }
     return "stored";
@@ -1085,7 +1084,12 @@ export class Cloud implements Store {
       this.#db
         .prepare("SELECT id FROM docs WHERE appealed_hour > ?1 AND appealed_hour < ?2 ORDER BY id LIMIT ?3")
         .bind(after, before, atMost),
-      this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS keys FROM net_day WHERE day = ?").bind(newKeysDay),
+      this.#db
+        .prepare(
+          `SELECT COALESCE(SUM(keys), 0) AS keys, COALESCE(SUM(CASE WHEN net = ?2 THEN bytes END), 0) AS new_keys_bytes
+           FROM net_day WHERE day = ?1`,
+        )
+        .bind(newKeysDay, NEW_KEYS_NET),
     ]);
     const ids = (rows: typeof blocked): string[] => ((rows?.results ?? []) as { id: string }[]).map(({ id }) => id);
     return {
@@ -1096,6 +1100,9 @@ export class Cloud implements Store {
       appealed: ids(appealed),
       newKeys: (keys?.results?.[0] as { keys: number } | undefined)?.keys ?? 0,
       newKeysDay,
+      newKeysNearTheirTop:
+        ((keys?.results?.[0] as { new_keys_bytes: number } | undefined)?.new_keys_bytes ?? 0) >=
+        this.#limits.newKeysBytesADay * NEW_KEYS_NOTICED_AT,
     };
   }
 

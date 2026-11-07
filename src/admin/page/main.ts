@@ -74,16 +74,36 @@ const panicking = async (id: string, version: number, note: string): Promise<voi
   }
 };
 
-const purging = async (id: string, note: string): Promise<void> => {
+const purging = async (id: string): Promise<void> => {
   said.textContent = "Trabajando…";
-  const answered = await sent(`${id}/purge_owner`, { note });
-  if (!answered?.ok) {
+  const preview = await answered(() =>
+    fetch(`/api/docs/${id}/purge_owner`, { credentials: "same-origin", cache: "no-store" }),
+  );
+  if (!preview?.ok) {
     said.textContent = COULD_NOT;
     return;
   }
-  const { purged, kept } = (await answered.json()) as { purged: number; kept: number };
+  const { purged, kept } = (await preview.json()) as { purged: number; kept: number };
+  said.textContent = "";
+  if (purged === 0) {
+    said.textContent = `No hay nada que borrar de esta llave. Se conservan ${kept}.`;
+    return;
+  }
+  const count = prompt(
+    `Se borrarán ${purged} documentos de la llave dueña de ${id}, no de quien haya firmado una versión, y se conservan ${kept}: retenidos, con denuncia grave o citados por otra persona. No se puede deshacer. Escribe ${purged} para seguir.`,
+  );
+  if (count?.trim() !== String(purged)) return;
+  const note = prompt("¿Por qué se borran?");
+  if (!note?.trim()) return;
+  said.textContent = "Trabajando…";
+  const purge = await sent(`${id}/purge_owner`, { note });
+  if (!purge?.ok) {
+    said.textContent = COULD_NOT;
+    return;
+  }
+  const done = (await purge.json()) as { purged: number; kept: number };
   await load();
-  said.textContent = `Se borrarán ${purged} en la próxima limpieza. Se conservan ${kept}.`;
+  said.textContent = `Dejaron de servirse ${done.purged}. Se vacían en la próxima limpieza, que espera si el servicio está cortado. Se conservan ${done.kept}.`;
 };
 
 let reportsFrom = 0;
@@ -124,12 +144,7 @@ const load = async (): Promise<void> => {
       const note = prompt(`¿Por qué bloquear y retener ${id}? Dejará de servirse y se retiene 180 días.`);
       if (note?.trim()) void panicking(id, version, note);
     },
-    purgeOwner: (id) => {
-      const note = prompt(
-        `¿Por qué borrar todos los documentos de la llave dueña de ${id}? No se puede deshacer. Se conserva lo retenido, lo denunciado por abuso infantil y lo que cita otra persona.`,
-      );
-      if (note?.trim()) void purging(id, note);
-    },
+    purgeOwner: (id) => void purging(id),
     verifyLink: (id, version) => void verifying(id, version),
     reportsPage: (from) => {
       reportsFrom = from;

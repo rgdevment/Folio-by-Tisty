@@ -142,6 +142,17 @@ describe("the mail", () => {
     expect(left?.n).toBe(0);
   });
 
+  it("tells when new keys near their top of the day, and not before", async () => {
+    await testEnv.DB.prepare("INSERT INTO net_day (day, net, docs, bytes) VALUES (?, '~new-keys', 0, ?)")
+      .bind(TODAY, LEVEL_ONE.newKeysBytesADay * 0.9 - 1)
+      .run();
+    expect((await digest()).sent).toBe(false);
+    await testEnv.DB.prepare("UPDATE net_day SET bytes = bytes + 1").run();
+    const { send } = await digest();
+    expect(send.mock.calls[0]?.[1]).toContain("casi agotado");
+    await testEnv.DB.prepare("DELETE FROM net_day").run();
+  });
+
   it("tells of the stage of the service only when it changed", async () => {
     await store.setStage("blocked");
     const { send } = await digest();

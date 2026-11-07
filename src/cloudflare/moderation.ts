@@ -34,10 +34,10 @@ const REPORTS_TO_SEE = "FROM reports r WHERE r.level <> 'light' AND r.cleared = 
 
 export const CLAIMED = -1;
 
-// Broader than what the sweep holds: a report of child abuse stays whoever else that network reported, and a stranger's citation stays whole.
+// Broader than what the sweep holds: a grave report stays whoever else that network reported, and a stranger's citation stays whole.
 const MUST_STAY = (doc: string, today: string): string =>
   `(COALESCE(${doc}.legal_until, 0) >= ${today}
-    OR EXISTS (SELECT 1 FROM reports r WHERE r.doc = ${doc}.id AND r.category = 'csam' AND r.cleared = 0)
+    OR EXISTS (SELECT 1 FROM reports r WHERE r.doc = ${doc}.id AND r.level = 'grave' AND r.cleared = 0)
     OR EXISTS (SELECT 1 FROM cases c WHERE c.doc = ${doc}.id AND c.sealed_records IS NOT NULL AND c.until >= ${today})
     OR EXISTS (SELECT 1 FROM holds h JOIN docs k ON k.id = h.holder WHERE h.held = ${doc}.id AND k.owner <> ${doc}.owner))`;
 
@@ -213,6 +213,18 @@ export class CloudModeration {
       )
       .bind(dayOf(now), hourOf(now), this.#limits.evidenceDays, id);
     return this.#actedAndLogged([blocking], this.#logIfChanged(id, "block", now, note));
+  }
+
+  async purgePreview(id: string, now: number): Promise<{ purged: number; kept: number } | null> {
+    const [purgeable, all] = await this.#db.batch<{ n: number }>([
+      this.#db.prepare(`SELECT COUNT(*) AS n FROM (${PURGEABLE})`).bind(id, dayOf(now)),
+      this.#db
+        .prepare("SELECT COUNT(*) AS n FROM docs WHERE owner = (SELECT owner FROM docs WHERE id = ?1) AND latest >= 0")
+        .bind(id),
+    ]);
+    const purged = purgeable?.results[0]?.n ?? 0;
+    const total = all?.results[0]?.n ?? 0;
+    return total > 0 ? { purged, kept: total - purged } : null;
   }
 
   // The sweep of the private Worker empties what is claimed here, since this Worker never holds the envelopes.

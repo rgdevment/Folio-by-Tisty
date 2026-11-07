@@ -14,6 +14,7 @@ export interface AdminApi {
     | "opened"
     | "panic"
     | "purgeOwner"
+    | "purgePreview"
     | "makeCase"
     | "handedOver"
     | "forgetContact"
@@ -25,6 +26,7 @@ export interface AdminApi {
 }
 
 const ACTION_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|purge_owner|case|handed_over)$/;
+const PURGE_PREVIEW_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/purge_owner$/;
 const TOKEN_HASH = /^[A-Za-z0-9_-]{43}$/;
 const REPORT_PATH =
   /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/(false|false_network|forget_contact)$/;
@@ -104,6 +106,11 @@ export const answer = async (request: Request, api: AdminApi): Promise<Response>
   const { pathname } = new URL(request.url);
   if (request.method === "GET" && pathname === "/api/queue") {
     return json(200, await api.moderation.queue(api.now, reportsFromOf(request)));
+  }
+  const [, toPurge] = PURGE_PREVIEW_PATH.exec(pathname) ?? [];
+  if (request.method === "GET" && toPurge) {
+    const preview = await api.moderation.purgePreview(toPurge, api.now);
+    return preview ? json(200, preview) : json(404, { refused: "missing" });
   }
   if (request.method !== "POST") return json(404, { refused: "missing" });
   // A form or a link from elsewhere cannot send this header, and the preflight it needs is never answered.

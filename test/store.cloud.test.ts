@@ -657,6 +657,34 @@ describe("expiring", () => {
   });
 });
 
+describe("room for what new keys upload", () => {
+  const tenBytes = (id: string, n = 1) => ({ ...upload(id, n), newKey: true });
+
+  it("forgets only a first version that never went, and gives its place back", async () => {
+    await store.create(newDoc("sent"), DAY);
+    await store.upload(upload("sent", 1), DAY);
+    await store.create(newDoc("unsent"), DAY);
+    const placesOf = () => testEnv.DB.prepare("SELECT docs FROM net_day WHERE net = 'n1'").first<{ docs: number }>();
+    expect((await placesOf())?.docs).toBe(2);
+    await store.forgetUnsent("sent", "n1", DAY);
+    expect(await row("sent")).not.toBeNull();
+    expect((await placesOf())?.docs).toBe(2);
+    await store.forgetUnsent("unsent", "n1", DAY);
+    expect(await row("unsent")).toBeNull();
+    expect((await placesOf())?.docs).toBe(1);
+  });
+
+  it("lets a network reach its own share to the byte, and not one past it", async () => {
+    const limited = new Cloud(testEnv, { ...LEVEL_ONE, newKeysNetBytesADay: 20 });
+    await limited.create(newDoc("up"), DAY);
+    await limited.create(newDoc("other", { owner: "o2" }), DAY);
+    await limited.create(newDoc("third", { owner: "o3" }), DAY);
+    expect(await limited.upload(tenBytes("up"), DAY)).toBe("stored");
+    expect(await limited.upload(tenBytes("other"), DAY)).toBe("stored");
+    expect(await limited.upload(tenBytes("third"), DAY)).toBe("new_keys_full");
+  });
+});
+
 describe("orphans", () => {
   it("forgets objects with no row once they are old, and nothing else", async () => {
     await store.create(newDoc("d1"), DAY);

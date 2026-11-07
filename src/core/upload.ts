@@ -303,6 +303,7 @@ const storeVersion = async (
     today,
     held,
   );
+  if (sharing && uploaded !== "stored" && uploaded !== "same") await store.forgetUnsent(id, net, today);
   // Kept only once a version is, so a request that stores nothing leaves no key to age.
   if (uploaded === "stored") await keys.keep();
   return answerOf(uploaded, manifest.version, now);
@@ -333,7 +334,7 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
   const { store, limits } = tools;
   const open = await openTo(uploading, tools);
   if ("refused" in open) return open;
-  const { net, stage } = open;
+  const { net } = open;
   const held = await store.held(id);
   if (!held) return { refused: "missing" };
   const stoppedHere = stopped(held);
@@ -349,15 +350,12 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
   if (floor !== null && isBelowVersion(manifest.contract, floor)) return { refused: "outdated" };
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
   if (!mayUpload(read, held)) return { refused: "not_yours" };
-  const newKey = await keyIsNew(read, now, tools);
-  if (newKey && stage === "new_keys_off") return { refused: "uploads_off" };
 
   const hash = toBase64Url(await sha256(manifestBytes, index));
   if (held.versions.at(-1)?.files !== hash) return { refused: "behind" };
   if (await store.hasFiles(id, hash)) return { stored: true, hash };
   const hourSpent = await takeUploadHour(net, now, tools);
   if (hourSpent) return hourSpent;
-  const kept = await store.keepFiles({ id, hash, body: bytes, net, newKey }, dayOf(now));
-  if (kept === "new_keys_full") return { refused: "uploads_off" };
+  const kept = await store.keepFiles({ id, hash, body: bytes, net }, dayOf(now));
   return kept === "stored" ? { stored: true, hash } : { refused: "quota", until: now + DAY_MS };
 };

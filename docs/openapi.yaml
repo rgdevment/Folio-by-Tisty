@@ -368,7 +368,7 @@ paths:
                   - $ref: "#/components/schemas/Quota"
         "500": { $ref: "#/components/responses/Failed" }
         "503":
-          description: Uploads are off for now, by the spending cut, or the owner's or the signer's key is too new while the storage is near its ceiling or new keys used up what they may store today. Reading goes on.
+          description: Uploads are off for now, by the spending cut. Reading goes on.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UploadsOff" }

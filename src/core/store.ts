@@ -44,7 +44,6 @@ export interface KeptFiles {
   hash: string;
   body: Uint8Array;
   net: string;
-  newKey?: boolean;
 }
 
 export type Appealed = "accepted" | "review";
@@ -92,6 +91,7 @@ export interface News {
   appealed: string[];
   newKeys: number;
   newKeysDay: number;
+  newKeysNearTheirTop: boolean;
 }
 
 // What a read needs of a document, in one row.
@@ -174,6 +174,7 @@ export interface AcceptedTerms {
 export interface Store {
   create(doc: NewDoc, today: number): Promise<Created>;
   upload(upload: Upload, today: number, held?: Held): Promise<Uploaded>;
+  forgetUnsent(id: string, net: string, today: number): Promise<void>;
   held(id: string): Promise<Held | null>;
   setPermit(id: string, permit: string | null): Promise<void>;
   revoke(revocations: Revocation[]): Promise<boolean>;
@@ -186,7 +187,7 @@ export interface Store {
   openedCase(id: string, hash: string, today: number, now: number): Promise<OpenedCase | null>;
   envelope(id: string, version: Version): Promise<ReadableStream | null>;
   hasFiles(id: string, hash: string): Promise<boolean>;
-  keepFiles(files: KeptFiles, today: number): Promise<"stored" | "quota" | "new_keys_full">;
+  keepFiles(files: KeptFiles, today: number): Promise<"stored" | "quota">;
   filesOf(id: string, hash: string): Promise<ReadableStream | null>;
   dayKey(today: number): Promise<string>;
   evidenceKey(today: number): Promise<string>;

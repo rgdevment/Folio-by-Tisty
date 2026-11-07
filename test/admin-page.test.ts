@@ -140,6 +140,68 @@ describe("the page when no answer comes, as when the session of Access ended", (
   });
 });
 
+describe("erasing a key from the panel", () => {
+  const SAID_OF = () => page.getElementById("said")?.textContent;
+  const BUTTON = "Borrar todo de esta llave";
+
+  const opened = async (typed: Array<string | null>, preview = { purged: 3, kept: 1 }) => {
+    const questions: string[] = [];
+    const answers = [...typed];
+    const fetching = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.startsWith("/api/queue")) return new Response(JSON.stringify(QUEUE));
+      const said = init?.method === "POST" ? { purged: 3, kept: 1 } : preview;
+      return new Response(JSON.stringify(said));
+    });
+    vi.resetModules();
+    vi.stubGlobal("document", page);
+    vi.stubGlobal("fetch", fetching);
+    vi.stubGlobal("prompt", (asked: string) => {
+      questions.push(asked);
+      return answers.shift() ?? null;
+    });
+    await import("../src/admin/page/main");
+    await vi.waitFor(() => expect(fetching).toHaveBeenCalled());
+    await new Promise((done) => setTimeout(done, 0));
+    const erasing = () =>
+      fetching.mock.calls.filter(([path, init]) => path.endsWith("/purge_owner") && init?.method === "POST");
+    return { questions, erasing };
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("says how many first, and erases only with that number and a reason", async () => {
+    const { questions, erasing } = await opened(["3", "granja de spam"]);
+    pressing("reports", BUTTON);
+    await vi.waitFor(() => expect(erasing()).toHaveLength(1));
+    expect(questions[0]).toContain("Se borrarán 3 documentos");
+    expect(questions[0]).toContain("se conservan 1");
+    expect(JSON.parse(String(erasing()[0]?.[1]?.body))).toEqual({ note: "granja de spam" });
+    await vi.waitFor(() => expect(SAID_OF()).toContain("Dejaron de servirse 3"));
+    expect(SAID_OF()).toContain("espera si el servicio está cortado");
+  });
+
+  it.each<[Array<string | null>]>([[["2"]], [[""]], [[null]], [["3", ""]], [["3", null]]])(
+    "erases nothing when told %j",
+    async (typed) => {
+      const { questions, erasing } = await opened(typed);
+      pressing("reports", BUTTON);
+      await vi.waitFor(() => expect(questions).toHaveLength(typed.length));
+      await new Promise((done) => setTimeout(done, 0));
+      expect(erasing()).toHaveLength(0);
+    },
+  );
+
+  it("asks nothing when there is nothing to erase", async () => {
+    const { questions, erasing } = await opened([], { purged: 0, kept: 2 });
+    pressing("reports", BUTTON);
+    await vi.waitFor(() => expect(SAID_OF()).toContain("Se conservan 2"));
+    expect(questions).toEqual([]);
+    expect(erasing()).toHaveLength(0);
+  });
+});
+
 describe("a network found false", () => {
   it("offers to discard all its reports, only on its own", () => {
     const offered = [...(page.getElementById("reports") as Element).querySelectorAll("button")];

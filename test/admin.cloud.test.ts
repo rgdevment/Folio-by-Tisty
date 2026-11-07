@@ -420,6 +420,30 @@ describe("what it can do", () => {
       expect(await purge()).toEqual({ status: 200, said: { purged: 2, kept: 0 } });
     });
 
+    it("says what it would do, and does nothing yet", async () => {
+      await share();
+      await another("Bbbbbbbb");
+      await testEnv.DB.prepare("UPDATE docs SET legal_until = ? WHERE id = ?").bind(TODAY, "Bbbbbbbb").run();
+      const preview = await asked(`/api/docs/${ID}/purge_owner`);
+      expect(await preview.json()).toEqual({ purged: 1, kept: 1 });
+      expect(await latestOf(ID)).toBe(1);
+      expect((await asked("/api/docs/Nnnnnnnn/purge_owner")).status).toBe(404);
+    });
+
+    it.each(["threat", "doxxing", "intimate"])("keeps a report of %s, unless it was cleared", async (category) => {
+      await share();
+      await store.report({ doc: ID, net: "n1", asn: 1, category, version: 1, sealedLink: "s" }, TODAY, HOUR);
+      expect((await purge()).said).toEqual({ purged: 0, kept: 1 });
+      await testEnv.DB.prepare("UPDATE reports SET cleared = 1").run();
+      expect((await purge()).said).toEqual({ purged: 1, kept: 0 });
+    });
+
+    it("does not keep what only a medium or light report names", async () => {
+      await share();
+      await store.report({ doc: ID, net: "n1", asn: 1, category: "phishing", version: 1 }, TODAY, HOUR);
+      expect((await purge()).said).toEqual({ purged: 1, kept: 0 });
+    });
+
     it("keeps a report of child abuse and its anchor, unless the report was cleared", async () => {
       await share();
       await another("Language", { anchor: ID });
@@ -482,7 +506,6 @@ describe("what it can do", () => {
       expect((await purge("Nnnnnnnn")).status).toBe(404);
       expect((await asked(`/api/docs/${ID}/purge_owner`, { method: "POST" })).status).toBe(403);
       expect(await latestOf(ID)).toBe(1);
-    });
     });
   });
 

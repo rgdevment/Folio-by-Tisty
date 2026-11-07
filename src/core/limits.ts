@@ -4,6 +4,7 @@ export interface Limits {
   languagesAtMost: number;
   daysAKeyIsNew: number;
   newKeysBytesADay: number;
+  newKeysNetBytesADay: number;
   revokedMachinesAtMost: number;
   versionsKept: number;
   replacedKeptDays: number;
@@ -52,6 +53,7 @@ export const LEVEL_ONE: Limits = {
   languagesAtMost: 20,
   daysAKeyIsNew: 30,
   newKeysBytesADay: 5_000_000_000,
+  newKeysNetBytesADay: 50_000_000,
   revokedMachinesAtMost: 64,
   versionsKept: 3,
   replacedKeptDays: 7,
