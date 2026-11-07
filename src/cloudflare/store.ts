@@ -420,28 +420,30 @@ export class Cloud implements Store {
     return taken.meta.changes > 0;
   }
 
-  async heldByNewOwner(owner: string, newSince: number, today: number): Promise<number> {
+  // Each distinct set of attachments counts at the most it may weigh: its real size is never written down.
+  async heldByOwner(owner: string, today: number, except: string, filesBytes: number): Promise<number> {
     const held = await this.#db
       .prepare(
-        `SELECT COALESCE(SUM(bytes), 0) AS n FROM docs
-         WHERE owner = ?1 AND latest >= 0 AND dies_on >= ?3
-           AND NOT EXISTS (SELECT 1 FROM keys k WHERE k.root = ?1 AND k.first_day <= ?2)`,
+        `SELECT COALESCE(SUM(d.bytes + ?4 * (
+           SELECT COUNT(DISTINCT json_extract(v.value, '$.files')) FROM json_each(d.versions) v
+         )), 0) AS n
+         FROM docs d
+         WHERE d.owner = ?1 AND d.latest >= 0 AND d.dies_on >= ?2 AND d.blocked_at IS NULL AND d.id <> ?3`,
       )
-      .bind(owner, newSince, today)
+      .bind(owner, today, except, filesBytes)
       .first<{ n: number }>();
     return held?.n ?? 0;
   }
 
-  async allKeysSignedBy(roots: string[], day: number): Promise<boolean> {
-    const asked = [...new Set(roots)];
+  async newRootsOf(roots: string[], day: number): Promise<string[]> {
     const found = await this.#db
       .prepare(
-        `SELECT COUNT(*) AS n FROM json_each(?1) j
-         WHERE EXISTS (SELECT 1 FROM keys k WHERE k.root = j.value AND k.first_day <= ?2)`,
+        `SELECT j.value AS root FROM json_each(?1) j
+         WHERE NOT EXISTS (SELECT 1 FROM keys k WHERE k.root = j.value AND k.first_day <= ?2)`,
       )
-      .bind(JSON.stringify(asked), day)
-      .first<{ n: number }>();
-    return found?.n === asked.length;
+      .bind(JSON.stringify([...new Set(roots)]), day)
+      .all<{ root: string }>();
+    return found.results.map((one) => one.root);
   }
 
   async admitKey(root: string, net: string, today: number): Promise<KeyAdmitted> {

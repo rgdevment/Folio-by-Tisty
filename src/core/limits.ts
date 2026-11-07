@@ -112,6 +112,8 @@ export const publishedLimits = (limits: Limits) => ({
   ttl_days: limits.ttlChoices,
   shares_at_most: limits.sharesAtMost,
   languages_at_most: limits.languagesAtMost,
+  days_a_key_is_new: limits.daysAKeyIsNew,
+  new_key_bytes_at_most: limits.newKeyBytesAtMost,
   envelope_bytes_at_most: limits.envelopeBytesAtMost,
   first_bytes_at_most: limits.firstBytesAtMost,
   rest_bytes_at_most: limits.restBytesAtMost,

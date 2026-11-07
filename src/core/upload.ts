@@ -6,8 +6,8 @@ import { netDigest } from "./net";
 import type { ReadTools } from "./read";
 import { askForProof, type Refused, tooFast } from "./refused";
 import { hourEnds, hourOf, proofIsFresh, startHolds, toBase64Url, tokenHash } from "./start";
-import type { AcceptedTerms, Created, Held, Stage, Uploaded } from "./store";
-import { listFreesAt, uploadAllowedAt } from "./versions";
+import type { AcceptedTerms, Created, Held, Stage, Uploaded, Version } from "./store";
+import { keptVersions, listFreesAt, uploadAllowedAt } from "./versions";
 
 export interface FirstUpload {
   start: string;
@@ -186,17 +186,24 @@ const openTo = async ({ ip, now }: Uploading, { store, limiter, dayKey }: ReadTo
 const rootsOf = ({ manifest, signature }: ReadEnvelope): string[] => [(manifest.owner as Owner).root, signature.root];
 
 // A key costs nothing to make, so the owner's counts as much as the signer's, or one old signer opens the way to all.
-const keyIsNew = async (read: ReadEnvelope, now: number, { store, limits }: ReadTools): Promise<boolean> =>
-  !(await store.allKeysSignedBy(rootsOf(read), dayOf(now) - limits.daysAKeyIsNew));
+const newRootsOf = (read: ReadEnvelope, now: number, { store, limits }: ReadTools): Promise<string[]> =>
+  store.newRootsOf(rootsOf(read), dayOf(now) - limits.daysAKeyIsNew);
+
+const weightOf = (versions: Version[], limits: Limits): number =>
+  versions.reduce((sum, one) => sum + one.bytes, 0) +
+  new Set(versions.flatMap((one) => (one.files === undefined ? [] : [one.files]))).size *
+    filesEnvelopeBytesAtMost(limits);
 
 // One key that moves from network to network holds only so much in its first days, until what it shared expires.
 const roomRefused = async (
   owner: string,
-  bytes: number,
+  id: string,
+  kept: Version[],
   now: number,
   { store, limits }: ReadTools,
 ): Promise<Refused | null> =>
-  (await store.heldByNewOwner(owner, dayOf(now) - limits.daysAKeyIsNew, dayOf(now))) + bytes > limits.newKeyBytesAtMost
+  (await store.heldByOwner(owner, dayOf(now), id, filesEnvelopeBytesAtMost(limits))) + weightOf(kept, limits) >
+  limits.newKeyBytesAtMost
     ? { refused: "room_full" }
     : null;
 
@@ -265,7 +272,18 @@ const storeVersion = async (
   if (version === null) return { refused: "terms", version: tools.termsVersion };
   // The terms promise that an owner's own version lifts a block, however new the key.
   const correcting = held?.correctable && signature.root === held.owner;
-  const newKey = !correcting && (await keyIsNew(read, now, tools));
+  const fresh = correcting ? [] : await newRootsOf(read, now, tools);
+  const newKey = fresh.length > 0;
+  const arriving: Version = {
+    n: manifest.version,
+    hash,
+    bytes: bytes.length,
+    at: now,
+    signer: signature.root,
+    machine: signature.machine,
+    contract: manifest.contract,
+    ...(files === undefined ? {} : { files }),
+  };
   if (newKey && stage === "new_keys_off") return { refused: "uploads_off" };
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
@@ -274,7 +292,8 @@ const storeVersion = async (
     if (hourSpent) return hourSpent;
     const full = await keys.admit(roots, accepted);
     if (full) return full;
-    const noRoom = newKey ? await roomRefused((manifest.owner as Owner).root, bytes.length, now, tools) : null;
+    const ownerRoot = (manifest.owner as Owner).root;
+    const noRoom = fresh.includes(ownerRoot) ? await roomRefused(ownerRoot, id, [arriving], now, tools) : null;
     if (noRoom) return noRoom;
     const refused = await share(uploading, sharing, read, net, tools);
     if (refused) return refused;
@@ -295,7 +314,8 @@ const storeVersion = async (
     // Its owner's key too, or a blocked owner's documents would carry on through an edit link.
     const full = await keys.admit([held.owner, signature.root], accepted);
     if (full) return full;
-    const noRoom = newKey ? await roomRefused(held.owner, bytes.length, now, tools) : null;
+    const kept = keptVersions([...held.versions, arriving], now, limits);
+    const noRoom = fresh.includes(held.owner) ? await roomRefused(held.owner, id, kept, now, tools) : null;
     if (noRoom) return noRoom;
   }
 
