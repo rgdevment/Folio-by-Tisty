@@ -6,6 +6,9 @@ export interface Doing {
   reportWasFalse: (id: string, net: string) => void;
   opened: (id: string) => void;
   copy: (said: string) => void;
+  panic: (id: string, version: number) => void;
+  verifyLink: (id: string, version: number) => void;
+  handedOver: (id: string) => void;
 }
 
 const STAGES: Record<string, string> = {
@@ -58,7 +61,11 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
   if (report.fromFalseNet)
     card.append(piece(page, "p", "card-line", "Esta red ya tuvo una denuncia falsa: no cuenta para bloquear."));
   if (report.detail) card.append(piece(page, "p", "card-line", report.detail));
-  const buttons = [button(page, "Era falsa", () => doing.reportWasFalse(report.doc, report.net))];
+  const buttons = [
+    button(page, "Link para verificar", () => doing.verifyLink(report.doc, report.version)),
+    button(page, "Era falsa", () => doing.reportWasFalse(report.doc, report.net)),
+    button(page, "Botón de pánico", () => doing.panic(report.doc, report.version), true),
+  ];
   if (report.sealedLink) {
     const sealed = report.sealedLink;
     card.append(piece(page, "code", "sealed", sealed));
@@ -82,9 +89,18 @@ const docCard = (page: Document, doc: QueuedDoc, doing: Doing, waiting: boolean)
     piece(page, "p", "card-title", doc.id),
     piece(page, "p", "card-line", `Bloqueado el ${dayText(doc.blockedAt)} · versión ${doc.latest}`),
     piece(page, "p", "card-line", signersText(doc)),
+    piece(page, "p", "card-line", `Un link de caso abre la versión ${doc.versionToOpen}.`),
   );
   if (doc.mayCorrect)
     card.append(piece(page, "p", "card-line", "Reclamo aceptado solo: espera una versión de su dueño."));
+  card.append(
+    actions(
+      page,
+      button(page, "Link para verificar", () => doing.verifyLink(doc.id, doc.versionToOpen)),
+      button(page, "Botón de pánico", () => doing.panic(doc.id, doc.versionToOpen), true),
+      ...(doc.mayHandOver ? [button(page, "Ya lo entregué", () => doing.handedOver(doc.id))] : []),
+    ),
+  );
   if (waiting) {
     card.append(
       actions(

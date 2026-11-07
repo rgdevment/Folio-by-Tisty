@@ -24,8 +24,8 @@ const REFUSALS: Record<string, string> = {
 const COULD_NOT_SEND = "No se pudo enviar la denuncia. Vuelve a intentarlo en un momento.";
 const SEALED = "Lo cifras aquí, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar.";
 const ALWAYS_ON_GRAVE = `Una denuncia grave siempre entrega el link, porque sin él nadie podría revisarla. ${SEALED}`;
-const NEVER_OPENED =
-  "Esta denuncia siempre entrega el link, y nunca incluye lo que permite editar. Una persona la revisa sin ver imágenes, videos ni otros archivos y, si no es falsa, la denuncia a la PDI o a la Fiscalía. No descargues, copies, reenvíes ni mandes por correo ese material.";
+const CHILD_ABUSE_REVIEW =
+  "Esta denuncia entrega el link cifrado, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar. El operador lo abre solo para verificarla y no puede guardar copia en su equipo. Si es falsa, la descarta; si no, bloquea el documento y lo denuncia a las autoridades pertinentes, las únicas que reciben la llave. No descargues, copies, reenvíes ni mandes por correo ese material.";
 const LINK_IN_DETAIL = "Quita el link de tu mensaje. Si quieres entregarlo, marca la casilla: así viaja cifrado.";
 
 const post = ({ id, body }: Sending, proof?: string): Promise<Response> =>
@@ -89,7 +89,8 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
     handOver.disabled = level === "grave";
     if (level === "grave") handOver.checked = true;
     else if (wasRequired || consent.hidden) handOver.checked = false;
-    handingOverSaid.textContent = category === "csam" ? NEVER_OPENED : level === "grave" ? ALWAYS_ON_GRAVE : SEALED;
+    handingOverSaid.textContent =
+      category === "csam" ? CHILD_ABUSE_REVIEW : level === "grave" ? ALWAYS_ON_GRAVE : SEALED;
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

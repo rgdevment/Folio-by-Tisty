@@ -1,6 +1,6 @@
 import "virtual:tisty-tokens.css";
 import "./frame.css";
-import { keyOfFragment } from "../link";
+import { type CaseLink, caseOfFragment, keyOfFragment } from "../link";
 import { askFor } from "./ask";
 import { drawClosed } from "./closed";
 import { offerThemes } from "./theme";
@@ -26,13 +26,23 @@ const showAsked = async (id: string): Promise<void> => {
   await showLink(id, keyOfFragment(location.hash.slice(1)), asked, NOT_FOUND);
 };
 
+const showAskedCase = async (id: string, caseLink: CaseLink): Promise<void> => {
+  const { showCase } = await import("./show");
+  await showCase(id, caseLink);
+};
+
+const opening = (id: string): Promise<void> => {
+  const caseLink = caseOfFragment(location.hash.slice(1));
+  return caseLink ? showAskedCase(id, caseLink) : showAsked(id);
+};
+
 offerThemes();
 
 if (import.meta.env.MODE !== "production") {
   await showSample();
 } else if (ID_PATH.test(location.pathname)) {
   // Here and not further in: the code that failed may be the code that would have said so.
-  await showAsked(location.pathname.slice(1)).catch((error: unknown) => {
+  await opening(location.pathname.slice(1)).catch((error: unknown) => {
     console.error(error);
     drawClosed(COULD_NOT_OPEN);
   });

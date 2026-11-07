@@ -19,6 +19,8 @@ export interface QueuedDoc {
   appealedAt: number | null;
   waitsForOperator: boolean;
   mayCorrect: boolean;
+  versionToOpen: number;
+  mayHandOver: boolean;
   signers: { n: number; byOwner: boolean }[];
 }
 
