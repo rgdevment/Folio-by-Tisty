@@ -47,6 +47,8 @@ export const saidOf = (body: unknown, limits: Limits): Said | null => {
   if (!detailIsTaken(detail, limits) || !linkIsTaken(sealedLink, category, limits) || !versionIsTaken(version)) {
     return null;
   }
+  // Nobody could review a grave one without its link, so it would only be an accusation on record.
+  if (levelOfReport(category) === "grave" && sealedLink === undefined) return null;
   return {
     category,
     ...(detail === undefined ? {} : { detail: detail as string }),

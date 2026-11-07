@@ -117,6 +117,7 @@
           <dialog class="report-dialog" id="report-dialog" aria-labelledby="report-title">
             <form id="report-form">
               <h2 id="report-title">Denunciar este documento</h2>
+              <p class="report-copyright">¿Infringe tus derechos de autor? Si eres su titular, escribe a <a href="mailto:abuso@tisty.app">abuso@tisty.app</a>.</p>
               <fieldset>
                 <legend>Molesto, sin ser delito</legend>
                 <label><input type="radio" name="category" value="spam" required /> Spam</label>
@@ -139,11 +140,11 @@
                 <textarea name="detail" rows="3" maxlength="2000"></textarea>
               </label>
               <p class="report-note">Esto se guarda sin cifrar: no pegues aquí el link ni partes del documento.</p>
-              <div id="report-consent">
+              <div id="report-consent" hidden>
                 <label><input type="checkbox" id="report-hand-over" /> Entrego el link para que una persona lo revise</label>
-                <p>Lo cifras aquí, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar. Una denuncia grave sin el link queda registrada, pero no bloquea nada, porque nadie podría revisarla.</p>
+                <p id="report-consent-said"></p>
               </div>
-              <p class="report-note">Los derechos de autor los reclama su titular, en <a href="mailto:abuso@tisty.app">abuso@tisty.app</a>.</p>
+              <p class="report-note">Al enviar, declaras que denuncias de buena fe. Si el operador comprueba que es falsa, las denuncias de tu red dejan de contar hasta 180 días.</p>
               <p class="report-said" id="report-said" role="status"></p>
               <div class="report-actions">
                 <button type="button" id="report-cancel">Cerrar</button>

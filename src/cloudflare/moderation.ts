@@ -20,15 +20,7 @@ const acceptingAppeal = (
   id: string,
   today: number,
 ): D1PreparedStatement[] => [
-  // Who reported it stops counting for a while, and the reports stay as a record.
-  db
-    .prepare(
-      `INSERT INTO false_reporters (net, at)
-         SELECT net, ?2 FROM reports
-         WHERE doc = ?1 AND cleared = 0 AND EXISTS (SELECT 1 FROM docs WHERE id = ?1 AND blocked_at IS NOT NULL)
-         ON CONFLICT (net) DO UPDATE SET at = excluded.at`,
-    )
-    .bind(id, today),
+  // Clears them and keeps them as a record. A network shared in good faith pays only if a report is found false.
   db
     .prepare(
       "UPDATE reports SET cleared = 1 WHERE doc = ?1 AND EXISTS (SELECT 1 FROM docs WHERE id = ?1 AND blocked_at IS NOT NULL)",

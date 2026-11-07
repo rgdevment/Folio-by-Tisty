@@ -22,6 +22,10 @@ const REFUSALS: Record<string, string> = {
   slow: TOO_MANY_VISITS,
 };
 const COULD_NOT_SEND = "No se pudo enviar la denuncia. Vuelve a intentarlo en un momento.";
+const SEALED = "Lo cifras aquí, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar.";
+const ALWAYS_ON_GRAVE = `Una denuncia grave siempre entrega el link, porque sin él nadie podría revisarla. ${SEALED}`;
+const NEVER_OPENED =
+  "Esta denuncia siempre entrega el link, y nunca incluye lo que permite editar. Una persona la revisa sin ver imágenes, videos ni otros archivos y, si no es falsa, la denuncia a la PDI o a la Fiscalía. No descargues, copies, reenvíes ni mandes por correo ese material.";
 const LINK_IN_DETAIL = "Quita el link de tu mensaje. Si quieres entregarlo, marca la casilla: así viaja cifrado.";
 
 const post = ({ id, body }: Sending, proof?: string): Promise<Response> =>
@@ -52,6 +56,7 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
   const form = element<HTMLFormElement>("report-form");
   const consent = element<HTMLElement>("report-consent");
   const handOver = element<HTMLInputElement>("report-hand-over");
+  const handingOverSaid = element<HTMLElement>("report-consent-said");
   const said = element<HTMLElement>("report-said");
   const submit = element<HTMLButtonElement>("report-send");
 
@@ -60,7 +65,8 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
   const bodyOf = async (): Promise<string> => {
     const category = categoryOf();
     const detail = detailOf();
-    const withLink = handOver.checked && levelOfReport(category) !== "light" && linkKey !== "";
+    const level = levelOfReport(category);
+    const withLink = (level === "grave" || (handOver.checked && level !== "light")) && linkKey !== "";
     return JSON.stringify({
       category,
       ...(detail === "" ? {} : { detail }),
@@ -73,8 +79,14 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
   button.addEventListener("click", () => dialog.showModal());
   element<HTMLButtonElement>("report-cancel").addEventListener("click", () => dialog.close());
   form.addEventListener("change", () => {
-    consent.hidden = levelOfReport(categoryOf()) === "light";
-    if (consent.hidden) handOver.checked = false;
+    const category = categoryOf();
+    const level = levelOfReport(category);
+    const wasRequired = handOver.disabled;
+    consent.hidden = level === "light" || level === null;
+    handOver.disabled = level === "grave";
+    if (level === "grave") handOver.checked = true;
+    else if (wasRequired || consent.hidden) handOver.checked = false;
+    handingOverSaid.textContent = category === "csam" ? NEVER_OPENED : level === "grave" ? ALWAYS_ON_GRAVE : SEALED;
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

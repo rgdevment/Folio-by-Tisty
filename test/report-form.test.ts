@@ -61,10 +61,58 @@ describe("the report form", () => {
     expect(place.HTMLDialogElement.prototype.showModal).toHaveBeenCalled();
   });
 
-  it("sends no link unless the reader agrees", async () => {
-    choose("threat");
+  it.each(["threat", "doxxing", "intimate", "csam"])("always hands over the link on %s", async (category) => {
+    choose(category);
+    const handOver = element<HTMLInputElement>("report-hand-over");
+    expect(handOver.checked).toBe(true);
+    expect(handOver.disabled).toBe(true);
     await submitted();
-    expect(bodySent(0)).toEqual({ category: "threat", version: 3 });
+    expect(bodySent(0).sealedLink).toMatch(/^sealed1\./);
+  });
+
+  it("keeps the link box hidden until a category says what it means", () => {
+    expect(element("report-consent").hidden).toBe(true);
+    choose("phishing");
+    expect(element("report-consent").hidden).toBe(false);
+    expect(element("report-consent-said").textContent).toContain("Lo cifras aquí");
+  });
+
+  it("sends the link on a grave report whatever the box says, as after a browser restores the form", async () => {
+    (place.document.querySelector('input[value="threat"]') as HTMLInputElement).checked = true;
+    expect(element<HTMLInputElement>("report-hand-over").checked).toBe(false);
+    await submitted();
+    expect(bodySent(0).sealedLink).toMatch(/^sealed1\./);
+  });
+
+  it("gives the choice back when the reader moves off a grave report", () => {
+    choose("threat");
+    choose("phishing");
+    const handOver = element<HTMLInputElement>("report-hand-over");
+    expect(handOver.checked).toBe(false);
+    expect(handOver.disabled).toBe(false);
+  });
+
+  it("says what happens to the link, which nobody opens on child abuse", () => {
+    choose("csam");
+    expect(element("report-consent-said").textContent).toContain("sin ver imágenes");
+    choose("threat");
+    expect(element("report-consent-said").textContent).toContain("siempre entrega el link");
+  });
+
+  it("points a holder of rights to the mail before anything else", () => {
+    const form = element("report-form");
+    expect(form.querySelector(".report-copyright a")?.getAttribute("href")).toBe("mailto:abuso@tisty.app");
+    expect(form.firstElementChild?.nextElementSibling?.className).toBe("report-copyright");
+  });
+
+  it("says a report is made in good faith before it is sent", () => {
+    expect(element("report-form").textContent).toContain("buena fe");
+  });
+
+  it("sends no link unless the reader agrees", async () => {
+    choose("phishing");
+    await submitted();
+    expect(bodySent(0)).toEqual({ category: "phishing", version: 3 });
     expect(element("report-said").textContent).toContain("Recibimos");
     expect(element<HTMLButtonElement>("report-send").disabled).toBe(true);
   });
@@ -79,7 +127,7 @@ describe("the report form", () => {
   });
 
   it("does not offer the link on a light report, and takes back the choice", async () => {
-    choose("threat");
+    choose("phishing");
     element<HTMLInputElement>("report-hand-over").checked = true;
     choose("spam");
     expect(element("report-consent").hidden).toBe(true);

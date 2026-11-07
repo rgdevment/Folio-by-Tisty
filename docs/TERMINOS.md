@@ -1,21 +1,24 @@
 # Términos de uso de Folio by Tisty
 
-**Borrador del 6 de noviembre de 2026.** Folio todavía no está abierto.
+**Versión 6, vigente desde el 6 de noviembre de 2026.**
 
 ## En corto
 
-Folio convierte un documento de Tisty en un link para compartirlo.
-No tiene cuentas: el link es el permiso. Lo que compartes va cifrado, y el
-servicio lo guarda sin la llave para leerlo. Es gratis, sin fines de lucro y
-sin garantías: puede fallar, cambiar o terminar. Tu documento sigue siempre en
-tu Tisty; el link es una copia que caduca.
+Folio convierte un documento de Tisty en un link para compartirlo. No tiene
+cuentas: el link es el permiso. Lo que compartes va cifrado, y el servicio lo
+guarda sin la llave para leerlo. Al denunciar, quien tenga el link puede
+entregárselo al operador, y la copia puede quedar hasta 180 días aunque dejes de
+compartir. Es gratis, sin fines de lucro y sin garantías: puede fallar, cambiar
+o terminar. Tu documento sigue siempre en tu Tisty; el link es una copia que
+caduca.
 
 ## Quién lo opera
 
 Folio lo opera Mario, una persona natural en Chile, como proyecto sin fines de
-lucro. No hay empresa detrás ni nadie que gane dinero con él. El código del
-servicio es público, bajo la
-[Functional Source License 1.1, Apache 2.0 Future License](../LICENSE).
+lucro. No hay empresa detrás ni nadie que gane dinero con él, lo atiende una
+sola persona y no promete plazos de respuesta. Recibe avisos y notificaciones en
+<abuso@tisty.app>. El código del servicio es público, bajo la [Functional Source
+License 1.1, Apache 2.0 Future License](../LICENSE).
 
 ## Qué es Folio
 
@@ -25,40 +28,59 @@ muestra: los documentos se editan en Tisty, nunca aquí.
 
 ## Qué cubren
 
-El servicio que guarda y sirve los documentos compartidos, en
-tisty.cl, la página donde se leen en un navegador y la página que explica Folio,
-en folio.tisty.app. Hoy Folio solo comparte en privado: si llega una forma
-pública, tendrá sus propias reglas, y Tisty te pedirá aceptarlas antes de usarla.
-La app Tisty tiene sus propios [términos](https://github.com/rgdevment/Tisty/blob/main/TERMS.md).
+El servicio que guarda y sirve los documentos compartidos, en tisty.cl, la
+página donde se leen en un navegador y el sitio folio.tisty.app. Hoy solo existe
+el modo privado; el modo público tiene su propia sección más abajo y todavía no
+funciona. La app Tisty tiene sus propios
+[términos](https://github.com/rgdevment/Tisty/blob/main/TERMS.md).
+
+Si las versiones en español e inglés difieren, manda la española.
+
+## Quién puede usarlo
+
+Debes tener al menos 14 años. Si tienes menos de 18, compartes con permiso de
+quien te cuida. Leer un link no pide cuenta ni aceptar nada, pero lo que hagas
+con lo que lees es tu responsabilidad.
 
 ## Cómo funciona
 
-- **Se comparte solo desde Tisty**, y lo compartido es no listado: lo lee quien
-  tiene el link.
+- **Se comparte solo desde Tisty**, y lo compartido no aparece en ninguna lista:
+  lo lee quien tiene el link.
 - **Cada documento tiene tres links:** uno para leer, otro para editar y otro
   para administrar. Quien tiene un link tiene ese poder; cuídalos como una
-  llave.
+  llave. Un link de leer no se puede retirar si no dejas de compartir.
 - **Lo compartido va cifrado de punta a punta.** La llave va en el link, después
-  del `#`, y no llega al servidor. El servidor guarda bytes que no puede leer.
+  del `#`, y los navegadores no la envían al servidor. El servidor guarda bytes
+  que no puede leer. Si pierdes el link, nadie puede recuperarlo por ti.
 - **Lo compartido caduca solo** tras el plazo sin actividad que elijas al
   compartir, de un día a 15 días como mucho: sin lecturas, sin visitas tuyas y
-  sin versiones nuevas. Al caducar, los links dejan de
-  funcionar y la copia del servidor se borra. Tu documento sigue en Tisty y
-  puedes volver a compartirlo. Con una denuncia seria o una orden, deja de
-  servirse, pero su copia queda hasta 180 días, o lo que la orden pida.
-- **Hay topes** de tamaño y de cantidad de imágenes y adjuntos, que el servicio
-  puede cambiar. Tisty te avisa antes de compartir si algo no cabe.
+  sin versiones nuevas. Al caducar, los links dejan de funcionar y la copia del
+  servidor se borra. Tu documento sigue en Tisty y puedes volver a compartirlo.
+- **Dejar de compartir** corta los links al instante. La copia se borra en la
+  siguiente limpieza, normalmente antes de una hora. Una denuncia puede impedir
+  ese borrado, y no se te avisará.
+- **Hay topes** de tamaño, de imágenes y adjuntos, de documentos compartidos a
+  la vez y de subidas por hora, que el servicio puede cambiar. Hoy cada llave
+  puede tener dos documentos compartidos a la vez. Tisty te avisa antes de
+  compartir si algo no cabe.
+- **Si el servicio llega a su límite de gasto,** puede dejar de aceptar
+  documentos o de responder por un tiempo. Mientras esté detenido, nada caduca.
 
 ## Tu llave y tu reputación
 
-- **Aceptas estos términos** la primera vez que compartes desde Tisty, y ahí
-  Tisty te explica lo básico. Lo que firmas dice qué versión aceptaste, y Folio
-  guarda esa versión y la fecha junto a tu llave. Sin eso, Folio no acepta lo que
-  subes, venga de Tisty o de otro programa.
+- **Aceptas estos términos** la primera vez que compartes desde Tisty. Antes de
+  aceptar, Tisty te los muestra completos, y puedes abrirlos en la web para
+  guardarlos o imprimirlos. Lo que firmas dice qué versión aceptaste, y Folio
+  guarda esa versión y la hora junto a tu llave. Sin eso, Folio no acepta lo que
+  subes. Si usas otro programa, firmar con tu llave es aceptarlos, aunque no te
+  los muestre.
+- **Quien sube una versión con un link de editar** acepta también estos
+  términos, y su llave queda guardada como la del dueño.
 - **Tu llave es lo que permite a Folio distinguirte.** Tisty firma lo que
   compartes con una llave tuya, y Folio guarda su parte pública para siempre,
-  aunque tus documentos ya no estén. No dice quién eres. El nombre que eliges
-  mostrar viaja cifrado, y solo lo lee quien tiene el link.
+  aunque tus documentos ya no estén, salvo que pidas borrarla como dice la
+  [política de privacidad](PRIVACIDAD.md). No dice quién eres. El nombre que
+  eliges mostrar viaja cifrado, y solo lo lee quien tiene el link.
 - **Tu reputación es de esa llave.** Los topes parten bajos, y la reputación es
   lo que dará acceso a más. Todavía no está decidido cómo se gana, y estos
   términos lo dirán cuando lo esté. Las denuncias por sí solas nunca la quitan:
@@ -68,8 +90,8 @@ La app Tisty tiene sus propios [términos](https://github.com/rgdevment/Tisty/bl
 
 ## Qué no se permite
 
-Aunque nadie pueda leer lo cifrado, compartirlo sigue siendo tu
-responsabilidad. No se permite usar Folio para:
+Aunque nadie pueda leer lo cifrado, compartirlo sigue siendo tu responsabilidad.
+No se permite usar Folio para:
 
 - Material de abuso sexual infantil, en cualquier forma.
 - Imágenes sexuales explícitas, de cualquier persona.
@@ -79,82 +101,146 @@ responsabilidad. No se permite usar Folio para:
 - Publicar datos personales de alguien para acosarlo o exponerlo.
 - Cualquier otra cosa que sea delito en Chile.
 - Contenido que infrinja derechos de autor, cuando su titular lo reclame.
+- Atacar el servicio, saturarlo o saltarse sus topes.
 
 ## Denuncias y retiro
 
-- **Cualquiera puede denunciar** un link desde la página donde se lee: con una
-  categoría, el porqué y, si acepta, el link para leerlo, nunca la parte que
-  permite editar. Una denuncia seria (abuso infantil, amenazas o violencia,
-  incitación concreta, doxxing o imágenes íntimas) sin ese link queda registrada
-  pero no bloquea nada, porque nadie podría revisarla. Si el link que trajo no
-  abre el documento, la denuncia se descarta como falsa.
+En esta sección, una **red** es la conexión desde la que se denuncia, y un
+**proveedor** es la compañía que da esa conexión. Folio no pide tu identidad
+para denunciar: guarda un resumen de la red.
+
+- **Cualquiera con el link puede denunciar** desde la página donde se lee. Cada
+  red denuncia una vez por documento, y Folio le pide a su navegador un pequeño
+  trabajo de cómputo para frenar los abusos. Quien no tenga el link puede
+  escribir a <abuso@tisty.app> o acudir a la PDI o a la Fiscalía.
 - **Una denuncia leve** (spam, o algo molesto u ofensivo sin ser delito) no
-  necesita que nadie intervenga. Con tres desde lugares y operadores distintos,
-  quien lo compartió ve un aviso en su link de administración, también desde
-  Tisty, y tiene tres días para subir una versión nueva. Si no lo hace, deja de
+  necesita que nadie intervenga. Con tres redes de al menos dos proveedores,
+  quien lo compartió ve un aviso en su link de administrar, también desde Tisty,
+  y tiene tres días para subir una versión nueva. Si no lo hace, deja de
   servirse hasta que llegue una. Una versión nueva deja esas denuncias en cero.
-- **Con tres denuncias** de phishing, malware, estafa o algo serio, desde lugares
-  distintos, el documento se bloquea: deja de servirse, pero no se borra. Quien
-  lo compartió ve el bloqueo en su link de administración y puede reclamar ahí.
-  Si todas las versiones denunciadas las firmó alguien a quien dejó editar, el
-  reclamo se acepta solo, salvo que haya una denuncia de abuso infantil: el link
-  de edición deja de funcionar, las denuncias quedan registradas y sigue
-  bloqueado hasta que suba una versión propia. Un bloqueo puesto tras revisar el
-  documento a mano solo lo levanta quien lo revisó, y su reclamo siempre le llega.
-- **Las denuncias de delitos se envían a quien corresponde:** a la PDI o a la
-  Fiscalía, y el phishing y el malware además a Google Safe Browsing y a
-  Cloudflare. Los reclamos de derechos de autor los hace su titular, con orden
-  judicial o con un aviso DMCA a través de Cloudflare.
+- **Una denuncia de engaño** (phishing, malware o estafa) puede traer el link
+  para leerlo, si quien denuncia acepta. Con tres redes de al menos dos
+  proveedores, el documento se bloquea: deja de servirse, pero no se borra.
+- **Una denuncia grave** (amenazas o violencia, incitación concreta, datos
+  personales publicados para dañar, imágenes íntimas o abuso sexual infantil)
+  siempre trae el link para leerlo, cifrado para que solo el operador lo abra, y
+  nunca la parte que permite editar. Bloquea con las mismas tres redes, o cuando
+  el operador lo decida.
+- **Una sola denuncia de engaño o grave conserva el documento:** si caduca o
+  dejas de compartirlo, no se sirve, pero su copia queda hasta 180 días desde la
+  denuncia, por si una autoridad la pide. Una orden puede pedir más.
+- **Una denuncia falsa se descarta.** Si el link que trae no abre el documento,
+  o el operador comprueba que era falsa, la descarta, y las denuncias de esa red
+  dejan de contar en todos los documentos hasta 180 días. Hasta entonces cuenta
+  como cualquier otra. Si se acepta un reclamo, las denuncias sobre esa versión
+  dejan de contar, pero una versión nueva se puede denunciar.
+- **Puedes reclamar una vez por documento** en tu link de administrar. Si todas
+  las versiones denunciadas las firmó alguien a quien dejaste editar, y no hay
+  una denuncia de abuso infantil, el reclamo se acepta solo: el link de editar
+  deja de funcionar y sigue bloqueado hasta que subas una versión tuya. Los
+  demás reclamos los ve el operador, que los acepta o los rechaza sin obligación
+  de explicar por qué. Puedes escribirle a <abuso@tisty.app>.
+- **El operador puede retirar** cualquier documento que incumpla estos términos,
+  y bloquear el acceso a quien abuse del servicio. Lo que él bloquea solo lo
+  levanta él, ninguna versión nueva lo hace, y la copia queda hasta 180 días.
+- **El operador puede denunciar** a la PDI o a la Fiscalía lo que, al revisarlo,
+  parezca delito, y avisar de phishing y malware a Google Safe Browsing y a
+  Cloudflare. Lo hace una persona, a mano.
 - **El operador solo abre lo cifrado** en cuatro casos y siempre con el link
-  para leerlo: cuando quien lo compartió lo entrega para
-  demostrar que el bloqueo fue un error, para revisar una denuncia seria con el
-  link que entregó quien denunció, para confirmar phishing o malware antes de
-  reportarlo, o por orden de un juez. Cada apertura queda registrada.
-  Lo que señala una denuncia de abuso infantil, sean imágenes, videos u otros
-  archivos, no se abre nunca: el documento se bloquea, se conserva lo mínimo y
-  se avisa a la PDI o a la
-  Fiscalía con el link, para que lo abran ellos. En un navegador, el código que
-  descifra viene del mismo servidor; la [política de privacidad](PRIVACIDAD.md)
-  dice de qué no protege eso.
-- **El operador puede retirar** cualquier documento que incumpla estos
-  términos, y bloquear el acceso a quien abuse del servicio.
+  para leerlo: cuando quien lo compartió lo entrega para demostrar que el
+  bloqueo fue un error, para revisar una denuncia grave con el link que trajo,
+  para confirmar phishing o malware antes de reportarlo, o por orden de un juez.
+  Anota cada apertura. En un navegador, el código que descifra viene del mismo
+  servidor; la [política de privacidad](PRIVACIDAD.md) dice de qué no protege
+  eso.
+- **Una denuncia de abuso infantil la revisa una persona,** sin ver imágenes,
+  videos ni otros archivos: lee solo el texto, con las imágenes apagadas. Si es
+  falsa, la descarta. Si no, o si no se puede saber sin verlos, la denuncia a mano
+  a la PDI o a la Fiscalía y les entrega el link y la copia cifrada. Quien denuncia
+  no debe descargar, copiar, reenviar ni mandar por correo ese material.
+- **Los derechos de autor los reclama su titular** en <abuso@tisty.app>. Un
+  retiro obligatorio requiere orden judicial, como dice la Ley 17.336, y el
+  operador también puede atender un aviso DMCA. El operador puede dejar de
+  aceptar lo que suba quien infrinja de forma reiterada, cuando un tribunal lo
+  establezca. Un aviso falso a sabiendas tiene consecuencias legales.
+- **Las autoridades escriben** a <abuso@tisty.app>. Una orden puede obligar a
+  conservar un documento y sus registros más allá de estos plazos. El operador
+  cumple lo que la ley le exija y no discute por ti lo que pida. Sin el link, lo
+  cifrado sigue ilegible también para él.
 
 ## Lo que es tuyo
 
-Lo que escribes es tuyo. Compartirlo no le da al operador ningún derecho sobre
-tu contenido, más allá de guardarlo cifrado y servirlo a quien tenga el link
-mientras siga compartido.
+Lo que escribes es tuyo. Compartirlo solo le da al operador el permiso de
+guardarlo y servirlo a quien tenga el link mientras siga compartido. Los plazos
+y entregas de estos términos existen por seguridad y por la ley, no por una
+autorización que puedas retirar.
+
+## Modo público (todavía no existe)
+
+Nada de esta sección funciona hoy, y aceptar estos términos no te obliga a ella.
+Dice lo que está previsto, que puede cambiar. Antes de usarlo, Tisty te pedirá
+aceptar sus reglas aparte.
+
+- **Lo publicado no iría cifrado.** Se guardaría firmado y sin cifrar, y lo
+  podría leer cualquiera en folio.tisty.app, también el operador. El servidor no
+  lo abriría ni lo cambiaría, y lo serviría desde una caché.
+- **No caducaría por falta de lecturas.** Se retiraría tras 12 meses sin
+  actividad tuya, con aviso en Tisty, o cuando lo borres. Una copia en caché, en
+  un buscador o en manos de quien ya lo leyó podría seguir existiendo.
+- **Empezaría fuera de los buscadores** hasta mostrar señales de que es
+  legítimo.
+- **Seguirías siendo su autor.** Publicar le daría al operador el permiso de
+  guardarlo, mostrarlo y copiarlo en caché, sin pago, mientras siga publicado.
+- **Se prohibirían además** el racismo y la apología de delitos.
+- **Lo bloquearían** las denuncias de 10 redes de al menos tres proveedores, o
+  del 1 % de sus lectores si es más, con revisión del operador.
+- **Comentarios y votos** podrían llegar después. Quien los escriba respondería
+  por ellos.
 
 ## Sin garantías
 
 Folio se ofrece «tal cual», sin garantías de ningún tipo, como también dice su
-[licencia](../LICENSE). Puede caerse, perder lo que guarda, cambiar sus
-topes, dejar de aceptar documentos o de responder por un tiempo al llegar a su
-límite de gasto, o dejar de existir, avisando cuando sea posible. Por eso tu documento
-nunca deja de estar en tu Tisty.
+[licencia](../LICENSE). Puede caerse, perder lo que guarda, cambiar sus topes,
+dejar de aceptar documentos o dejar de existir, avisando cuando sea posible. Por
+eso tu documento nunca deja de estar en tu Tisty, y por eso no debes confiarle a
+Folio tu única copia de nada.
 
 ## Responsabilidad
 
-En la medida en que la ley lo permita, el operador no responde por pérdidas o
-daños que vengan del uso de Folio, ni por lo que otras personas
-comparten. Donde la ley no permita estos límites, se aplican hasta donde la ley
-lo permita.
+Folio es gratis y lo sostiene una persona. En la medida en que la ley lo
+permita, el operador no responde por pérdidas o daños que vengan del uso de
+Folio, ni por lo que otras personas comparten. Esto no excluye lo que la ley no
+permite excluir, como el dolo o la culpa grave, ni los derechos que te den las
+leyes de tu país.
 
-## Cambios
+## Cambios y fin del servicio
 
-Cada cambio a estos términos queda en el repositorio público, con su fecha.
-Antes de volver a compartir, Tisty te muestra los términos nuevos y te pide
-aceptarlos. Mientras no lo hagas, lo que ya compartiste se sigue sirviendo, pero
-no puedes subirle versiones nuevas.
+Cada cambio a estos términos queda en el repositorio público, con su fecha, y
+sube su versión. Antes de volver a compartir, Tisty te muestra los términos
+nuevos y te pide aceptarlos. Mientras no lo hagas, lo que ya compartiste se
+sigue sirviendo, pero no puedes subirle versiones nuevas. Si no los aceptas,
+puedes dejar de compartir y tu documento sigue en Tisty.
+
+Puedes dejar de usar Folio cuando quieras. Si el servicio termina, los links
+dejan de funcionar y sus copias se borran, salvo lo que una denuncia vigente o
+una orden obligue a conservar. Se avisa con la anticipación que sea posible. Si
+el operador ya no puede atenderlo, el servicio puede detenerse sin aviso.
+
+## Avisos
+
+No hay cuentas ni correos tuyos, así que no podemos escribirte. Los avisos se
+publican en folio.tisty.app y en el repositorio, y Tisty los muestra antes de
+compartir.
 
 ## Ley aplicable
 
-Estos términos se rigen por las leyes de Chile, sin quitarte los derechos que
-te dé la ley de tu país como consumidor.
+Estos términos se rigen por las leyes de Chile, y los conflictos los resuelven
+sus tribunales, sin quitarte los derechos que te dé la ley de tu país como
+consumidor. Si una parte de estos términos no vale, el resto sigue vigente.
 
 ## Contacto
 
-Denuncias y reclamos: <abuso@tisty.app>. Cualquier otra pregunta:
-<rgdevment@tisty.app>.
+Denuncias, reclamos, derechos de autor y autoridades: <abuso@tisty.app>.
+Cualquier otra pregunta: <rgdevment@tisty.app>.
 
 [English](TERMS.md)

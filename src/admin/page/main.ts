@@ -33,7 +33,7 @@ const load = async (): Promise<void> => {
     return;
   }
   drawQueue(document, (await response.json()) as Queue, {
-    accept: (id) => confirmed(`¿Aceptar y desbloquear ${id}? Sus denunciantes dejarán de contar.`, `${id}/accept`),
+    accept: (id) => confirmed(`¿Aceptar y desbloquear ${id}?`, `${id}/accept`),
     reject: (id) => confirmed(`¿Rechazar el reclamo de ${id}? Sigue bloqueado.`, `${id}/reject`),
     reportWasFalse: (id, net) =>
       confirmed("¿Esta denuncia era falsa? Esa red dejará de contar.", `${id}/reports/${net}/false`),
