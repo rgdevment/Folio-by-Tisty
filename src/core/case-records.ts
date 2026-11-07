@@ -4,10 +4,13 @@ import { toBase64Url } from "./start";
 const PREFIX = "case1.";
 const IV_BYTES = 12;
 const SEALED_AT_MOST = 1_000_000;
+const CASE_NAMED_BY = 8;
 const SEALED_BODY = /^[A-Za-z0-9_-]+$/;
 
 const keyOf = (raw: Bytes, use: "encrypt" | "decrypt"): Promise<CryptoKey> =>
   crypto.subtle.importKey("raw", raw, "AES-GCM", false, [use]);
+
+export const caseNameOf = (hash: string): string => hash.slice(0, CASE_NAMED_BY);
 
 export const isSealedRecords = (said: unknown): said is string =>
   typeof said === "string" &&

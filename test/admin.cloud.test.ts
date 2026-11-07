@@ -383,6 +383,8 @@ describe("what it can do", () => {
     it("hands over only for the operator, and answers what it did", async () => {
       await share();
       await reported("csam", ["n1"], "sealed1.x");
+      await acting(`/api/docs/${ID}/panic`, "looks real");
+      await sendingCase(ID, { version: 1, tokenHash: HASH, sealedRecords: "case1.abc" });
       expect((await asked(`/api/docs/${ID}/handed_over`, { method: "POST" })).status).toBe(403);
       expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(200);
       expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(404);

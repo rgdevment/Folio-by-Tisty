@@ -1,3 +1,4 @@
+import { caseNameOf } from "../core/case-records";
 import { dayOf, LEVEL_ONE, type Limits } from "../core/limits";
 import type { Queue, QueuedReport } from "../core/queue";
 import { hourOf } from "../core/start";
@@ -12,6 +13,23 @@ export interface NewCase {
 
 const SEEN_AT_MOST = 200;
 const CASE_LINK_DAYS = 30;
+const RECORD_ROWS_AT_MOST = 200;
+const REPORT_ROWS_AT_MOST = 1000;
+const REPORTS_BYTES_IN_RECORDS = 300_000;
+const CASE_FOR_THE_AUTHORITY = "c.doc = ?1 AND c.sealed_records IS NOT NULL AND c.until >= ?2";
+const READY_TO_HAND_OVER = `EXISTS (SELECT 1 FROM docs d WHERE d.id = ?1 AND d.blocked_by_operator = 1)
+  AND EXISTS (SELECT 1 FROM cases c WHERE ${CASE_FOR_THE_AUTHORITY})`;
+
+const reportsThatFit = (reports: unknown[]): { kept: unknown[]; leftOut: number } => {
+  const kept: unknown[] = [];
+  let bytes = 0;
+  for (const report of reports) {
+    bytes += new TextEncoder().encode(JSON.stringify(report)).length;
+    if (bytes > REPORTS_BYTES_IN_RECORDS) break;
+    kept.push(report);
+  }
+  return { kept, leftOut: reports.length - kept.length };
+};
 const REPORTS_TO_SEE = "FROM reports r WHERE r.level <> 'light' AND r.cleared = 0";
 
 export const mayCorrect = (row: {
@@ -75,11 +93,21 @@ export class CloudModeration {
       this.#db.prepare(`SELECT COUNT(*) AS n ${REPORTS_TO_SEE}`),
       this.#db
         .prepare(
-          `SELECT id, owner, latest, versions, blocked_at, appealed_at, appealed_hour, counts_from, blocked_by_operator
+          `SELECT id, owner, latest, versions, blocked_at, appealed_at, appealed_hour, counts_from, blocked_by_operator,
+             COALESCE(
+               (SELECT MAX(r.version) FROM reports r
+                WHERE r.doc = docs.id AND r.cleared = 0 AND r.level <> 'light'
+                  AND EXISTS (SELECT 1 FROM json_each(docs.versions) v WHERE json_extract(v.value, '$.n') = r.version)),
+               latest
+             ) AS version_to_open,
+             blocked_by_operator = 1
+               AND EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND r.sealed_link IS NOT NULL)
+               AND EXISTS (SELECT 1 FROM cases c WHERE c.doc = docs.id AND c.sealed_records IS NOT NULL AND c.until >= ?2)
+               AS may_hand_over
            FROM docs WHERE blocked_at IS NOT NULL
-           ORDER BY appealed_hour IS NULL, blocked_at DESC, id LIMIT ?`,
+           ORDER BY appealed_hour IS NULL, blocked_at DESC, id LIMIT ?1`,
         )
-        .bind(SEEN_AT_MOST),
+        .bind(SEEN_AT_MOST, dayOf(now)),
     ]);
     return {
       stage: (stage?.results?.[0] as { stage: string } | undefined)?.stage ?? "open",
@@ -106,6 +134,8 @@ export class CloudModeration {
           appealed_hour: number | null;
           counts_from: number;
           blocked_by_operator: number;
+          version_to_open: number;
+          may_hand_over: number;
         }[]
       ).map((row) => ({
         id: row.id,
@@ -114,6 +144,8 @@ export class CloudModeration {
         appealedAt: row.appealed_at,
         waitsForOperator: row.appealed_hour !== null,
         mayCorrect: mayCorrect(row),
+        versionToOpen: row.version_to_open,
+        mayHandOver: row.may_hand_over === 1,
         signers: (JSON.parse(row.versions) as { n: number; signer: string }[]).map(({ n, signer }) => ({
           n,
           byOwner: signer === row.owner,
@@ -123,7 +155,19 @@ export class CloudModeration {
   }
 
   async accept(id: string, now: number): Promise<Acted> {
-    const lifting = acceptingAppeal(this.#db, this.#limits, id, dayOf(now));
+    const today = dayOf(now);
+    const lifting = [
+      this.#db
+        .prepare(
+          "DELETE FROM cases WHERE doc = ?1 AND EXISTS (SELECT 1 FROM docs WHERE id = ?1 AND blocked_at IS NOT NULL)",
+        )
+        .bind(id),
+      // A panic never holds past the evidence period, so what does came from an order and stays.
+      this.#db
+        .prepare("UPDATE docs SET legal_until = NULL WHERE id = ?1 AND blocked_at IS NOT NULL AND legal_until <= ?2")
+        .bind(id, today + this.#limits.evidenceDays),
+      ...acceptingAppeal(this.#db, this.#limits, id, today),
+    ];
     return this.#actedAndLogged(lifting, this.#logIfChanged(id, "accept", now));
   }
 
@@ -155,7 +199,8 @@ export class CloudModeration {
     const holding = this.#db
       .prepare(
         `UPDATE docs SET blocked_by_operator = 1, blocked_at = COALESCE(blocked_at, ?1),
-           blocked_hour = COALESCE(blocked_hour, ?2), dies_on = ?3, legal_until = MAX(COALESCE(legal_until, 0), ?3)
+           blocked_hour = COALESCE(blocked_hour, ?2), dies_on = CASE WHEN blocked_at IS NULL THEN ?3 ELSE dies_on END,
+           legal_until = MAX(COALESCE(legal_until, 0), ?3)
          WHERE id = ?4 AND latest >= 0`,
       )
       .bind(today, hourOf(now), until, id);
@@ -171,14 +216,22 @@ export class CloudModeration {
          WHERE d.id = ?5 AND EXISTS (SELECT 1 FROM json_each(d.versions) v WHERE json_extract(v.value, '$.n') = ?2)`,
       )
       .bind(made.tokenHash, made.version, dayOf(now) + CASE_LINK_DAYS, made.sealedRecords ?? null, id);
-    return this.#actedAndLogged([adding], this.#logIfChanged(id, "case", now));
+    const purpose = made.sealedRecords === undefined ? "verify" : "authority";
+    const note = `${purpose} v${made.version} ${caseNameOf(made.tokenHash)}`;
+    return this.#actedAndLogged([adding], this.#logIfChanged(id, "case", now, note));
   }
 
   async handedOver(id: string, now: number): Promise<Acted> {
+    const today = dayOf(now);
+    const endingVerifyLinks = this.#db
+      .prepare(`DELETE FROM cases WHERE doc = ?1 AND sealed_records IS NULL AND ${READY_TO_HAND_OVER}`)
+      .bind(id, today);
     const erasing = this.#db
-      .prepare("UPDATE reports SET sealed_link = NULL WHERE doc = ? AND sealed_link IS NOT NULL")
-      .bind(id);
-    return this.#actedAndLogged([erasing], this.#logIfChanged(id, "handed_over", now));
+      .prepare(
+        `UPDATE reports SET sealed_link = NULL WHERE doc = ?1 AND sealed_link IS NOT NULL AND ${READY_TO_HAND_OVER}`,
+      )
+      .bind(id, today);
+    return this.#actedAndLogged([endingVerifyLinks, erasing], this.#logIfChanged(id, "handed_over", now));
   }
 
   // Never who reported: not the network, nor its provider, nor the link it sealed (decision 152).
@@ -188,10 +241,17 @@ export class CloudModeration {
         .prepare("SELECT owner, latest, versions, blocked_at, dies_on, legal_until FROM docs WHERE id = ?")
         .bind(id),
       this.#db
-        .prepare("SELECT category, level, detail, version, at, cleared FROM reports WHERE doc = ? ORDER BY at")
-        .bind(id),
-      this.#db.prepare("SELECT at, action, note FROM moderation WHERE doc = ? ORDER BY at").bind(id),
-      this.#db.prepare("SELECT at, reason FROM openings WHERE doc = ? ORDER BY at").bind(id),
+        .prepare(
+          `SELECT category, level, detail, version, at, cleared FROM reports WHERE doc = ?
+           ORDER BY category = 'csam' DESC, level = 'grave' DESC, at LIMIT ?`,
+        )
+        .bind(id, REPORT_ROWS_AT_MOST),
+      this.#db
+        .prepare("SELECT at, action, note FROM moderation WHERE doc = ? ORDER BY at DESC LIMIT ?")
+        .bind(id, RECORD_ROWS_AT_MOST),
+      this.#db
+        .prepare("SELECT at, reason FROM openings WHERE doc = ? ORDER BY at DESC LIMIT ?")
+        .bind(id, RECORD_ROWS_AT_MOST),
       this.#db
         .prepare(
           `SELECT k.first_day, k.terms_version, k.terms_hour FROM keys k
@@ -200,12 +260,14 @@ export class CloudModeration {
         .bind(id),
     ]);
     const row = doc?.results[0] as { versions: string } & Record<string, unknown>;
+    const { kept, leftOut } = reportsThatFit(reports?.results ?? []);
     return {
       id,
       ...row,
       versions: JSON.parse(row.versions) as unknown,
       ownerKey: ownerKey?.results[0] ?? null,
-      reports: reports?.results ?? [],
+      reports: kept,
+      reportsLeftOut: leftOut,
       actions: actions?.results ?? [],
       openings: openings?.results ?? [],
     };

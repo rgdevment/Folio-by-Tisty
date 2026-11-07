@@ -49,6 +49,12 @@ describe("a case made in the panel", () => {
     expect(JSON.parse(opened)).toEqual({ reports: ["one"] });
   });
 
+  it("seals records far larger than a call's arguments can hold", async () => {
+    const { link, body } = await madeCase("AbCdEfGh", 1, { said: "ñ".repeat(300_000) });
+    const key = caseOfFragment(partsOf(link))?.recordsKey ?? "";
+    expect(JSON.parse(await openRecords(body.sealedRecords ?? "", fromBase64Url(key))).said).toHaveLength(300_000);
+  });
+
   it("is new each time", async () => {
     expect((await madeCase("AbCdEfGh", 1)).link).not.toBe((await madeCase("AbCdEfGh", 1)).link);
   });

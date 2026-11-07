@@ -43,6 +43,8 @@ const QUEUE: Queue = {
       appealedAt: 20_001,
       waitsForOperator: true,
       mayCorrect: false,
+      versionToOpen: 1,
+      mayHandOver: false,
       signers: [
         { n: 1, byOwner: true },
         { n: 2, byOwner: false },
@@ -55,6 +57,8 @@ const QUEUE: Queue = {
       appealedAt: 20_001,
       waitsForOperator: false,
       mayCorrect: true,
+      versionToOpen: 1,
+      mayHandOver: false,
       signers: [{ n: 1, byOwner: false }],
     },
     {
@@ -64,6 +68,8 @@ const QUEUE: Queue = {
       appealedAt: null,
       waitsForOperator: false,
       mayCorrect: false,
+      versionToOpen: 1,
+      mayHandOver: true,
       signers: [{ n: 1, byOwner: true }],
     },
   ],
@@ -127,6 +133,86 @@ describe("the page when no answer comes, as when the session of Access ended", (
   });
 });
 
+describe("a case in the panel", () => {
+  const CASE_LINK = () => page.getElementById("case-link-code")?.textContent ?? "";
+  const answering = (over: Record<string, () => Response> = {}) =>
+    vi.fn(async (path: string, _asked?: RequestInit) => {
+      const answer = Object.entries(over).find(([end]) => path.endsWith(end));
+      if (answer) return answer[1]();
+      if (path === "/api/queue") return new Response(JSON.stringify(QUEUE));
+      if (path.endsWith("/panic")) return new Response(JSON.stringify({ records: { id: "AbCdEfGh" } }));
+      return new Response(JSON.stringify({ done: true }));
+    });
+  const opened = async (fetching: ReturnType<typeof answering>, reason: string | null = "looks real") => {
+    vi.resetModules();
+    vi.stubGlobal("document", page);
+    vi.stubGlobal("confirm", () => true);
+    vi.stubGlobal("prompt", () => reason);
+    vi.stubGlobal("fetch", fetching);
+    await import("../src/admin/page/main");
+    await vi.waitFor(() => expect(page.getElementById("reports")?.querySelector("button")).not.toBeNull());
+  };
+  const paths = (fetching: ReturnType<typeof answering>) => fetching.mock.calls.map(([path]) => path);
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("panics first, then makes the link for the authority with its records sealed", async () => {
+    const fetching = answering();
+    await opened(fetching);
+    pressing("reports", "Botón de pánico");
+    await vi.waitFor(() => expect(CASE_LINK()).toContain("#caso."));
+    expect(CASE_LINK().split("#")[1]?.split(".")).toHaveLength(3);
+    const sent = paths(fetching).filter((path) => path !== "/api/queue");
+    expect(sent).toEqual(["/api/docs/AbCdEfGh/panic", "/api/docs/AbCdEfGh/case"]);
+    const made = JSON.parse(fetching.mock.calls.at(-1)?.[1]?.body as string);
+    expect(made.version).toBe(2);
+    expect(made.sealedRecords).toMatch(/^case1\./);
+    expect(page.getElementById("case-link")?.hidden).toBe(false);
+  });
+
+  it("does nothing without a reason", async () => {
+    const fetching = answering();
+    await opened(fetching, "  ");
+    pressing("reports", "Botón de pánico");
+    expect(paths(fetching).filter((path) => path !== "/api/queue")).toEqual([]);
+  });
+
+  it("makes no link when the panic did not hold", async () => {
+    const fetching = answering({ "/panic": () => new Response("{}", { status: 500 }) });
+    await opened(fetching);
+    pressing("reports", "Botón de pánico");
+    await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toContain("No se pudo"));
+    expect(paths(fetching).some((path) => path.endsWith("/case"))).toBe(false);
+  });
+
+  it("says it stayed held when only the link failed", async () => {
+    const fetching = answering({ "/case": () => new Response("{}", { status: 400 }) });
+    await opened(fetching);
+    pressing("reports", "Botón de pánico");
+    await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toContain("Quedó bloqueado y retenido"));
+    expect(page.getElementById("case-link")?.hidden).toBe(true);
+  });
+
+  it("keeps the link on screen through the next action, and copies it", async () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const fetching = answering();
+    await opened(fetching);
+    pressing("reports", "Link para verificar");
+    await vi.waitFor(() => expect(CASE_LINK()).toContain("#caso."));
+    const link = CASE_LINK();
+    expect(link.split("#")[1]?.split(".")).toHaveLength(2);
+    pressing("appeals", "Rechazar");
+    await vi.waitFor(() => expect(paths(fetching).some((path) => path.endsWith("/reject"))).toBe(true));
+    await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toBe(""));
+    expect(CASE_LINK()).toBe(link);
+    page.getElementById("case-link-copy")?.click();
+    expect(writeText).toHaveBeenCalledWith(link);
+  });
+});
+
 describe("the panel", () => {
   it("says the state of the service", () => {
     expect(page.getElementById("state")?.textContent).toBe("Servicio con aviso de gasto. Llaves nuevas hoy: 7.");
@@ -182,22 +268,27 @@ describe("the panel", () => {
     expect(page.getElementById("reports")?.textContent).toContain("Se ven las 2 más graves y recientes de 900.");
   });
 
-  it("offers a report's own version to verify and to panic, and its link only to hand over", () => {
+  it("offers a report's own version to verify and to panic", () => {
     pressing("reports", "Link para verificar");
     expect(doing.verifyLink).toHaveBeenCalledWith("AbCdEfGh", 2);
     pressing("reports", "Botón de pánico", 1);
     expect(doing.panic).toHaveBeenCalledWith("IjKlMnOp", 1);
-    pressing("reports", "Ya lo entregué");
-    expect(doing.handedOver).toHaveBeenCalledWith("AbCdEfGh");
-    const buttons = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
-    expect(buttons.filter((one) => one.textContent === "Ya lo entregué")).toHaveLength(1);
+    expect(page.getElementById("reports")?.textContent).not.toContain("Ya lo entregué");
   });
 
-  it("offers the latest version of a blocked document", () => {
-    pressing("blocked", "Botón de pánico");
-    expect(doing.panic).toHaveBeenCalledWith("QrStUvWx", 1);
+  it("offers a blocked document's reported version, and says which it is", () => {
+    pressing("appeals", "Botón de pánico");
+    expect(doing.panic).toHaveBeenCalledWith("AbCdEfGh", 1);
     pressing("appeals", "Link para verificar");
-    expect(doing.verifyLink).toHaveBeenCalledWith("AbCdEfGh", 2);
+    expect(doing.verifyLink).toHaveBeenCalledWith("AbCdEfGh", 1);
+    expect(page.getElementById("appeals")?.textContent).toContain("abre la versión 1");
+  });
+
+  it("offers to hand over only what is ready for it", () => {
+    const buttons = [...(page.getElementById("blocked") as Element).querySelectorAll("button")];
+    expect(buttons.filter((one) => one.textContent === "Ya lo entregué")).toHaveLength(1);
+    pressing("blocked", "Ya lo entregué");
+    expect(doing.handedOver).toHaveBeenCalledWith("YzAbCdEf");
   });
 
   it("says when there is nothing", () => {

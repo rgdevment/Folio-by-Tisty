@@ -7,10 +7,9 @@ const encoder = new TextEncoder();
 
 export const toBase64Url = (bytes: ArrayBuffer | Uint8Array): string => {
   const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  return btoa(String.fromCharCode(...view))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replaceAll("=", "");
+  let binary = "";
+  for (const byte of view) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 };
 
 export const macOf = async (secret: string, said: string): Promise<string> => {

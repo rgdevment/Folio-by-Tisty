@@ -1,4 +1,5 @@
 import type { Revocation } from "@tisty/contracts";
+import { caseNameOf } from "../core/case-records";
 import { DAY_MS, LEVEL_ONE, type Limits, levelOfReport } from "../core/limits";
 import { momentOf } from "../core/moment";
 import { toBase64Url } from "../core/start";
@@ -64,7 +65,6 @@ interface DocRow {
 
 // A document being forgotten: nothing can move it on from here, and the sweep finishes it even after failing halfway.
 const CLAIMED = -1;
-const CASE_NAMED_BY = 8;
 
 // Beside the envelopes, so D1 and its backups never hold both the digests and their key (decision 128).
 const KEY_OBJECTS = "~";
@@ -537,7 +537,7 @@ export class Cloud implements Store {
           `INSERT OR IGNORE INTO openings (doc, at, reason)
            SELECT ?2, ?4, ?5 FROM cases WHERE token_hash = ?1 AND doc = ?2 AND until >= ?3`,
         )
-        .bind(hash, id, today, now, `case ${hash.slice(0, CASE_NAMED_BY)}`),
+        .bind(hash, id, today, now, `case ${caseNameOf(hash)}`),
     ]);
     const row = found?.results[0];
     if (!row) return null;

@@ -1,8 +1,10 @@
 import { applyD1Migrations, createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { madeCase as caseFromThePanel } from "../src/admin/page/case";
 import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
+import { isSealedRecords } from "../src/core/case-records";
 import { dayOf } from "../src/core/limits";
 import { tokenHash } from "../src/core/start";
 import worker from "../src/private/index";
@@ -105,6 +107,43 @@ describe("the panic button", () => {
     expect(await docRow()).toMatchObject({ blocked_at: TODAY - 5, blocked_by_operator: 1 });
   });
 
+  it("does not move the date the owner sees when it was blocked already", async () => {
+    await testEnv.DB.prepare("UPDATE docs SET blocked_at = ?, dies_on = ? WHERE id = ?")
+      .bind(TODAY - 5, TODAY + 175, ID)
+      .run();
+    await moderation.panic(ID, "first", NOW);
+    expect((await docRow())?.dies_on).toBe(TODAY + 175);
+    await moderation.panic(ID, "again", NOW + 100 * 86_400_000);
+    expect(await docRow()).toMatchObject({ dies_on: TODAY + 175, legal_until: TODAY + 280 });
+  });
+
+  it("keeps a held document past the date the owner sees", async () => {
+    await moderation.panic(ID, "first", NOW);
+    await moderation.panic(ID, "again", NOW + 100 * 86_400_000);
+    await store.sweep(TODAY + 200);
+    expect((await docRow())?.legal_until).toBe(TODAY + 280);
+    expect(await store.envelope(ID, { n: 1, hash: "h1" } as never)).not.toBeNull();
+  });
+
+  it("keeps the records small enough to seal, the gravest first, and says what it left out", async () => {
+    const long = "ñ".repeat(2000);
+    const writes = Array.from({ length: 400 }, (_, at) =>
+      testEnv.DB.prepare(
+        "INSERT INTO reports (doc, net, at, at_hour, category, detail, asn, level, version) VALUES (?, ?, 1, 1, ?, ?, 1, ?, 1)",
+      ).bind(ID, `net${at}`, at === 399 ? "csam" : at === 398 ? "threat" : "spam", long, at >= 398 ? "grave" : "light"),
+    );
+    await testEnv.DB.batch(writes);
+    const records = (await moderation.panic(ID, "x".repeat(500), NOW)) as {
+      reports: { category: string }[];
+      reportsLeftOut: number;
+    };
+    expect(records.reports.slice(0, 2).map((one) => one.category)).toEqual(["csam", "threat"]);
+    expect(records.reportsLeftOut).toBeGreaterThan(0);
+    expect(records.reports.length + records.reportsLeftOut).toBe(400);
+    const made = await caseFromThePanel(ID, 1, records);
+    expect(isSealedRecords(made.body.sealedRecords)).toBe(true);
+  });
+
   it("renews the hold when pressed again, and never shortens an order that asked for more", async () => {
     await moderation.panic(ID, "first", NOW);
     await moderation.panic(ID, "again", NOW + 10 * 86_400_000);
@@ -180,26 +219,155 @@ describe("making a case", () => {
     expect(await madeCase(1, undefined, "Nothing1")).toBe("missing");
     expect((await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM moderation").first<{ n: number }>())?.n).toBe(0);
   });
+
+  it("says on record what each link is for and which one it is", async () => {
+    await madeCase(1, SEALED);
+    await testEnv.DB.prepare("DELETE FROM cases").run();
+    await madeCase(2);
+    const named = (await tokenHash(TOKEN)).slice(0, 8);
+    const logged = await testEnv.DB.prepare("SELECT note FROM moderation ORDER BY note").all();
+    expect(logged.results).toEqual([{ note: `authority v1 ${named}` }]);
+    await moderation.makeCase(ID, { version: 2, tokenHash: "V".repeat(43) }, NOW + 1);
+    const again = await testEnv.DB.prepare("SELECT note FROM moderation ORDER BY note").all();
+    expect(again.results).toContainEqual({ note: "verify v2 VVVVVVVV" });
+  });
 });
 
 describe("saying it was handed over", () => {
+  const sealedReport = (doc = ID) =>
+    store.report({ doc, net: "n1", asn: 1, category: "csam", version: 1, sealedLink: "sealed1.x" }, TODAY, 1);
+  const links = async () =>
+    (
+      await testEnv.DB.prepare("SELECT sealed_link FROM reports WHERE doc = ?")
+        .bind(ID)
+        .first<{ sealed_link: string | null }>()
+    )?.sealed_link;
+
   it("erases the sealed links of that document alone, and says so on record", async () => {
     await share(OTHER);
-    for (const doc of [ID, OTHER]) {
-      await store.report({ doc, net: "n1", asn: 1, category: "csam", version: 1, sealedLink: "sealed1.x" }, TODAY, 1);
-    }
+    await sealedReport();
+    await sealedReport(OTHER);
+    await moderation.panic(ID, "looks real", NOW);
+    await madeCase(1, SEALED);
     expect(await moderation.handedOver(ID, NOW)).toBe("done");
-    const left = await testEnv.DB.prepare("SELECT doc, sealed_link FROM reports ORDER BY doc = ?").bind(OTHER).all();
-    expect(left.results).toEqual([
-      { doc: ID, sealed_link: null },
-      { doc: OTHER, sealed_link: "sealed1.x" },
-    ]);
-    const logged = await testEnv.DB.prepare("SELECT doc, action FROM moderation").all();
-    expect(logged.results).toEqual([{ doc: ID, action: "handed_over" }]);
+    expect(await links()).toBeNull();
+    const other = await testEnv.DB.prepare("SELECT sealed_link FROM reports WHERE doc = ?").bind(OTHER).first();
+    expect(other).toEqual({ sealed_link: "sealed1.x" });
+    const logged = await testEnv.DB.prepare("SELECT action FROM moderation WHERE action = 'handed_over'").all();
+    expect(logged.results).toHaveLength(1);
+  });
+
+  it("ends the links to verify and keeps the authority's", async () => {
+    await sealedReport();
+    await moderation.panic(ID, "looks real", NOW);
+    await madeCase(1, SEALED);
+    await moderation.makeCase(ID, { version: 1, tokenHash: "V".repeat(43) }, NOW);
+    await moderation.handedOver(ID, NOW);
+    const left = await testEnv.DB.prepare("SELECT token_hash FROM cases").all();
+    expect(left.results).toEqual([{ token_hash: await tokenHash(TOKEN) }]);
+  });
+
+  it("does nothing while the document is not under the operator's block", async () => {
+    await sealedReport();
+    await madeCase(1, SEALED);
+    expect(await moderation.handedOver(ID, NOW)).toBe("missing");
+    expect(await links()).toBe("sealed1.x");
+  });
+
+  it.each([
+    ["no link for the authority", null],
+    ["only a link to verify", undefined],
+  ])("does nothing with %s", async (_, records) => {
+    await sealedReport();
+    await moderation.panic(ID, "looks real", NOW);
+    if (records === undefined) await madeCase(1);
+    expect(await moderation.handedOver(ID, NOW)).toBe("missing");
+    expect(await links()).toBe("sealed1.x");
+    const left = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM cases").first<{ n: number }>();
+    expect(left?.n).toBe(records === undefined ? 1 : 0);
+  });
+
+  it("does nothing once the link for the authority is past", async () => {
+    await sealedReport();
+    await moderation.panic(ID, "looks real", NOW);
+    await madeCase(1, SEALED);
+    expect(await moderation.handedOver(ID, NOW + 31 * 86_400_000)).toBe("missing");
+    expect(await links()).toBe("sealed1.x");
   });
 
   it("does nothing when there is nothing left to erase", async () => {
+    await moderation.panic(ID, "looks real", NOW);
+    await madeCase(1, SEALED);
     expect(await moderation.handedOver(ID, NOW)).toBe("missing");
+  });
+});
+
+describe("lifting a block", () => {
+  it("ends the hold and every case link, so a mistake keeps nothing", async () => {
+    await moderation.panic(ID, "a mistake", NOW);
+    await madeCase(1, SEALED);
+    expect(await moderation.accept(ID, NOW)).toBe("done");
+    expect((await docRow())?.legal_until).toBeNull();
+    expect((await send(`cases/${ID}`, TOKEN)).status).toBe(404);
+    expect((await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM cases").first<{ n: number }>())?.n).toBe(0);
+  });
+
+  it("keeps a hold that came from an order asking for longer", async () => {
+    await moderation.panic(ID, "looks real", NOW);
+    await testEnv.DB.prepare("UPDATE docs SET legal_until = ? WHERE id = ?")
+      .bind(TODAY + 181, ID)
+      .run();
+    await moderation.accept(ID, NOW);
+    expect((await docRow())?.legal_until).toBe(TODAY + 181);
+  });
+
+  it("touches nothing on a document that is not blocked", async () => {
+    await madeCase(1, SEALED);
+    await testEnv.DB.prepare("UPDATE docs SET legal_until = ? WHERE id = ?").bind(TODAY, ID).run();
+    expect(await moderation.accept(ID, NOW)).toBe("missing");
+    expect((await docRow())?.legal_until).toBe(TODAY);
+    expect((await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM cases").first<{ n: number }>())?.n).toBe(1);
+  });
+});
+
+describe("the queue of blocked documents", () => {
+  const blockedDoc = async () => {
+    const queue = await moderation.queue(NOW);
+    return queue.docs[0];
+  };
+
+  it("opens the version that was reported, not the latest", async () => {
+    await store.report({ doc: ID, net: "n1", asn: 1, category: "phishing", version: 1 }, TODAY, 1);
+    await moderation.panic(ID, "looks real", NOW);
+    expect(await blockedDoc()).toMatchObject({ latest: 2, versionToOpen: 1 });
+  });
+
+  it.each([
+    ["no report", []],
+    ["a light report", [{ category: "spam", version: 1 }]],
+  ])("opens the latest with %s", async (_, reports) => {
+    for (const report of reports) await store.report({ doc: ID, net: "n1", asn: 1, ...report }, TODAY, 1);
+    await moderation.panic(ID, "looks real", NOW);
+    expect((await blockedDoc())?.versionToOpen).toBe(2);
+  });
+
+  it("ignores a version the document no longer holds", async () => {
+    await store.report({ doc: ID, net: "n1", asn: 1, category: "phishing", version: 1 }, TODAY, 1);
+    await testEnv.DB.prepare("UPDATE reports SET version = 99").run();
+    await moderation.panic(ID, "looks real", NOW);
+    expect((await blockedDoc())?.versionToOpen).toBe(2);
+  });
+
+  it("offers to hand over only when the panic, the link and a key are all there", async () => {
+    await store.report({ doc: ID, net: "n1", asn: 1, category: "csam", version: 1, sealedLink: "sealed1.x" }, TODAY, 1);
+    await moderation.panic(ID, "looks real", NOW);
+    expect((await blockedDoc())?.mayHandOver).toBe(false);
+    await madeCase(1);
+    expect((await blockedDoc())?.mayHandOver).toBe(false);
+    await moderation.makeCase(ID, { version: 1, tokenHash: "V".repeat(43), sealedRecords: SEALED }, NOW);
+    expect((await blockedDoc())?.mayHandOver).toBe(true);
+    await moderation.handedOver(ID, NOW);
+    expect((await blockedDoc())?.mayHandOver).toBe(false);
   });
 });
 

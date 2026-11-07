@@ -72,7 +72,6 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
     buttons.unshift(
       button(page, "Copiar para abrir", () => doing.copy(openCommand(report.doc, sealed))),
       button(page, "Anotar apertura", () => doing.opened(report.doc)),
-      button(page, "Ya lo entregué", () => doing.handedOver(report.doc)),
     );
   }
   card.append(actions(page, ...buttons));
@@ -86,14 +85,16 @@ const docCard = (page: Document, doc: QueuedDoc, doing: Doing, waiting: boolean)
     piece(page, "p", "card-title", doc.id),
     piece(page, "p", "card-line", `Bloqueado el ${dayText(doc.blockedAt)} · versión ${doc.latest}`),
     piece(page, "p", "card-line", signersText(doc)),
+    piece(page, "p", "card-line", `Un link de caso abre la versión ${doc.versionToOpen}.`),
   );
   if (doc.mayCorrect)
     card.append(piece(page, "p", "card-line", "Reclamo aceptado solo: espera una versión de su dueño."));
   card.append(
     actions(
       page,
-      button(page, "Link para verificar", () => doing.verifyLink(doc.id, doc.latest)),
-      button(page, "Botón de pánico", () => doing.panic(doc.id, doc.latest), true),
+      button(page, "Link para verificar", () => doing.verifyLink(doc.id, doc.versionToOpen)),
+      button(page, "Botón de pánico", () => doing.panic(doc.id, doc.versionToOpen), true),
+      ...(doc.mayHandOver ? [button(page, "Ya lo entregué", () => doing.handedOver(doc.id))] : []),
     ),
   );
   if (waiting) {
