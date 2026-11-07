@@ -16,6 +16,7 @@ export interface AdminApi {
     | "makeCase"
     | "handedOver"
     | "forgetContact"
+    | "networkWasFalse"
   >;
   access: AccessSettings;
   certs: Certs;
@@ -24,7 +25,13 @@ export interface AdminApi {
 
 const ACTION_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|case|handed_over)$/;
 const TOKEN_HASH = /^[A-Za-z0-9_-]{43}$/;
-const REPORT_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/(false|forget_contact)$/;
+const REPORT_PATH =
+  /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/(false|false_network|forget_contact)$/;
+const ON_REPORT = {
+  false: "reportWasFalse",
+  false_network: "networkWasFalse",
+  forget_contact: "forgetContact",
+} as const;
 const SAID_AT_MOST = 500;
 const HEADERS = {
   "Cache-Control": "no-store",
@@ -59,8 +66,8 @@ const newCaseOf = async (request: Request): Promise<NewCase | null> => {
 const act = async (request: Request, path: string, { moderation, now }: AdminApi): Promise<Response> => {
   const [, reportDoc, net, onReport] = REPORT_PATH.exec(path) ?? [];
   if (reportDoc && net) {
-    const acting = onReport === "false" ? moderation.reportWasFalse : moderation.forgetContact;
-    return answerOf(await acting.call(moderation, reportDoc, net, now));
+    const acting = ON_REPORT[onReport as keyof typeof ON_REPORT];
+    return answerOf(await moderation[acting](reportDoc, net, now));
   }
   const [, id, action] = ACTION_PATH.exec(path) ?? [];
   if (!id) return json(404, { refused: "missing" });
@@ -80,12 +87,19 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
   return answerOf(action === "block" ? await moderation.block(id, note, now) : await moderation.opened(id, note, now));
 };
 
+const reportsFromOf = (request: Request): number => {
+  const from = Number(new URL(request.url).searchParams.get("from"));
+  return Number.isSafeInteger(from) && from > 0 ? from : 0;
+};
+
 export const answer = async (request: Request, api: AdminApi): Promise<Response> => {
   const operator = await isOperator(request.headers.get("Cf-Access-Jwt-Assertion"), api.access, api.certs, api.now);
   if (!operator) return json(403, { refused: "not_the_operator" });
 
   const { pathname } = new URL(request.url);
-  if (request.method === "GET" && pathname === "/api/queue") return json(200, await api.moderation.queue(api.now));
+  if (request.method === "GET" && pathname === "/api/queue") {
+    return json(200, await api.moderation.queue(api.now, reportsFromOf(request)));
+  }
   if (request.method !== "POST") return json(404, { refused: "missing" });
   // A form or a link from elsewhere cannot send this header, and the preflight it needs is never answered.
   if (request.headers.get("Folio-Operator") !== "1") return json(403, { refused: "not_the_operator" });

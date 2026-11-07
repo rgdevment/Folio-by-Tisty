@@ -2,6 +2,7 @@ import type { Revocation } from "@tisty/contracts";
 import { caseNameOf } from "../core/case-records";
 import { DAY_MS, LEVEL_ONE, type Limits, levelOfReport } from "../core/limits";
 import { momentOf } from "../core/moment";
+import { GRAVEST_FIRST } from "../core/queue";
 import { toBase64Url } from "../core/start";
 import type {
   AcceptedTerms,
@@ -77,7 +78,9 @@ const KEYS_AT_ONCE = 1000;
 
 // A report that weighs: not cleared by an appeal, and not from who reported falsely before (decision 41).
 const COUNTED_REPORT = "r.cleared = 0 AND r.net NOT IN (SELECT net FROM false_reporters)";
-const REPORT_AS_EVIDENCE = `${COUNTED_REPORT} AND r.level <> 'light'`;
+// A network is often shared: finding one report false says nothing of what others on it reported before.
+const REPORT_AS_EVIDENCE =
+  "r.cleared = 0 AND r.level <> 'light' AND r.net NOT IN (SELECT f.net FROM false_reporters f WHERE COALESCE(f.since, f.at) < r.at)";
 // The API now refuses a grave report without its link: this is for what was reported before it did (decision 153).
 const REPORT_THAT_BLOCKS = `${COUNTED_REPORT} AND (r.level = 'medium' OR (r.level = 'grave' AND r.sealed_link IS NOT NULL))`;
 const LIGHT_REPORT = `${COUNTED_REPORT} AND r.level = 'light'`;
@@ -666,7 +669,9 @@ export class Cloud implements Store {
              ?11
            FROM docs d WHERE d.id = ?1
            ON CONFLICT (doc, net) DO UPDATE
-             SET at = CASE WHEN ${REPORT_MOVES} THEN excluded.at ELSE reports.at END,
+             SET at = CASE WHEN reports.cleared = 1 THEN excluded.at
+                   WHEN EXISTS (SELECT 1 FROM false_reporters f WHERE f.net = excluded.net) THEN reports.at
+                   WHEN ${REPORT_MOVES} THEN excluded.at ELSE reports.at END,
                  at_hour = CASE WHEN ${REPORT_MOVES} THEN excluded.at_hour ELSE reports.at_hour END,
                  asn = CASE WHEN ${REPORT_MOVES} THEN excluded.asn ELSE reports.asn END,
                  category = CASE WHEN ${REPORT_REPLACES} THEN excluded.category ELSE reports.category END,
@@ -780,7 +785,7 @@ export class Cloud implements Store {
       .prepare(
         `UPDATE docs SET appealed_at = ?2, permit = NULL, counts_from = latest + 1
          WHERE id = ?1 AND blocked_at IS NOT NULL AND appealed_at IS NULL AND blocked_by_operator = 0
-           AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND r.category = 'csam' AND ${COUNTED_REPORT})
+           AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND r.category = 'csam' AND ${REPORT_AS_EVIDENCE})
            AND EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND ${COUNTS_NOW})
            AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND ${COUNTS_NOW} AND ${SIGNED_BY_OWNER})`,
       )
@@ -1026,14 +1031,22 @@ export class Cloud implements Store {
 
   async news(after: number, before: number, atMost: number): Promise<News> {
     const newKeysDay = Math.floor((before - 1) / HOURS_IN_A_DAY);
-    const [reports, blocked, appealed, keys] = await this.#db.batch([
+    const newReports = "FROM reports WHERE at_hour > ?1 AND at_hour < ?2 AND cleared = 0 AND level <> 'light'";
+    const [reports, totals, blocked, appealed, keys] = await this.#db.batch([
       this.#db
         .prepare(
-          `SELECT doc, category, COUNT(*) AS nets FROM reports
-           WHERE at_hour > ?1 AND at_hour < ?2 AND cleared = 0 AND level <> 'light'
-           GROUP BY doc, category ORDER BY category = 'csam' DESC, nets DESC, doc LIMIT ?3`,
+          `SELECT doc, category, COUNT(*) AS nets FROM (
+             SELECT doc, category, level, net IN (SELECT net FROM false_reporters) AS false_net,
+               ROW_NUMBER() OVER (PARTITION BY net ORDER BY ${GRAVEST_FIRST}, at_hour) AS in_its_net
+             ${newReports}
+           )
+           GROUP BY doc, category
+           ORDER BY MIN(in_its_net), ${GRAVEST_FIRST}, SUM(NOT false_net) DESC, doc LIMIT ?3`,
         )
         .bind(after, before, atMost),
+      this.#db
+        .prepare(`SELECT COUNT(*) AS n, COUNT(DISTINCT doc || '|' || category) AS listed ${newReports}`)
+        .bind(after, before),
       this.#db
         .prepare("SELECT id FROM docs WHERE blocked_hour > ?1 AND blocked_hour < ?2 ORDER BY id LIMIT ?3")
         .bind(after, before, atMost),
@@ -1045,6 +1058,8 @@ export class Cloud implements Store {
     const ids = (rows: typeof blocked): string[] => ((rows?.results ?? []) as { id: string }[]).map(({ id }) => id);
     return {
       reports: (reports?.results ?? []) as News["reports"],
+      reportsTotal: (totals?.results?.[0] as { n: number } | undefined)?.n ?? 0,
+      reportLines: (totals?.results?.[0] as { listed: number } | undefined)?.listed ?? 0,
       blocked: ids(blocked),
       appealed: ids(appealed),
       newKeys: (keys?.results?.[0] as { keys: number } | undefined)?.keys ?? 0,

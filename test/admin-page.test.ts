@@ -9,6 +9,7 @@ const QUEUE: Queue = {
   stage: "warned",
   newKeys: 7,
   reportsTotal: 2,
+  reportsFrom: 0,
   reports: [
     {
       doc: "AbCdEfGh",
@@ -99,6 +100,8 @@ beforeEach(() => {
     verifyLink: vi.fn(),
     handedOver: vi.fn(),
     forgetContact: vi.fn(),
+    reportsPage: vi.fn(),
+    networkWasFalse: vi.fn(),
   };
   drawQueue(page, QUEUE, doing as unknown as Doing);
 });
@@ -133,6 +136,76 @@ describe("the page when no answer comes, as when the session of Access ended", (
     await vi.waitFor(() => expect(page.getElementById("appeals")?.querySelector("button")).not.toBeNull());
     pressing("appeals", "Rechazar");
     await vi.waitFor(() => expect(SAID_OF()).toContain("No se pudo. Recarga"));
+  });
+});
+
+describe("a network found false", () => {
+  it("offers to discard all its reports, only on its own", () => {
+    const offered = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
+    expect(offered.filter((one) => one.textContent === "Descartar todas las de esta red")).toHaveLength(1);
+    pressing("reports", "Descartar todas las de esta red");
+    expect(doing.networkWasFalse).toHaveBeenCalledWith("IjKlMnOp", "n2");
+  });
+});
+
+describe("pages of reports", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const drawn = (reportsFrom: number, reportsTotal: number) =>
+    drawQueue(page, { ...QUEUE, reportsFrom, reportsTotal }, doing as unknown as Doing);
+
+  it("offers nothing when all of them are in sight", () => {
+    expect(page.getElementById("reports")?.textContent).not.toContain("Se ven de");
+  });
+
+  it("offers the next ones when some did not fit, and says which are in sight", () => {
+    drawn(0, 450);
+    expect(page.getElementById("reports")?.textContent).toContain("Se ven de la 1 a la 2 de 450.");
+    pressing("reports", "Ver las siguientes");
+    expect(doing.reportsPage).toHaveBeenCalledWith(2);
+    expect(page.getElementById("reports")?.textContent).not.toContain("Volver al inicio");
+  });
+
+  it("offers the way back from further in, and nothing further at the end", () => {
+    drawn(448, 450);
+    pressing("reports", "Volver al inicio");
+    expect(doing.reportsPage).toHaveBeenCalledWith(0);
+    expect(page.getElementById("reports")?.textContent).not.toContain("Ver las siguientes");
+  });
+
+  it("goes back to the start when acting left the page empty", async () => {
+    const fetching = vi.fn(
+      async (path: string) =>
+        new Response(
+          JSON.stringify(
+            path === "/api/queue" ? { ...QUEUE, reportsTotal: 450 } : { ...QUEUE, reports: [], reportsFrom: 2 },
+          ),
+        ),
+    );
+    vi.resetModules();
+    vi.stubGlobal("document", page);
+    vi.stubGlobal("fetch", fetching);
+    await import("../src/admin/page/main");
+    await vi.waitFor(() => expect(page.getElementById("reports")?.textContent).toContain("Se ven de"));
+    pressing("reports", "Ver las siguientes");
+    await vi.waitFor(() => expect(fetching.mock.calls.at(-1)?.[0]).toBe("/api/queue"));
+    await vi.waitFor(() => expect(page.getElementById("reports")?.textContent).toContain("Se ven de la 1 a la 2"));
+  });
+
+  it("asks the server for that page, and stays on it after acting", async () => {
+    const fetching = vi.fn(async (_path: string) => new Response(JSON.stringify({ ...QUEUE, reportsTotal: 450 })));
+    vi.resetModules();
+    vi.stubGlobal("document", page);
+    vi.stubGlobal("confirm", () => true);
+    vi.stubGlobal("fetch", fetching);
+    await import("../src/admin/page/main");
+    await vi.waitFor(() => expect(page.getElementById("reports")?.textContent).toContain("Se ven de"));
+    pressing("reports", "Ver las siguientes");
+    await vi.waitFor(() => expect(fetching.mock.calls.at(-1)?.[0]).toBe("/api/queue?from=2"));
+    pressing("appeals", "Rechazar");
+    await vi.waitFor(() => expect(fetching.mock.calls.filter(([path]) => path === "/api/queue?from=2").length).toBe(2));
   });
 });
 
@@ -271,9 +344,9 @@ describe("the panel", () => {
   });
 
   it("says when some reports did not fit, and not otherwise", () => {
-    expect(page.getElementById("reports")?.textContent).not.toContain("Se ven las");
+    expect(page.getElementById("reports")?.textContent).not.toContain("Se ven de");
     drawQueue(page, { ...QUEUE, reportsTotal: 900 }, doing as unknown as Doing);
-    expect(page.getElementById("reports")?.textContent).toContain("Se ven las 2 más graves y recientes de 900.");
+    expect(page.getElementById("reports")?.textContent).toContain("Se ven de la 1 a la 2 de 900.");
   });
 
   it("warns that nobody checked the address, and offers to erase it", () => {
@@ -318,7 +391,11 @@ describe("the panel", () => {
   });
 
   it("says when there is nothing", () => {
-    drawQueue(page, { stage: "open", newKeys: 0, reportsTotal: 0, reports: [], docs: [] }, doing as unknown as Doing);
+    drawQueue(
+      page,
+      { stage: "open", newKeys: 0, reportsTotal: 0, reportsFrom: 0, reports: [], docs: [] },
+      doing as unknown as Doing,
+    );
     expect(page.getElementById("reports")?.textContent).toBe("Ninguna.");
     expect(page.getElementById("appeals")?.textContent).toBe("Ninguno.");
   });

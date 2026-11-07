@@ -74,15 +74,29 @@ const panicking = async (id: string, version: number, note: string): Promise<voi
   }
 };
 
+let reportsFrom = 0;
+
 const load = async (): Promise<void> => {
-  const response = await answered(() => fetch("/api/queue", { credentials: "same-origin", cache: "no-store" }));
+  const path = reportsFrom === 0 ? "/api/queue" : `/api/queue?from=${reportsFrom}`;
+  const response = await answered(() => fetch(path, { credentials: "same-origin", cache: "no-store" }));
   if (!response?.ok) {
     said.textContent = "No se pudo traer el panel. Recarga la página, quizá debas volver a entrar.";
     return;
   }
-  drawQueue(document, (await response.json()) as Queue, {
+  const queue = (await response.json()) as Queue;
+  if (queue.reports.length === 0 && reportsFrom > 0) {
+    reportsFrom = 0;
+    await load();
+    return;
+  }
+  drawQueue(document, queue, {
     accept: (id) => confirmed(`¿Aceptar y desbloquear ${id}?`, `${id}/accept`),
     reject: (id) => confirmed(`¿Rechazar el reclamo de ${id}? Sigue bloqueado.`, `${id}/reject`),
+    networkWasFalse: (id, net) =>
+      confirmed(
+        "¿Descartar todas las denuncias de esta red? Si es compartida, puede incluir denuncias reales, y sus documentos dejarán de retenerse.",
+        `${id}/reports/${net}/false_network`,
+      ),
     forgetContact: (id, net) =>
       confirmed(
         "¿Borrar el correo de esta denuncia? Sigue hasta 30 días en los respaldos cifrados.",
@@ -99,6 +113,10 @@ const load = async (): Promise<void> => {
       if (note?.trim()) void panicking(id, version, note);
     },
     verifyLink: (id, version) => void verifying(id, version),
+    reportsPage: (from) => {
+      reportsFrom = from;
+      void load();
+    },
     handedOver: (id) =>
       confirmed(
         "¿Ya entregaste el link de caso y la llave a la autoridad? Se borran las llaves selladas de este documento, aunque siguen hasta 30 días en los respaldos cifrados.",
