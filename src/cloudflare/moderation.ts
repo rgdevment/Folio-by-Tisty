@@ -84,7 +84,7 @@ export class CloudModeration {
       this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS n FROM net_day WHERE day = ?").bind(dayOf(now)),
       this.#db
         .prepare(
-          `SELECT r.doc, r.net, r.category, r.level, r.detail, r.sealed_link, r.version, r.at, r.asn,
+          `SELECT r.doc, r.net, r.category, r.level, r.detail, r.sealed_link, r.sealed_contact, r.version, r.at, r.asn,
              r.net IN (SELECT net FROM false_reporters) AS false_net
            ${REPORTS_TO_SEE}
            ORDER BY r.category = 'csam' DESC, r.level = 'grave' DESC, r.at DESC, r.doc LIMIT ?`,
@@ -114,13 +114,15 @@ export class CloudModeration {
       newKeys: (keys?.results?.[0] as { n: number } | undefined)?.n ?? 0,
       reportsTotal: (reportsTotal?.results?.[0] as { n: number } | undefined)?.n ?? 0,
       reports: (
-        (reports?.results ?? []) as (Omit<QueuedReport, "sealedLink" | "fromFalseNet"> & {
+        (reports?.results ?? []) as (Omit<QueuedReport, "sealedLink" | "sealedContact" | "fromFalseNet"> & {
           sealed_link: string | null;
+          sealed_contact: string | null;
           false_net: number;
         })[]
-      ).map(({ sealed_link: sealedLink, false_net: falseNet, ...report }) => ({
+      ).map(({ sealed_link: sealedLink, sealed_contact: sealedContact, false_net: falseNet, ...report }) => ({
         ...report,
         sealedLink,
+        sealedContact,
         fromFalseNet: falseNet === 1,
       })),
       docs: (
@@ -271,6 +273,13 @@ export class CloudModeration {
       actions: actions?.results ?? [],
       openings: openings?.results ?? [],
     };
+  }
+
+  async forgetContact(id: string, net: string, now: number): Promise<Acted> {
+    const forgetting = this.#db
+      .prepare("UPDATE reports SET sealed_contact = NULL WHERE doc = ? AND net = ? AND sealed_contact IS NOT NULL")
+      .bind(id, net);
+    return this.#actedAndLogged([forgetting], this.#logIfChanged(id, "forget_contact", now));
   }
 
   async reportWasFalse(id: string, net: string, now: number): Promise<Acted> {

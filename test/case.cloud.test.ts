@@ -175,6 +175,7 @@ describe("the panic button", () => {
         category: "csam",
         version: 1,
         sealedLink: "sealed1.secret-link",
+        sealedContact: "contact1.secret-mail",
         detail: "said",
       },
       TODAY,
@@ -186,6 +187,7 @@ describe("the panic button", () => {
     expect(written).not.toContain("secret-net");
     expect(written).not.toContain("4242");
     expect(written).not.toContain("secret-link");
+    expect(written).not.toContain("secret-mail");
     expect(records).toMatchObject({
       id: ID,
       owner: "o1",

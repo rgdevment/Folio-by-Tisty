@@ -86,6 +86,7 @@ const WEIGHT_OF = (level: string): string => `CASE ${level} WHEN 'grave' THEN 2 
 const REPORT_RISES = `${WEIGHT_OF("excluded.level")} > ${WEIGHT_OF("reports.level")}`;
 // Cleared stays cleared for what it was about, so the same networks cannot undo an accepted appeal; a newer version is news.
 const REPORT_REPLACES = `(CASE WHEN reports.cleared = 1 THEN reports.level = 'light' OR excluded.version > reports.version ELSE ${REPORT_RISES} END)`;
+const REPORT_MOVES = `(${REPORT_REPLACES} OR (reports.cleared = 0 AND reports.sealed_link IS NULL AND excluded.sealed_link IS NOT NULL))`;
 
 // What keeps a document past its days, not served and not deleted (decision 42). Reports leave once their days pass.
 const HELD_AS_EVIDENCE = (doc: string, today: string): string =>
@@ -652,22 +653,27 @@ export class Cloud implements Store {
     const [, moved] = await this.#db.batch([
       this.#db
         .prepare(
-          `INSERT INTO reports (doc, net, at, category, detail, sealed_link, asn, at_hour, level, version)
+          `INSERT INTO reports (doc, net, at, category, detail, sealed_link, asn, at_hour, level, version, sealed_contact)
            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9,
              CASE WHEN EXISTS (SELECT 1 FROM json_each(d.versions) v WHERE json_extract(v.value, '$.n') = ?10)
-               THEN ?10 ELSE d.latest END
+               THEN ?10 ELSE d.latest END,
+             ?11
            FROM docs d WHERE d.id = ?1
            ON CONFLICT (doc, net) DO UPDATE
-             SET at = excluded.at, at_hour = excluded.at_hour, asn = excluded.asn,
+             SET at = CASE WHEN ${REPORT_MOVES} THEN excluded.at ELSE reports.at END,
+                 at_hour = CASE WHEN ${REPORT_MOVES} THEN excluded.at_hour ELSE reports.at_hour END,
+                 asn = CASE WHEN ${REPORT_MOVES} THEN excluded.asn ELSE reports.asn END,
                  category = CASE WHEN ${REPORT_REPLACES} THEN excluded.category ELSE reports.category END,
                  level = CASE WHEN ${REPORT_REPLACES} THEN excluded.level ELSE reports.level END,
                  version = CASE WHEN ${REPORT_REPLACES} THEN excluded.version ELSE reports.version END,
                  detail = CASE WHEN reports.cleared = 1 THEN excluded.detail
-                   ELSE COALESCE(excluded.detail, reports.detail) END,
+                   WHEN ${REPORT_MOVES} THEN COALESCE(excluded.detail, reports.detail) ELSE reports.detail END,
                  sealed_link = CASE WHEN reports.cleared = 1 THEN excluded.sealed_link
                    ELSE COALESCE(reports.sealed_link, excluded.sealed_link) END,
+                 sealed_contact = CASE WHEN ${REPORT_REPLACES} THEN excluded.sealed_contact
+                   ELSE COALESCE(reports.sealed_contact, excluded.sealed_contact) END,
                  cleared = 0
-             WHERE ${REPORT_REPLACES} OR (reports.cleared = 0 AND reports.sealed_link IS NULL AND excluded.sealed_link IS NOT NULL)`,
+             WHERE ${REPORT_MOVES} OR (reports.cleared = 0 AND reports.sealed_contact IS NULL AND excluded.sealed_contact IS NOT NULL)`,
         )
         .bind(
           report.doc,
@@ -680,6 +686,7 @@ export class Cloud implements Store {
           hour,
           level,
           report.version ?? null,
+          report.sealedContact ?? null,
         ),
       level === "light" ? this.#warnAuthor(report.doc, today) : this.#blockWhenItCounts(report.doc, today, hour),
     ]);

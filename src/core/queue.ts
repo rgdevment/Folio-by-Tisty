@@ -5,6 +5,7 @@ export interface QueuedReport {
   level: string;
   detail: string | null;
   sealedLink: string | null;
+  sealedContact: string | null;
   version: number;
   at: number;
   asn: number;

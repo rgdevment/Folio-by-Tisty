@@ -74,6 +74,7 @@ export interface Report {
   asn: number;
   detail?: string;
   sealedLink?: string;
+  sealedContact?: string;
   version?: number;
 }
 
