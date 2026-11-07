@@ -1,0 +1,40 @@
+name: Published
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/limits.json
+      - docs/limits.json.minisig
+      - docs/limits.pub
+      - docs/TERMINOS.md
+      - docs/TERMS.md
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  # Tisty reads these from GitHub before sharing: a failure here means people cannot accept the terms.
+  published:
+    name: What Tisty reads holds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+
+      - run: node scripts/limits-published.ts
