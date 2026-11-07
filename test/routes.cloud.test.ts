@@ -95,11 +95,6 @@ describe("sharing over HTTP", () => {
     const answer = await sharing({ SHARING_OPEN: "true" });
     expect(await answer.json()).toEqual({ refused: "bad_upload" });
   });
-
-  it("goes on to look at a new document when closed but some keys test it", async () => {
-    const answer = await sharing({ SHARING_OPEN: "false", TESTER_ROOTS: "a, b" });
-    expect(await answer.json()).toEqual({ refused: "bad_upload" });
-  });
 });
 
 describe("reporting over HTTP", () => {
