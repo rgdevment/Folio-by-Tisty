@@ -1,5 +1,5 @@
 {
-  "serial": 12,
+  "serial": 13,
   "ttl_days": [
     1,
     3,
@@ -28,9 +28,9 @@
   "oldest_contract_taken": null,
   "oldest_contract_served": null,
   "terms": {
-    "version": "7",
-    "es": "ab87d5193eb500ca53361ec2179df5dc2adf315b3c332b467778cb46aa813516",
-    "en": "612f2c468436be8f72359abcfa9f8d40c8fd29d627857e8240ad3e925b49f06b"
+    "version": "8",
+    "es": "87d79c4b4a99d17de89264193c4f762696074c934ef910f418fc4ac3ef906dd7",
+    "en": "eecf290f0b721dc78f62029d7a2a2a2b7a01715bdc09b947a12acbc84fa472c4"
   },
   "sharing_open": true
 }
