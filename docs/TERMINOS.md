@@ -91,8 +91,8 @@ con lo que lees es tu responsabilidad.
   día no sube ninguna más. Cuenta la llave del dueño y la de quien firma la
   versión: si una es nueva, la versión también.
 - **Cuando Folio guarda 80 GB,** solo acepta versiones de llaves que no son
-  nuevas, salvo la versión con que el dueño corrige un documento bloqueado. Con
-  100 GB no acepta ninguna hasta que se libere espacio.
+  nuevas, salvo la del dueño que espera un documento cuyo reclamo se aceptó
+  solo. Con 100 GB no acepta ninguna hasta que se libere espacio.
 - **Puedes retirar hasta 64 llaves,** por ejemplo la de un equipo perdido. Folio
   guarda cada retiro para siempre, para que quien lea sepa que esa llave ya no
   habla por ti.
@@ -172,7 +172,8 @@ para denunciar: guarda un resumen de la red.
   y bloquear el acceso a quien abuse del servicio. Lo que él bloquea solo lo
   levanta él, ninguna versión nueva lo hace, y la copia queda hasta 180 días.
   También puede bloquear una llave: no sube nada más, ni documentos ni
-  versiones, y lo que ya compartió sigue hasta que caduque o él lo retire.
+  versiones, y nadie sube versiones de sus documentos, tampoco con un link de
+  editar. Lo que ya compartió sigue hasta que caduque o él lo retire.
 - **El operador puede denunciar** a la PDI o a la Fiscalía lo que, al revisarlo,
   parezca delito, y avisar de phishing y malware a Google Safe Browsing y a
   Cloudflare. Lo hace una persona, a mano.

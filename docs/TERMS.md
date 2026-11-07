@@ -90,8 +90,8 @@ but what you do with what you read is your responsibility.
   uploads more. Both the owner's key and the signer's count: if either is new,
   so is the version.
 - **Once Folio holds 80 GB,** it only takes versions from keys that are not new,
-  except the version with which an owner corrects a blocked document. At 100 GB
-  it takes none until space frees up.
+  except the owner's version that a document awaits after its appeal was
+  accepted on its own. At 100 GB it takes none until space frees up.
 - **You may take back up to 64 keys,** such as the one on a lost device. Folio
   keeps each one for good, so readers know that key no longer speaks for you.
 
@@ -170,8 +170,9 @@ you are to report: it keeps a digest of the network.
   access to whoever abuses the service. What the operator blocks only the
   operator lifts, no new version does, and the copy stays for up to 180 days.
   The operator may also block a key: it uploads nothing more, neither documents
-  nor versions, and what it already shared stays until it expires or the
-  operator removes it.
+  nor versions, and nobody uploads versions of its documents, not even with an
+  edit link. What it already shared stays until it expires or the operator
+  removes it.
 - **The operator may report** to the PDI or the prosecutor what, on review,
   looks like a crime, and tell Google Safe Browsing and Cloudflare about
   phishing and malware. One person does this, by hand.
