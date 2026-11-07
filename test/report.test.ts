@@ -54,6 +54,11 @@ describe("what a report may say", () => {
     expect(saidOf({ category: "spam", version: 4 }, LEVEL_ONE)).toEqual({ category: "spam", version: 4 });
   });
 
+  it.each(["threat", "doxxing", "intimate", "csam"])("refuses a grave report of %s without its link", (category) => {
+    expect(saidOf({ category }, LEVEL_ONE)).toBeNull();
+    expect(saidOf({ category, sealedLink: sealed }, LEVEL_ONE)).not.toBeNull();
+  });
+
   it("takes a category it knows, with what it may bring", () => {
     expect(saidOf({ category: "spam" }, LEVEL_ONE)).toEqual({ category: "spam" });
     expect(saidOf({ category: "threat", detail: "x", sealedLink: sealed }, LEVEL_ONE)).toEqual({

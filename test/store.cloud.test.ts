@@ -1,6 +1,7 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
 import { DAY_MS, LEVEL_ONE, type Limits, REPORT_CATEGORIES } from "../src/core/limits";
 import type { NewDoc, Reading } from "../src/core/store";
@@ -1092,7 +1093,10 @@ describe("reports", () => {
     expect((await report("b")).blocked).toBe(false);
   });
 
-  it("stops counting who reported something whose appeal was accepted, and asks others for three", async () => {
+  const foundFalse = (net: string, doc = "d1", day = DAY) =>
+    new CloudModeration(testEnv.DB).reportWasFalse(doc, net, day * DAY_MS);
+
+  it("does not let the same networks undo an accepted appeal, and asks others for three", async () => {
     await store.create(newDoc("d1"), DAY);
     for (const net of ["a", "b", "c"]) await report(net);
     await store.appealAccepted("d1", DAY);
@@ -1103,10 +1107,20 @@ describe("reports", () => {
     expect((await report("f")).blocked).toBe(true);
   });
 
-  it("carries that to other documents, and does not let them hold one past its days", async () => {
+  it("does not count against a network elsewhere that its report on an appealed document was cleared", async () => {
     await store.create(newDoc("d1"), DAY);
     for (const net of ["a", "b", "c"]) await report(net);
     await store.appealAccepted("d1", DAY);
+    await store.create(newDoc("d2", { owner: "o2" }), DAY);
+    expect((await report("a", "d2")).blocked).toBe(false);
+    expect((await report("b", "d2")).blocked).toBe(false);
+    expect((await report("c", "d2")).blocked).toBe(true);
+  });
+
+  it("carries a report found false to other documents, and does not let them hold one past its days", async () => {
+    await store.create(newDoc("d1"), DAY);
+    for (const net of ["a", "b", "c"]) await report(net);
+    for (const net of ["a", "b", "c"]) await foundFalse(net);
     await store.create(newDoc("d2", { owner: "o2" }), DAY);
     for (const net of ["a", "b", "c"]) expect((await report(net, "d2")).blocked).toBe(false);
     await store.sweep(DAY + 5);
@@ -1124,7 +1138,7 @@ describe("reports", () => {
   it("counts them again once the evidence days pass", async () => {
     await store.create(newDoc("d1"), DAY);
     for (const net of ["a", "b", "c"]) await report(net);
-    await store.appealAccepted("d1", DAY);
+    for (const net of ["a", "b", "c"]) await foundFalse(net);
     const flagged = () => testEnv.DB.prepare("SELECT COUNT(*) AS n FROM false_reporters").first<{ n: number }>();
     expect((await flagged())?.n).toBe(3);
     await store.sweep(DAY + LEVEL_ONE.evidenceDays);
@@ -1136,14 +1150,11 @@ describe("reports", () => {
   it("starts the days again when the same network reports falsely once more", async () => {
     await store.create(newDoc("d1"), DAY);
     for (const net of ["a", "b", "c"]) await report(net);
-    await store.appealAccepted("d1", DAY);
+    await foundFalse("a");
 
     await store.create(newDoc("d2"), DAY);
     await store.report({ doc: "d2", net: "a", category: "phishing", asn: 1 }, DAY + 100, (DAY + 100) * 24);
-    await testEnv.DB.prepare("UPDATE docs SET blocked_at = ? WHERE id = 'd2'")
-      .bind(DAY + 100)
-      .run();
-    await store.appealAccepted("d2", DAY + 100);
+    await foundFalse("a", "d2", DAY + 100);
 
     const again = await testEnv.DB.prepare("SELECT at FROM false_reporters WHERE net = 'a'").first<{ at: number }>();
     expect(again?.at).toBe(DAY + 100);

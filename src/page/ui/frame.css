@@ -952,6 +952,19 @@ body::before {
   margin-bottom: 12px;
 }
 
+.report-copyright {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: var(--track);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.report-copyright a {
+  color: inherit;
+}
+
 #report-consent p,
 .report-note {
   margin: 4px 0 12px;

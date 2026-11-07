@@ -337,14 +337,14 @@ describe("a block the operator placed", () => {
 });
 
 describe("what it can do", () => {
-  it("accepts an appeal: lifts the block, and those networks stop counting", async () => {
+  it("accepts an appeal: lifts the block, and punishes no network for reporting", async () => {
     await share();
     await reported();
     await store.appeal(ID, TODAY, HOUR);
     expect((await acting(`/api/docs/${ID}/accept`)).status).toBe(200);
     expect((await row())?.blocked_at).toBeNull();
     const counted = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM false_reporters").first<{ n: number }>();
-    expect(counted?.n).toBe(3);
+    expect(counted?.n).toBe(0);
     expect(await logged()).toEqual([{ action: "accept", note: null }]);
   });
 

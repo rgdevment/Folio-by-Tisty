@@ -75,7 +75,8 @@ const LIGHT_REPORT = `${COUNTED_REPORT} AND r.level = 'light'`;
 
 const WEIGHT_OF = (level: string): string => `CASE ${level} WHEN 'grave' THEN 2 WHEN 'medium' THEN 1 ELSE 0 END`;
 const REPORT_RISES = `${WEIGHT_OF("excluded.level")} > ${WEIGHT_OF("reports.level")}`;
-const REPORT_REPLACES = `(reports.cleared = 1 OR ${REPORT_RISES})`;
+// Only a light one, which a new version clears, can come again: the same networks must not undo an accepted appeal.
+const REPORT_REPLACES = `(CASE WHEN reports.cleared = 1 THEN reports.level = 'light' ELSE ${REPORT_RISES} END)`;
 
 // What keeps a document past its days, not served and not deleted (decision 42). Reports leave once their days pass.
 const HELD_AS_EVIDENCE = (doc: string, today: string): string =>

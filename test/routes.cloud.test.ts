@@ -126,6 +126,7 @@ describe("reporting over HTTP", () => {
       {},
       "text",
       { category: "copyright" },
+      { category: "threat" },
       { category: "phishing", detail: "x".repeat(LEVEL_ONE.reportDetailAtMost + 1) },
       { category: "phishing", sealedLink: "x".repeat(LEVEL_ONE.sealedLinkAtMost + 1) },
       { category: "phishing", detail: 7 },

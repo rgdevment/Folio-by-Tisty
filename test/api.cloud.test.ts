@@ -556,7 +556,7 @@ const SCENARIOS: Scenario[] = [
     path: REPORT_PATH,
     status: 500,
     refused: "failed",
-    body: JSON.stringify({ category: "csam" }),
+    body: JSON.stringify({ category: "csam", sealedLink: `sealed1.${"A".repeat(150)}` }),
     solves: true,
     ready: async () => {
       await share();

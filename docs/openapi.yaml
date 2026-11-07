@@ -482,9 +482,8 @@ paths:
         can raise its report to a higher level or add the link, and nothing else changes it. It answers
         the same whether or not the document exists. Spam and offensive content are light: three networks of two
         operators warn the author, who has three days to send a new version. Phishing, malware and scams block with three
-        networks of two operators. So do the grave ones, but only with `sealedLink`: without it they stay on
-        record and block nothing, since nobody could review them. Copyright is not reported here: its holder
-        asks, and it comes down. If telling the operator fails the answer is `failed`, the report stays, and
+        networks of two operators, and so do the grave ones, which must bring `sealedLink`: nobody could review
+        them without it. Copyright is not reported here: its holder asks, and it comes down. If telling the operator fails the answer is `failed`, the report stays, and
         sending it again tells again.
       parameters:
         - $ref: "#/components/parameters/Proof"
