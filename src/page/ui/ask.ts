@@ -1,7 +1,7 @@
 import type { Revocation } from "@tisty/contracts";
 import type { Arrived } from "../read";
 
-export const TOO_MANY_VISITS = "Hay demasiadas visitas desde tu red. Vuelve a intentarlo en un momento.";
+const TOO_MANY_VISITS = "Hay demasiadas visitas desde tu red. Vuelve a intentarlo en un momento.";
 
 export const NOT_ARRIVED: Record<string, string> = {
   paused: "Quien compartió este documento lo pausó.",

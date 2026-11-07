@@ -17,6 +17,7 @@ const BURST_USD = 3;
 const WARN_USD = 10;
 const UPLOADS_CUT_AT = 0.75;
 const STORED_GB_AT_MOST = 100;
+const STORED_GB_FOR_NEW_KEYS = 80;
 // An estimate: CPU is a small part of the bill, and this is what a read was measured to take.
 const CPU_MS_PER_REQUEST = 2;
 
@@ -63,6 +64,7 @@ export const stageOf = (usage: Usage, cycle: Cycle): Stage => {
   const line = lineOf(cycle);
   if (bill >= line) return "blocked";
   if (bill >= line * UPLOADS_CUT_AT || usage.storedGb >= STORED_GB_AT_MOST) return "no_uploads";
+  if (usage.storedGb >= STORED_GB_FOR_NEW_KEYS) return "new_keys_off";
   return bill >= WARN_USD ? "warned" : "open";
 };
 

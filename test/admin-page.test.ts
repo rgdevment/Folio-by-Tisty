@@ -294,6 +294,11 @@ describe("the panel", () => {
     expect(page.getElementById("state")?.textContent).toBe("Servicio con aviso de gasto. Llaves nuevas hoy: 7.");
   });
 
+  it("says when only old keys can upload", () => {
+    drawQueue(page, { ...QUEUE, stage: "new_keys_off" }, doing as unknown as Doing);
+    expect(page.getElementById("state")?.textContent).toContain("subidas solo de llaves antiguas");
+  });
+
   it("writes what a report brought as words, never as HTML", () => {
     const reports = page.getElementById("reports") as Element;
     expect(reports.textContent).toContain(HARM);

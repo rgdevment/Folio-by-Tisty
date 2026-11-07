@@ -26,6 +26,5 @@ export const takeRevocations = async (
     return { refused: "quota", until: hourEnds(now) };
   }
   if (!(await store.haveSigned(revocations.map((one) => one.root)))) return { refused: "bad_revocation" };
-  await store.revoke(revocations);
-  return { done: true };
+  return (await store.revoke(revocations)) ? { done: true } : { refused: "machines_full" };
 };

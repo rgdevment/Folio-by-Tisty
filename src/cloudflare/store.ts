@@ -95,6 +95,12 @@ const REPORT_MOVES = `(${REPORT_REPLACES} OR (reports.cleared = 0 AND reports.se
 const HELD_AS_EVIDENCE = (doc: string, today: string): string =>
   `(COALESCE(${doc}.legal_until, 0) >= ${today} OR EXISTS (SELECT 1 FROM reports r WHERE r.doc = ${doc}.id AND ${REPORT_AS_EVIDENCE}))`;
 
+// A language lives by its anchor, so its own days only say it left when it never got a version, or was stopped.
+const LANGUAGES_OF = (owner: string, anchor: string, today: string): string =>
+  `SELECT COUNT(*) FROM docs l WHERE l.owner = ${owner} AND l.anchor = ${anchor}
+     AND (l.latest > 0 OR (l.latest = 0 AND l.dies_on >= ${today}))
+     AND l.blocked_at IS NULL AND (l.paused_at IS NULL OR l.dies_on >= ${today})`;
+
 const LIVES_ON = "CASE WHEN paused_at IS NULL THEN MAX(dies_on, ?1 + ttl_days) ELSE dies_on END";
 
 // What can block now: an appeal that cleared its owner leaves earlier versions on record and out of the count.
@@ -139,13 +145,14 @@ export class Cloud implements Store {
     const held = await this.#row(doc.id);
     if (held) return this.#retried(held, doc);
     if (!(await this.#takeQuota(doc.net, 1, 0, today))) return "quota";
+    const otherLanguages = this.#limits.languagesAtMost - 1;
     const inserted = await this.#db
       .prepare(
         `INSERT OR IGNORE INTO docs (id, owner, anchor, permit, admin_hash, ttl_days, dies_on, active_day, owner_mark)
          SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?10
          WHERE (?3 IS NOT NULL AND EXISTS (
            SELECT 1 FROM docs a WHERE a.id = ?3 AND a.owner = ?2 AND a.anchor IS NULL AND a.latest >= 0
-         )) OR (?3 IS NULL AND (
+         ) AND (${LANGUAGES_OF("?2", "?3", "?8")}) < ?11) OR (?3 IS NULL AND (
            SELECT COUNT(*) FROM docs d
            WHERE d.owner = ?2 AND d.anchor IS NULL AND d.latest >= 0 AND d.blocked_at IS NULL
              AND NOT EXISTS (SELECT 1 FROM holds h WHERE h.held = d.id)
@@ -163,13 +170,19 @@ export class Cloud implements Store {
         today,
         this.#limits.sharesAtMost,
         doc.ownerMark ?? "",
+        otherLanguages,
       )
       .run();
     if (inserted.meta.changes > 0) return "created";
     await this.#giveQuotaBack(doc.net, 1, 0, today);
     const raced = await this.#row(doc.id);
     if (raced) return this.#retried(raced, doc);
-    return doc.anchor !== undefined ? "no_anchor" : "shares_full";
+    if (doc.anchor === undefined) return "shares_full";
+    const languages = await this.#db
+      .prepare(`SELECT (${LANGUAGES_OF("?1", "?2", "?3")}) AS n`)
+      .bind(doc.owner, doc.anchor, today)
+      .first<{ n: number }>();
+    return (languages?.n ?? 0) >= otherLanguages ? "languages_full" : "no_anchor";
   }
 
   // A lost answer comes back as the same document, and only that is not somebody else's id.
@@ -301,18 +314,30 @@ export class Cloud implements Store {
   }
 
   // The earliest one found counts, so a later note cannot move a theft forward (contract, revocation).
-  async revoke(revocations: Revocation[]): Promise<void> {
-    await this.#db.batch(
-      revocations.map(({ root, machine, at, signed }) =>
-        this.#db
-          .prepare(
-            `INSERT INTO revocations (root, machine, at, signed) VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT (root, machine) DO UPDATE SET at = excluded.at, signed = excluded.signed
-             WHERE excluded.at < revocations.at`,
-          )
-          .bind(root, machine, Date.parse(at) / 1000, signed),
-      ),
+  async revoke(revocations: Revocation[]): Promise<boolean> {
+    const taking = revocations.map(({ root, machine, at, signed }) =>
+      this.#db
+        .prepare(
+          `INSERT INTO revocations (root, machine, at, signed)
+           SELECT ?1, ?2, ?3, ?4
+           WHERE EXISTS (SELECT 1 FROM revocations WHERE root = ?1 AND machine = ?2)
+             OR (SELECT COUNT(*) FROM revocations WHERE root = ?1) < ?5
+           ON CONFLICT (root, machine) DO UPDATE SET at = excluded.at, signed = excluded.signed
+           WHERE excluded.at < revocations.at`,
+        )
+        .bind(root, machine, Date.parse(at) / 1000, signed, this.#limits.revokedMachinesAtMost),
     );
+    const asked = JSON.stringify(revocations.map(({ root, machine }) => [root, machine]));
+    const counting = this.#db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM json_each(?1) j WHERE EXISTS (
+           SELECT 1 FROM revocations r
+           WHERE r.root = json_extract(j.value, '$[0]') AND r.machine = json_extract(j.value, '$[1]')
+         )`,
+      )
+      .bind(asked);
+    const results = await this.#db.batch<{ n: number }>([...taking, counting]);
+    return results.at(-1)?.results[0]?.n === revocations.length;
   }
 
   async isRevoked(root: string, machine: string, now: number): Promise<boolean> {
@@ -381,6 +406,18 @@ export class Cloud implements Store {
       .bind(today, net, docs, bytes, this.#limits.netDocsADay, this.#limits.netBytesADay)
       .run();
     return taken.meta.changes > 0;
+  }
+
+  async allKeysSignedBy(roots: string[], day: number): Promise<boolean> {
+    const asked = [...new Set(roots)];
+    const found = await this.#db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM json_each(?1) j
+         WHERE EXISTS (SELECT 1 FROM keys k WHERE k.root = j.value AND k.first_day <= ?2)`,
+      )
+      .bind(JSON.stringify(asked), day)
+      .first<{ n: number }>();
+    return found?.n === asked.length;
   }
 
   async admitKey(root: string, net: string, today: number): Promise<KeyAdmitted> {

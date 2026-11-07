@@ -96,6 +96,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BadRevocation" }
+        "409":
+          description: A root already took back as many machines as it may, so a new one was not kept. What fit in the same request was, so sending it again is safe, and a machine it already took back can still move its date earlier.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MachinesFull" }
         "413":
           description: Past what a request may weigh.
           content:
@@ -237,7 +242,7 @@ paths:
                   - $ref: "#/components/schemas/Revoked"
         "404": { $ref: "#/components/responses/Missing" }
         "409":
-          description: Another version arrived first, or this person keeps as many documents as they may.
+          description: Another version arrived first, or this person keeps as many documents, or as many languages of this one, as they may.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Behind" }
@@ -278,8 +283,9 @@ paths:
         "500": { $ref: "#/components/responses/Failed" }
         "503":
           description: |
-            Uploads are off for now, by the spending cut, or this is a new document and the service has not opened
-            yet. What is already shared takes new versions while it has not. Reading goes on.
+            Uploads are off for now, by the spending cut, or the storage is near its ceiling and the owner's or the
+            signer's key is too new, or this is a new document and the service has not opened yet. What is already
+            shared takes new versions while it has not. Reading goes on.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UploadsOff" }
@@ -362,7 +368,7 @@ paths:
                   - $ref: "#/components/schemas/Quota"
         "500": { $ref: "#/components/responses/Failed" }
         "503":
-          description: Uploads are off for now, by the spending cut. Reading goes on.
+          description: Uploads are off for now, by the spending cut, or the storage is near its ceiling and the owner's or the signer's key is too new. Reading goes on.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UploadsOff" }
@@ -578,7 +584,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/TooBig" }
         "429":
-          description: A proof of work is asked for, or the network used up its reports of the hour.
+          description: A proof of work is asked for, the network used up its reports of the hour, or it asked too fast.
           headers:
             Retry-After: { $ref: "#/components/headers/RetryAfter" }
           content:
@@ -587,6 +593,7 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/Proof"
                   - $ref: "#/components/schemas/Quota"
+                  - $ref: "#/components/schemas/Slow"
         "500": { $ref: "#/components/responses/Failed" }
   /docs/{id}/admin:
     parameters:
@@ -790,7 +797,12 @@ components:
       type: object
       required: [refused]
       properties:
-        refused: { enum: [behind, shares_full] }
+        refused: { enum: [behind, shares_full, languages_full] }
+    MachinesFull:
+      type: object
+      required: [refused]
+      properties:
+        refused: { const: machines_full }
     BadEnvelope:
       type: object
       required: [refused, why]
