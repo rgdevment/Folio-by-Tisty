@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 5, vigente desde el 6 de noviembre de 2026.**
+**Versión 6, vigente desde el 6 de noviembre de 2026.**
 
 ## En corto
 
@@ -129,9 +129,11 @@ para denunciar: guarda un resumen de la red.
 - **Una sola denuncia de engaño o grave conserva el documento:** si caduca o
   dejas de compartirlo, no se sirve, pero su copia queda hasta 180 días desde la
   denuncia, por si una autoridad la pide. Una orden puede pedir más.
-- **Una denuncia falsa no cuenta.** Si el link que trae no abre el documento, o
-  el operador comprueba que era falsa, la descarta, y las denuncias de esa red
-  dejan de contar en todos los documentos hasta 180 días.
+- **Una denuncia falsa se descarta.** Si el link que trae no abre el documento,
+  o el operador comprueba que era falsa, la descarta, y las denuncias de esa red
+  dejan de contar en todos los documentos hasta 180 días. Hasta entonces cuenta
+  como cualquier otra. Si se acepta un reclamo, las denuncias sobre esa versión
+  dejan de contar, pero una versión nueva se puede denunciar.
 - **Puedes reclamar una vez por documento** en tu link de administrar. Si todas
   las versiones denunciadas las firmó alguien a quien dejaste editar, y no hay
   una denuncia de abuso infantil, el reclamo se acepta solo: el link de editar
@@ -151,11 +153,11 @@ para denunciar: guarda un resumen de la red.
   Anota cada apertura. En un navegador, el código que descifra viene del mismo
   servidor; la [política de privacidad](PRIVACIDAD.md) dice de qué no protege
   eso.
-- **Una denuncia de abuso infantil la revisa una persona.** Si es falsa, la
-  descarta. Si no, la denuncia a mano a la PDI o a la Fiscalía y les entrega el
-  link y la copia cifrada, sin abrir su contenido salvo orden de un juez. Quien
-  denuncia no debe descargar, copiar, reenviar ni mandar por correo ese
-  material.
+- **Una denuncia de abuso infantil la revisa una persona,** sin ver imágenes,
+  videos ni otros archivos: lee solo el texto, con las imágenes apagadas. Si es
+  falsa, la descarta. Si no, o si no se puede saber sin verlos, la denuncia a mano
+  a la PDI o a la Fiscalía y les entrega el link y la copia cifrada. Quien denuncia
+  no debe descargar, copiar, reenviar ni mandar por correo ese material.
 - **Los derechos de autor los reclama su titular** en <abuso@tisty.app>. Un
   retiro obligatorio requiere orden judicial, como dice la Ley 17.336, y el
   operador también puede atender un aviso DMCA. El operador puede dejar de

@@ -70,6 +70,20 @@ describe("the report form", () => {
     expect(bodySent(0).sealedLink).toMatch(/^sealed1\./);
   });
 
+  it("keeps the link box hidden until a category says what it means", () => {
+    expect(element("report-consent").hidden).toBe(true);
+    choose("phishing");
+    expect(element("report-consent").hidden).toBe(false);
+    expect(element("report-consent-said").textContent).toContain("Lo cifras aquí");
+  });
+
+  it("sends the link on a grave report whatever the box says, as after a browser restores the form", async () => {
+    (place.document.querySelector('input[value="threat"]') as HTMLInputElement).checked = true;
+    expect(element<HTMLInputElement>("report-hand-over").checked).toBe(false);
+    await submitted();
+    expect(bodySent(0).sealedLink).toMatch(/^sealed1\./);
+  });
+
   it("gives the choice back when the reader moves off a grave report", () => {
     choose("threat");
     choose("phishing");
@@ -80,7 +94,7 @@ describe("the report form", () => {
 
   it("says what happens to the link, which nobody opens on child abuse", () => {
     choose("csam");
-    expect(element("report-consent-said").textContent).toContain("sin abrir su contenido");
+    expect(element("report-consent-said").textContent).toContain("sin ver imágenes");
     choose("threat");
     expect(element("report-consent-said").textContent).toContain("siempre entrega el link");
   });

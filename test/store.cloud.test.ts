@@ -1107,6 +1107,39 @@ describe("reports", () => {
     expect((await report("f")).blocked).toBe(true);
   });
 
+  describe("after an accepted appeal", () => {
+    const lifted = async () => {
+      await store.create(newDoc("d1"), DAY);
+      for (const net of ["a", "b", "c"]) await report(net);
+      await store.appealAccepted("d1", DAY);
+    };
+    const reportingAgain = (net: string, category: string, sealedLink?: string) =>
+      store.report({ doc: "d1", net, category, asn: 1, ...(sealedLink ? { sealedLink } : {}) }, DAY, DAY * 24);
+    const counted = async () =>
+      (await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE cleared = 0").first<{ n: number }>())?.n;
+
+    it("does not revive a report for bringing its link now", async () => {
+      await lifted();
+      for (const net of ["a", "b", "c"]) await reportingAgain(net, "phishing", "sealed1.link");
+      expect(await counted()).toBe(0);
+      expect((await row("d1"))?.blocked_at).toBeNull();
+    });
+
+    it("does not revive a report for saying it is worse about the same version", async () => {
+      await lifted();
+      for (const net of ["a", "b", "c"]) await reportingAgain(net, "csam", "sealed1.link");
+      expect(await counted()).toBe(0);
+    });
+
+    it("hears the same networks about a newer version, child abuse included", async () => {
+      await lifted();
+      await testEnv.DB.prepare("UPDATE docs SET latest = latest + 1 WHERE id = 'd1'").run();
+      await reportingAgain("a", "csam", "sealed1.link");
+      const heard = await testEnv.DB.prepare("SELECT category, cleared FROM reports WHERE net = 'a'").first();
+      expect(heard).toEqual({ category: "csam", cleared: 0 });
+    });
+  });
+
   it("does not count against a network elsewhere that its report on an appealed document was cleared", async () => {
     await store.create(newDoc("d1"), DAY);
     for (const net of ["a", "b", "c"]) await report(net);

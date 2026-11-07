@@ -69,14 +69,14 @@ const KEYS_AT_ONCE = 1000;
 // A report that weighs: not cleared by an appeal, and not from who reported falsely before (decision 41).
 const COUNTED_REPORT = "r.cleared = 0 AND r.net NOT IN (SELECT net FROM false_reporters)";
 const REPORT_AS_EVIDENCE = `${COUNTED_REPORT} AND r.level <> 'light'`;
-// Without the link nobody could review a grave one, so it stays on record and blocks nothing (decision 153).
+// The API now refuses a grave report without its link: this is for what was reported before it did (decision 153).
 const REPORT_THAT_BLOCKS = `${COUNTED_REPORT} AND (r.level = 'medium' OR (r.level = 'grave' AND r.sealed_link IS NOT NULL))`;
 const LIGHT_REPORT = `${COUNTED_REPORT} AND r.level = 'light'`;
 
 const WEIGHT_OF = (level: string): string => `CASE ${level} WHEN 'grave' THEN 2 WHEN 'medium' THEN 1 ELSE 0 END`;
 const REPORT_RISES = `${WEIGHT_OF("excluded.level")} > ${WEIGHT_OF("reports.level")}`;
-// Only a light one, which a new version clears, can come again: the same networks must not undo an accepted appeal.
-const REPORT_REPLACES = `(CASE WHEN reports.cleared = 1 THEN reports.level = 'light' ELSE ${REPORT_RISES} END)`;
+// Cleared stays cleared for what it was about, so the same networks cannot undo an accepted appeal; a newer version is news.
+const REPORT_REPLACES = `(CASE WHEN reports.cleared = 1 THEN reports.level = 'light' OR excluded.version > reports.version ELSE ${REPORT_RISES} END)`;
 
 // What keeps a document past its days, not served and not deleted (decision 42). Reports leave once their days pass.
 const HELD_AS_EVIDENCE = (doc: string, today: string): string =>
@@ -598,7 +598,7 @@ export class Cloud implements Store {
                  sealed_link = CASE WHEN reports.cleared = 1 THEN excluded.sealed_link
                    ELSE COALESCE(reports.sealed_link, excluded.sealed_link) END,
                  cleared = 0
-             WHERE ${REPORT_REPLACES} OR (reports.sealed_link IS NULL AND excluded.sealed_link IS NOT NULL)`,
+             WHERE ${REPORT_REPLACES} OR (reports.cleared = 0 AND reports.sealed_link IS NULL AND excluded.sealed_link IS NOT NULL)`,
         )
         .bind(
           report.doc,

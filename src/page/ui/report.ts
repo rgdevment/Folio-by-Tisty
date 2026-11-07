@@ -25,7 +25,7 @@ const COULD_NOT_SEND = "No se pudo enviar la denuncia. Vuelve a intentarlo en un
 const SEALED = "Lo cifras aquí, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar.";
 const ALWAYS_ON_GRAVE = `Una denuncia grave siempre entrega el link, porque sin él nadie podría revisarla. ${SEALED}`;
 const NEVER_OPENED =
-  "Esta denuncia siempre entrega el link, y nunca incluye lo que permite editar. Una persona la revisa y, si no es falsa, la denuncia a la PDI o a la Fiscalía, sin abrir su contenido salvo orden de un juez. No descargues, copies, reenvíes ni mandes por correo ese material.";
+  "Esta denuncia siempre entrega el link, y nunca incluye lo que permite editar. Una persona la revisa sin ver imágenes, videos ni otros archivos y, si no es falsa, la denuncia a la PDI o a la Fiscalía. No descargues, copies, reenvíes ni mandes por correo ese material.";
 const LINK_IN_DETAIL = "Quita el link de tu mensaje. Si quieres entregarlo, marca la casilla: así viaja cifrado.";
 
 const post = ({ id, body }: Sending, proof?: string): Promise<Response> =>
@@ -65,7 +65,8 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
   const bodyOf = async (): Promise<string> => {
     const category = categoryOf();
     const detail = detailOf();
-    const withLink = handOver.checked && levelOfReport(category) !== "light" && linkKey !== "";
+    const level = levelOfReport(category);
+    const withLink = (level === "grave" || (handOver.checked && level !== "light")) && linkKey !== "";
     return JSON.stringify({
       category,
       ...(detail === "" ? {} : { detail }),
