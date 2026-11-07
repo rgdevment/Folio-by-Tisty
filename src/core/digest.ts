@@ -20,7 +20,7 @@ const dateOf = (day: number): string => new Date(day * DAY_MS).toISOString().sli
 
 const textOf = (stage: Stage, was: Stage, news: News, keysSaid: number, panel?: string) =>
   [
-    ...(stage === was ? [] : [`Gasto: ${stage} (antes: ${was})`, ""]),
+    ...(stage === was ? [] : [`Servicio: ${stage} (antes: ${was})`, ""]),
     ...(keysSaid > 0 ? [`Llaves nuevas el ${dateOf(news.newKeysDay)}: ${keysSaid}`, ""] : []),
     ...listOf(
       `Denuncias nuevas (${news.reportsTotal}):`,

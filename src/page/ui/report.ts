@@ -1,6 +1,5 @@
 import { LEVEL_ONE, levelOfReport } from "../../core/limits";
 import { holdsALink } from "../../core/sealed-link";
-import { TOO_MANY_VISITS } from "./ask";
 import { element } from "./frame";
 import { sealContact, sealLink } from "./seal";
 import { solved } from "./solve";
@@ -19,7 +18,7 @@ interface Sending {
 
 const REFUSALS: Record<string, string> = {
   quota: "Tu red ya envió muchas denuncias en esta hora. Vuelve a intentarlo más tarde.",
-  slow: TOO_MANY_VISITS,
+  slow: "Tu red envió muchas denuncias en poco tiempo. Vuelve a intentarlo en un momento.",
 };
 const COULD_NOT_SEND = "No se pudo enviar la denuncia. Vuelve a intentarlo en un momento.";
 const SEALED = "Lo cifras aquí, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar.";

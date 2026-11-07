@@ -228,6 +228,14 @@ describe("the report form", () => {
     expect(element("report-said").textContent).toContain("Recibimos");
   });
 
+  it("says it is about reports when its network is going too fast, not about visits", async () => {
+    asked.mockResolvedValueOnce(answer(429, { refused: "slow", until: 1 }));
+    choose("spam");
+    await submitted();
+    expect(element("report-said").textContent).toContain("en poco tiempo");
+    expect(element("report-said").textContent).not.toContain("visitas");
+  });
+
   it("says why it could not, and lets the reader try again", async () => {
     asked.mockResolvedValueOnce(answer(429, { refused: "proof", salt: "s", bits: 4 }));
     asked.mockResolvedValueOnce(answer(429, { refused: "quota", until: 1 }));

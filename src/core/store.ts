@@ -129,10 +129,18 @@ export interface Owned {
   status: DocStatus;
 }
 
-export type Created = "created" | "same" | "taken" | "shares_full" | "no_anchor" | "quota" | "bad_ttl";
+export type Created =
+  | "created"
+  | "same"
+  | "taken"
+  | "shares_full"
+  | "languages_full"
+  | "no_anchor"
+  | "quota"
+  | "bad_ttl";
 export type Uploaded = "stored" | "same" | "behind" | "missing" | "blocked" | "paused" | "quota" | "list_full";
 export type Admitted = "here" | "new" | "over" | "full";
-export type Stage = "open" | "warned" | "no_uploads" | "blocked";
+export type Stage = "open" | "warned" | "new_keys_off" | "no_uploads" | "blocked";
 
 export interface Swept {
   summed: number;
@@ -157,9 +165,10 @@ export interface Store {
   upload(upload: Upload, today: number, held?: Held): Promise<Uploaded>;
   held(id: string): Promise<Held | null>;
   setPermit(id: string, permit: string | null): Promise<void>;
-  revoke(revocations: Revocation[]): Promise<void>;
+  revoke(revocations: Revocation[]): Promise<boolean>;
   isRevoked(root: string, machine: string, now: number): Promise<boolean>;
   haveSigned(roots: string[]): Promise<boolean>;
+  allKeysSignedBy(roots: string[], day: number): Promise<boolean>;
   admit(reading: Reading, today: number): Promise<Admitted>;
   note(reading: Reading, today: number): Promise<void>;
   shown(id: string, today: number): Promise<Shown | null>;

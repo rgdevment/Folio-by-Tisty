@@ -12,6 +12,7 @@ interface Env extends Bindings, SpendBindings, MailBindings {
   FOLIO_SECRET: string;
   READS: RateLimit;
   SYNCS: RateLimit;
+  REPORTS: RateLimit;
   BILLING_DAY: string;
   HEARTBEAT_URL?: string;
   SPEND_HEARTBEAT_URL?: string;
@@ -54,6 +55,7 @@ export default {
         termsVersion: SIGNED_LIMITS.terms.version,
         limiter: { allows: async (key) => (await env.READS.limit({ key })).success },
         syncLimiter: { allows: async (key) => (await env.SYNCS.limit({ key })).success },
+        reportLimiter: { allows: async (key) => (await env.REPORTS.limit({ key })).success },
         dayKey: (today) => dayKeys.of(today, (day) => store.dayKey(day)),
         evidenceKey: (today) => evidenceKeys.of(today, (day) => store.evidenceKey(day)),
       },
