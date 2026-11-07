@@ -766,6 +766,111 @@ describe("the paper", () => {
     place.document.getElementById("sheets")?.click();
     expect(column?.style.getPropertyValue("--page-width")).toBe("794px");
   });
+
+  describe("and its buttons", () => {
+    const A4 = "@page { size: 210mm 297mm; }";
+    const LETTER = "@page { size: 215.9mm 279.4mm; }";
+    const FOLIO = "@page { size: 215.9mm 330.2mm; }";
+    let sizes: string[];
+
+    const leaf = (paper: string) => place.document.querySelector(`[data-paper="${paper}"]`) as HTMLButtonElement;
+    const toggle = () => place.document.getElementById("sheets") as HTMLButtonElement;
+    const landscape = () => place.document.getElementById("landscape") as HTMLButtonElement;
+    const pressedPapers = () =>
+      [...place.document.querySelectorAll<HTMLElement>('[data-paper][aria-pressed="true"]')].map(
+        (one) => one.dataset.paper,
+      );
+    const printsOn = () => sizes.at(-1);
+
+    beforeEach(() => {
+      sizes = [];
+      vi.stubGlobal(
+        "CSSStyleSheet",
+        class {
+          replaceSync(said: string) {
+            sizes.push(said);
+          }
+        },
+      );
+      (place.document as unknown as { adoptedStyleSheets: unknown[] }).adoptedStyleSheets = [];
+    });
+
+    it("come after the toggle they depend on", () => {
+      draw(HELD);
+      expect(place.document.getElementById("panel-paper")?.firstElementChild).toBe(toggle());
+    });
+
+    it("cannot be reached or pressed out of sheets, and printing keeps the document's paper", () => {
+      draw(HELD);
+      const letter = leaf("letter");
+      expect(letter.matches(":disabled")).toBe(true);
+      letter.focus();
+      expect(place.document.activeElement).not.toBe(letter);
+      letter.click();
+      expect(pressedPapers()).toEqual(["a4"]);
+      expect(printsOn()).toBe(A4);
+    });
+
+    it("can be chosen once the toggle is pressed, and printing follows them", () => {
+      draw(HELD);
+      toggle().click();
+      const letter = leaf("letter");
+      expect(letter.matches(":disabled")).toBe(false);
+      letter.focus();
+      expect(place.document.activeElement).toBe(letter);
+      letter.click();
+      expect(pressedPapers()).toEqual(["letter"]);
+      expect(printsOn()).toBe(LETTER);
+    });
+
+    it("go back to the document's paper when the toggle is released, and keep the choice for its return", () => {
+      draw(HELD);
+      toggle().click();
+      leaf("letter").click();
+      toggle().click();
+      expect(leaf("letter").matches(":disabled")).toBe(true);
+      expect(pressedPapers()).toEqual(["a4"]);
+      expect(printsOn()).toBe(A4);
+      toggle().click();
+      expect(pressedPapers()).toEqual(["letter"]);
+      expect(printsOn()).toBe(LETTER);
+    });
+
+    it("print and show the paper a document asked for, while they stay disabled", () => {
+      draw({ ...HELD, sheet: { paper: "folio" } });
+      expect(leaf("folio").matches(":disabled")).toBe(true);
+      expect(pressedPapers()).toEqual(["folio"]);
+      expect(printsOn()).toBe(FOLIO);
+    });
+
+    it("keep the tabloid a document asked for, which they do not offer", () => {
+      draw({ ...HELD, sheet: { paper: "tabloid" } });
+      expect(leaf("tabloid").hidden).toBe(false);
+      expect(pressedPapers()).toEqual(["tabloid"]);
+      expect(printsOn()).toBe("@page { size: 279.4mm 431.8mm; }");
+    });
+
+    it("are ready from the start in a document that opens in sheets", () => {
+      draw({ ...HELD, sheet: { on: true, paper: "letter" } });
+      expect(leaf("a4").matches(":disabled")).toBe(false);
+      expect(pressedPapers()).toEqual(["letter"]);
+    });
+
+    it("leave no hidden turn of the page behind when the toggle is released", () => {
+      draw(HELD);
+      toggle().click();
+      landscape().click();
+      expect(printsOn()).toBe("@page { size: 297mm 210mm; }");
+      toggle().click();
+      expect(landscape().hidden).toBe(true);
+      expect(printsOn()).toBe(A4);
+    });
+
+    it("keep a document's own turn of the page out of sheets", () => {
+      draw({ ...HELD, sheet: { orientation: "landscape" } });
+      expect(printsOn()).toBe("@page { size: 297mm 210mm; }");
+    });
+  });
 });
 
 describe("following the reading", () => {

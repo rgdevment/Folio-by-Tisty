@@ -70,22 +70,29 @@ const paperOf = (held: Document): Paper => {
 const pressed = (button: HTMLElement, on: boolean): void => button.setAttribute("aria-pressed", String(on));
 
 const drawPaperPanel = (host: HTMLElement, held: Document): void => {
-  const leaves = [...element("leaves").querySelectorAll<HTMLButtonElement>("button")];
+  const papers = element<HTMLFieldSetElement>("leaves");
+  const leaves = [...papers.querySelectorAll<HTMLButtonElement>("button")];
   const sheets = element("sheets");
   const landscape = element("landscape");
-  let paper = paperOf(held);
+  const ownPaper = paperOf(held);
+  const ownAcross = held.sheet?.orientation === "landscape";
+  let paper = ownPaper;
   let inSheets = held.sheet?.on === true;
-  let across = held.sheet?.orientation === "landscape";
+  let across = ownAcross;
   const apply = (): void => {
+    // Out of sheets these controls cannot be pressed, so printing must not follow a choice the reader can no longer see or undo.
+    const paperNow = inSheets ? paper : ownPaper;
+    const acrossNow = inSheets ? across : ownAcross;
+    papers.disabled = !inSheets;
     for (const leaf of leaves) {
-      pressed(leaf, leaf.dataset.paper === paper);
+      pressed(leaf, leaf.dataset.paper === paperNow);
       // Tabloid is not offered, but a document that asked for it keeps it.
-      if (leaf.dataset.paper === paper) leaf.hidden = false;
+      if (leaf.dataset.paper === paperNow) leaf.hidden = false;
     }
     pressed(sheets, inSheets);
-    pressed(landscape, across);
+    pressed(landscape, acrossNow);
     landscape.hidden = !inSheets;
-    withLayout(host, inSheets, paper, across ? "landscape" : "portrait");
+    withLayout(host, inSheets, paperNow, acrossNow ? "landscape" : "portrait");
   };
   for (const leaf of leaves) {
     leaf.addEventListener("click", () => {
