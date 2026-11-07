@@ -97,7 +97,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/BadRevocation" }
         "409":
-          description: A root already took back as many machines as it may, so this new one was not kept. A machine it already took back can still move its date earlier.
+          description: A root already took back as many machines as it may, so a new one was not kept. What fit in the same request was, so sending it again is safe, and a machine it already took back can still move its date earlier.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/MachinesFull" }

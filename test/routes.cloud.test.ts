@@ -203,6 +203,21 @@ describe("a report", () => {
     expect(await reports()).toHaveLength(0);
   });
 
+  it("brakes by the network's digest, never by its address", async () => {
+    await share();
+    const keys: string[] = [];
+    const { set } = tools({
+      reportLimiter: {
+        allows: async (key) => {
+          keys.push(key);
+          return true;
+        },
+      },
+    });
+    await proved(ID, "203.0.113.7", set, "spam", 1);
+    expect(keys[0]).toBe(await netDigest("a key for the day", "203.0.113.7"));
+  });
+
   it("is not stopped by what its network reads", async () => {
     await share();
     const busy = tools({ limiter: { allows: async () => false } }).set;

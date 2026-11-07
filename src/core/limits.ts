@@ -48,9 +48,9 @@ export interface Limits {
 export const LEVEL_ONE: Limits = {
   ttlChoices: [1, 3, 7, 15],
   sharesAtMost: 2,
-  languagesAtMost: 5,
+  languagesAtMost: 20,
   keyDaysOldNearTheCeiling: 30,
-  revokedMachinesAtMost: 8,
+  revokedMachinesAtMost: 64,
   versionsKept: 3,
   replacedKeptDays: 7,
   versionsListedAtMost: 300,

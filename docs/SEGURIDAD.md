@@ -33,7 +33,7 @@ amenazas legales.
   certificada por la llave raíz de la persona. Una sola firma cubre el manifiesto
   y el hash de cada parte, así que responde por todo lo de adentro, y el servidor
   rechaza una subida sin ella. Dice quién firmó, no qué programa lo hizo. Las
-  llaves retiradas se le avisan a cada lector.
+  llaves retiradas se le avisan a cada lector, hasta 64 por persona.
 - **La hoja nunca se cree.** La página de lectura limpia la hoja con una lista
   cerrada de etiquetas y estilos, no corre ningún script que venga en ella, y
   vive detrás de una política de seguridad de contenido que no permite nada de
@@ -44,8 +44,10 @@ amenazas legales.
 - **Abusar cuesta.** Denunciar y compartir algo nuevo piden una prueba de
   trabajo, y también un lector nuevo pasado el cupo gratis del día. Iniciar un
   compartido y leer tienen un freno de velocidad por red, y subir tiene un cupo
-  por red y una espera por persona. Una red trae solo unas pocas llaves nuevas al
-  día, y una llave nueva parte con los topes más bajos.
+  por red y una espera por persona. Denunciar tiene su propio freno de velocidad
+  por red. Una red trae solo unas pocas llaves nuevas al día, y una llave nueva
+  parte con los topes más bajos. Cerca del tope de almacenamiento solo suben
+  llaves con 30 días o más, y un documento admite hasta 20 idiomas.
 - **El panel del operador va aparte.** Es otro Worker, en panel.tisty.cl, sin
   acceso al almacenamiento de los documentos ni a sus llaves, así que no puede
   abrir nada. Está detrás de Cloudflare Access, comprueba de nuevo su token y

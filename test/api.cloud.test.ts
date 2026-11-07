@@ -701,6 +701,42 @@ beforeEach(async () => {
   if (held.objects.length > 0) await testEnv.ENVELOPES.delete(held.objects.map((one) => one.key));
 });
 
+describe("the brake of a report", () => {
+  const reporting = async (reads: boolean, reporting: boolean, ip = "198.51.100.77") => {
+    const limitOf = (success: boolean) => vi.fn(async (_: { key: string }) => ({ success }));
+    const REPORTS = limitOf(reporting);
+    const context = createExecutionContext();
+    const response = await worker.fetch(
+      new Request(`https://tisty.cl/api/v1/docs/${ID}/report`, {
+        method: "POST",
+        headers: { "CF-Connecting-IP": ip },
+        body: REPORT,
+      }) as Request<unknown, IncomingRequestCfProperties>,
+      {
+        ...testEnv,
+        FOLIO_SECRET: "09".repeat(32),
+        READS: { limit: limitOf(reads) },
+        REPORTS: { limit: REPORTS },
+      } as never,
+      context,
+    );
+    await waitOnExecutionContext(context);
+    return { said: (await response.json()) as { refused: string }, key: REPORTS.mock.calls[0]?.[0].key };
+  };
+
+  it("is its own, and neither binding stands in for the other", async () => {
+    expect((await reporting(false, true)).said.refused).toBe("proof");
+    expect((await reporting(true, false)).said.refused).toBe("slow");
+  });
+
+  it("is asked by the network's digest, never by its address", async () => {
+    const { key } = await reporting(true, true);
+    expect(key).not.toContain("198.51.100.77");
+    expect((await reporting(true, true)).key).toBe(key);
+    expect((await reporting(true, true, "198.51.100.78")).key).not.toBe(key);
+  });
+});
+
 describe("the written API", () => {
   beforeAll(async () => {
     owner = await newPerson();

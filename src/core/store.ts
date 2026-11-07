@@ -166,7 +166,7 @@ export interface Store {
   revoke(revocations: Revocation[]): Promise<boolean>;
   isRevoked(root: string, machine: string, now: number): Promise<boolean>;
   haveSigned(roots: string[]): Promise<boolean>;
-  keySignedBy(root: string, day: number): Promise<boolean>;
+  allKeysSignedBy(roots: string[], day: number): Promise<boolean>;
   admit(reading: Reading, today: number): Promise<Admitted>;
   note(reading: Reading, today: number): Promise<void>;
   shown(id: string, today: number): Promise<Shown | null>;

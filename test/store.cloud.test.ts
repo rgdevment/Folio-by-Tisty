@@ -429,8 +429,10 @@ describe("expiring", () => {
     for (let n = 1; n < LEVEL_ONE.languagesAtMost; n += 1) {
       expect(await store.create(language(`lang${n}`), DAY)).toBe("created");
     }
+    await testEnv.DB.prepare("UPDATE docs SET latest = 1 WHERE anchor = 'anchor'").run();
     expect(await store.create(language("toomany"), DAY)).toBe("languages_full");
     expect(await store.create(language("toomany"), DAY + 2)).toBe("languages_full");
+    expect(await store.create(newDoc("stranger", { owner: "stranger", anchor: "anchor" }), DAY)).toBe("no_anchor");
 
     await store.stop("lang1", DAY + 2);
     expect(await store.create(language("afterstop"), DAY + 2)).toBe("created");
@@ -438,7 +440,28 @@ describe("expiring", () => {
       .bind(DAY + 2, DAY + 182)
       .run();
     expect(await store.create(language("afterblock"), DAY + 2)).toBe("created");
+    await testEnv.DB.prepare("UPDATE docs SET latest = 1 WHERE anchor = 'anchor'").run();
     expect(await store.create(language("toomany"), DAY + 2)).toBe("languages_full");
+    await testEnv.DB.prepare("UPDATE docs SET latest = -1 WHERE id = 'lang3'").run();
+    expect(await store.create(language("afterclaim"), DAY + 2)).toBe("created");
+  });
+
+  it("does not count a language that never got a version once its days pass", async () => {
+    await store.create(newDoc("anchor", { ttlDays: 15 }), DAY);
+    const language = (id: string) => newDoc(id, { anchor: "anchor", ttlDays: 1 });
+    for (let n = 1; n < LEVEL_ONE.languagesAtMost; n += 1) await store.create(language(`lang${n}`), DAY);
+    expect(await store.create(language("sameday"), DAY)).toBe("languages_full");
+    expect(await store.create(language("lastday"), DAY + 1)).toBe("languages_full");
+    expect(await store.create(language("later"), DAY + 2)).toBe("created");
+  });
+
+  it("counts a paused language up to its last day", async () => {
+    await store.create(newDoc("anchor", { ttlDays: 15 }), DAY);
+    const language = (id: string) => newDoc(id, { anchor: "anchor", ttlDays: 15 });
+    for (let n = 1; n < LEVEL_ONE.languagesAtMost; n += 1) await store.create(language(`lang${n}`), DAY);
+    await testEnv.DB.prepare("UPDATE docs SET paused_at = ?1, dies_on = ?1 WHERE id = 'lang1'").bind(DAY).run();
+    expect(await store.create(language("sameday"), DAY)).toBe("languages_full");
+    expect(await store.create(language("nextday"), DAY + 1)).toBe("created");
   });
 
   it("calls an anchor that is not there, or not this owner's, missing", async () => {
@@ -452,17 +475,30 @@ describe("expiring", () => {
     const top = LEVEL_ONE.revokedMachinesAtMost;
     expect(await store.revoke(Array.from({ length: top }, (_, n) => taken(`m${n}`)))).toBe(true);
     expect(await store.revoke([taken("one more")])).toBe(false);
-    expect(await store.revoke([{ ...taken("m0", "2026-11-01T00:00:00Z"), root: "o1" }])).toBe(true);
+    expect(await store.revoke([taken("m0", "2026-11-01T00:00:00Z")])).toBe(true);
     const held = await testEnv.DB.prepare("SELECT COUNT(*) AS n, MIN(at) AS earliest FROM revocations").first();
     expect(held).toEqual({ n: top, earliest: Date.parse("2026-11-01T00:00:00Z") / 1000 });
-    expect(await store.revoke([{ ...taken("m0"), root: "another" }])).toBe(true);
+    expect(await store.revoke([{ ...taken("x"), root: "another" }])).toBe(true);
+    expect(await store.revoke([taken("x")])).toBe(false);
   });
 
-  it("knows a key by the day it first signed", async () => {
-    await store.keepKeys(["o1"], DAY);
-    expect(await store.keySignedBy("o1", DAY)).toBe(true);
-    expect(await store.keySignedBy("o1", DAY - 1)).toBe(false);
-    expect(await store.keySignedBy("nobody", DAY)).toBe(false);
+  it("keeps the note of the earliest date, and no other", async () => {
+    const taken = (at: string, signed: string) => ({ root: "o1", machine: "m1", at, signed });
+    const signedNow = () => testEnv.DB.prepare("SELECT signed FROM revocations").first<{ signed: string }>();
+    await store.revoke([taken("2026-11-02T00:00:00Z", "first")]);
+    await store.revoke([taken("2026-11-02T00:00:00Z", "same date")]);
+    expect((await signedNow())?.signed).toBe("first");
+    await store.revoke([taken("2026-11-03T00:00:00Z", "later")]);
+    expect((await signedNow())?.signed).toBe("first");
+    await store.revoke([taken("2026-11-01T00:00:00Z", "earlier")]);
+    expect((await signedNow())?.signed).toBe("earlier");
+  });
+
+  it("knows keys by the day they first signed", async () => {
+    await store.keepKeys(["o1", "o2"], DAY);
+    expect(await store.allKeysSignedBy(["o1", "o2", "o1"], DAY)).toBe(true);
+    expect(await store.allKeysSignedBy(["o1"], DAY - 1)).toBe(false);
+    expect(await store.allKeysSignedBy(["o1", "nobody"], DAY)).toBe(false);
   });
 
   it("takes a language with its anchor, and never on its own", async () => {

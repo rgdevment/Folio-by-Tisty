@@ -89,6 +89,12 @@ describe("the stage", () => {
     expect(stageOf({ ...quiet, storedGb: 80 }, cycle30(30))).toBe("new_keys_off");
   });
 
+  it("lets a cut outrank the storage near its ceiling, and that outrank a warning", () => {
+    expect(stageOf({ ...costing(8.5), storedGb: 80 }, cycle30(1))).toBe("blocked");
+    expect(stageOf({ ...costing(6.4), storedGb: 80 }, cycle30(1))).toBe("no_uploads");
+    expect(stageOf({ ...costing(11), storedGb: 80 }, cycle30(30))).toBe("new_keys_off");
+  });
+
   it("opens again at the next midnight when the attack stops, even in the first days", () => {
     const attacked = costing(8.5);
     expect(stageOf(attacked, cycle30(1))).toBe("blocked");

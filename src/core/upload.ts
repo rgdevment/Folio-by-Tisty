@@ -182,18 +182,22 @@ const openTo = async ({ ip, now }: Uploading, { store, limiter, dayKey }: ReadTo
   return stage === "no_uploads" || stage === "blocked" ? { refused: "uploads_off" } : { net, stage };
 };
 
+const rootsOf = ({ manifest, signature }: ReadEnvelope): string[] => [(manifest.owner as Owner).root, signature.root];
+
 // A key costs nothing to make, so near the ceiling only old ones may fill what is left: the owner too, or one old signer opens it to all.
 const newKeyNearTheCeiling = async (
   stage: Stage,
-  roots: string[],
+  read: ReadEnvelope,
   now: number,
   { store, limits }: ReadTools,
-): Promise<boolean> => {
-  if (stage !== "new_keys_off") return false;
-  const oldEnough = dayOf(now) - limits.keyDaysOldNearTheCeiling;
-  const signed = await Promise.all([...new Set(roots)].map((root) => store.keySignedBy(root, oldEnough)));
-  return signed.includes(false);
-};
+): Promise<boolean> =>
+  stage === "new_keys_off" &&
+  !(await store.allKeysSignedBy(rootsOf(read), dayOf(now) - limits.keyDaysOldNearTheCeiling));
+
+const takeUploadHour = async (net: string, now: number, { store, limits }: ReadTools): Promise<Refused | null> =>
+  (await store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour))
+    ? null
+    : { refused: "quota", until: hourEnds(now) };
 
 const answerOf = (uploaded: Uploaded, version: number, now: number): UploadAnswer => {
   switch (uploaded) {
@@ -242,7 +246,7 @@ const storeVersion = async (
 
   const hash = toBase64Url(await sha256(bytes));
   const version = termsAccepted(manifest, tools);
-  const roots = [(manifest.owner as Owner).root, signature.root];
+  const roots = rootsOf(read);
   const accepted = { root: signature.root, version: version ?? "", hour: hourOf(now) };
   if (held?.latest === manifest.version && held.versions.at(-1)?.hash === hash) {
     // A retry may be all that is left of an upload whose record was lost after its version was kept.
@@ -251,12 +255,14 @@ const storeVersion = async (
   }
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
   if (version === null) return { refused: "terms", version: tools.termsVersion };
-  if (await newKeyNearTheCeiling(stage, roots, now, tools)) return { refused: "uploads_off" };
-  const hourLeft = () => store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour);
+  // The terms promise that an owner's own version lifts a block, however new the key.
+  const correcting = held?.correctable && signature.root === held.owner;
+  if (!correcting && (await newKeyNearTheCeiling(stage, read, now, tools))) return { refused: "uploads_off" };
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
     // Before anything is written, or a refused first version could be sent again for free.
-    if (!(await hourLeft())) return { refused: "quota", until: hourEnds(now) };
+    const hourSpent = await takeUploadHour(net, now, tools);
+    if (hourSpent) return hourSpent;
     const full = await keys.admit(roots, accepted);
     if (full) return full;
     const refused = await share(uploading, sharing, read, net, tools);
@@ -273,9 +279,10 @@ const storeVersion = async (
   const allowedAt = uploadAllowedAt(held.versions, signature.root, now, limits);
   if (allowedAt > now) return { refused: "slow", until: allowedAt };
   if (!sharing) {
+    const hourSpent = await takeUploadHour(net, now, tools);
+    if (hourSpent) return hourSpent;
     const full = await keys.admit([signature.root], accepted);
     if (full) return full;
-    if (!(await hourLeft())) return { refused: "quota", until: hourEnds(now) };
   }
 
   const owner = manifest.owner as Owner;
@@ -344,15 +351,13 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
   if (floor !== null && isBelowVersion(manifest.contract, floor)) return { refused: "outdated" };
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
   if (!mayUpload(read, held)) return { refused: "not_yours" };
-  const roots = [(manifest.owner as Owner).root, signature.root];
-  if (await newKeyNearTheCeiling(stage, roots, now, tools)) return { refused: "uploads_off" };
+  if (await newKeyNearTheCeiling(stage, read, now, tools)) return { refused: "uploads_off" };
 
   const hash = toBase64Url(await sha256(manifestBytes, index));
   if (held.versions.at(-1)?.files !== hash) return { refused: "behind" };
   if (await store.hasFiles(id, hash)) return { stored: true, hash };
-  if (!(await store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour))) {
-    return { refused: "quota", until: hourEnds(now) };
-  }
+  const hourSpent = await takeUploadHour(net, now, tools);
+  if (hourSpent) return hourSpent;
   const kept = await store.keepFiles({ id, hash, body: bytes, net }, dayOf(now));
   return kept === "stored" ? { stored: true, hash } : { refused: "quota", until: now + DAY_MS };
 };

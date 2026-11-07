@@ -142,7 +142,7 @@ describe("the mail", () => {
     expect(left?.n).toBe(0);
   });
 
-  it("tells of the spending stage only when it changed", async () => {
+  it("tells of the stage of the service only when it changed", async () => {
     await store.setStage("blocked");
     const { send } = await digest();
     expect(send.mock.calls[0]?.[1]).toContain("Servicio: blocked (antes: open)");
