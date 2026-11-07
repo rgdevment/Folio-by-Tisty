@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { LEVEL_ONE, levelOfReport } from "../src/core/limits";
 import { saidOf } from "../src/core/report";
-import { isSealedLink } from "../src/core/sealed-link";
+import { isSealedContact, isSealedLink } from "../src/core/sealed-link";
 import { OPERATOR_KEY } from "../src/page/operator-key";
-import { sealLink } from "../src/page/ui/seal";
+import { sealContact, sealLink } from "../src/page/ui/seal";
 
 const ID = "k7Qm2xPa";
 const LINK_KEY = "nlt35tFEpAhP5bWJr2p2hIFCFml15FNS5LD2AsBbd2s";
@@ -38,6 +38,30 @@ describe("a link sealed for the operator", () => {
     expect(isSealedLink(await sealLink(ID, LINK_KEY, OPERATOR_KEY))).toBe(true);
   });
 
+  it("seals an email apart from a link, under its own document", async () => {
+    const sealed = await sealContact(ID, "a@b.co", operatorKey);
+    expect(isSealedContact(sealed)).toBe(true);
+    expect(sealed.startsWith("contact1.")).toBe(true);
+    expect(keyScript("open", file, ID, sealed)).toBe("a@b.co");
+    expect(() => keyScript("open", file, "another1", sealed)).toThrow();
+    const longest = await sealContact(ID, `${"a".repeat(244)}@example.co`, operatorKey);
+    expect(isSealedContact(longest)).toBe(true);
+    expect(isSealedLink(longest)).toBe(false);
+    expect(isSealedContact(await sealLink(ID, LINK_KEY, operatorKey))).toBe(false);
+  });
+
+  it("will not open under the other kind's label", async () => {
+    const sealed = await sealContact(ID, "a@b.co", operatorKey);
+    expect(() => keyScript("open", file, ID, `sealed1.${sealed.slice("contact1.".length)}`)).toThrow();
+    expect(() => keyScript("open", file, ID, "other1.abc")).toThrow();
+  });
+
+  it("shows what controls a terminal as text, since anyone can seal anything", async () => {
+    const sealed = await sealContact(ID, "a\u001b[2Jb\u202Ec\nd", operatorKey);
+    const shown = keyScript("open", file, ID, sealed);
+    expect(shown).toBe("a\\u{1b}[2Jb\\u{202e}c\\u{a}d");
+  });
+
   it("does not overwrite a key already there", () => {
     expect(() => keyScript("new", file)).toThrow();
   });
@@ -57,6 +81,23 @@ describe("what a report may say", () => {
   it.each(["threat", "doxxing", "intimate", "csam"])("refuses a grave report of %s without its link", (category) => {
     expect(saidOf({ category }, LEVEL_ONE)).toBeNull();
     expect(saidOf({ category, sealedLink: sealed }, LEVEL_ONE)).not.toBeNull();
+  });
+
+  it("takes an email only sealed, and not on a light report", () => {
+    const sealedContact = `contact1.${"A".repeat(80)}`;
+    expect(saidOf({ category: "phishing", sealedContact }, LEVEL_ONE)).toEqual({ category: "phishing", sealedContact });
+    expect(saidOf({ category: "spam", sealedContact }, LEVEL_ONE)).toBeNull();
+    expect(saidOf({ category: "offensive", sealedContact }, LEVEL_ONE)).toBeNull();
+    for (const said of [
+      "a@b.co",
+      `contact1.${"A".repeat(79)}`,
+      `sealed1.${"A".repeat(80)}`,
+      `contacts.${"A".repeat(80)}`,
+      `contact1.${"A".repeat(504)}`,
+      7,
+    ]) {
+      expect(saidOf({ category: "phishing", sealedContact: said }, LEVEL_ONE)).toBeNull();
+    }
   });
 
   it("takes a category it knows, with what it may bring", () => {

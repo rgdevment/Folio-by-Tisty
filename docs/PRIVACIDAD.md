@@ -34,11 +34,11 @@ Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 | Un resumen de tu IP (un HMAC con una llave que cambia) | Topes por IP y bloqueos ante abuso | Lo que dura la cuota o el bloqueo, y hasta un día más |
 | Una copia diaria de la base de datos, cifrada con una llave guardada fuera de línea, sin los resúmenes de lectura del día ni los cupos, y sin los documentos | Recuperarse de una falla | 30 días, en GitHub |
 | Lo que el operador hizo con un documento y por qué, también abrirlo: su id, la acción y el motivo | Poder responder por ello después | 180 días, o mientras el documento esté retenido |
-| Un link de caso, para verificar una denuncia o entregarlo a una autoridad: un resumen de su token, el documento y la versión que abre, cada apertura y, si es para una autoridad, los registros del documento, cifrados con una clave que Folio no guarda y sin la red de quien denunció | Que quien verifica o investiga lea esa versión aunque el documento esté bloqueado | 30 días; las aperturas, como lo anterior |
+| Un link de caso, para verificar una denuncia o entregarlo a una autoridad: un resumen de su token, el documento y la versión que abre, cada apertura y, si es para una autoridad, los registros del documento, cifrados con una clave que Folio no guarda y sin la red ni el correo de quien denunció | Que quien verifica o investiga lea esa versión aunque el documento esté bloqueado | 30 días; las aperturas, como lo anterior |
 | Un resumen por correo al operador, hasta dos veces al día: el id de los links denunciados, bloqueados o reclamados, la categoría y cuántas redes denunciaron, nunca una llave, una IP o el contenido | Avisarle qué revisar | Hasta 180 días, o más si una orden lo pide, en su buzón de Migadu |
 | Lo que le escribes al operador por correo, con tu dirección | Responderte | Hasta 180 días desde el último mensaje, o más si una orden lo pide, en su buzón de Migadu |
 | Las llaves que retiraste, como las firmó tu raíz: la parte pública de la llave y la de tu raíz | Para que quien lea sepa que una llave robada o retirada ya no habla por ti | Para siempre, porque quien lea siempre tiene que poder saberlo |
-| Las denuncias: categoría, detalle y versión denunciada, en claro; si lo dejaron el link, sellado para que solo el operador lo abra; y un resumen de la red de quien denuncia (un HMAC con una llave que cambia cada 180 días), para que cada red denuncie una sola vez | Moderar y enviarlas a quien corresponde | 180 días, o más si una orden o una autoridad lo pide. Si el operador comprueba que era falsa, el resumen de esa red queda 180 días desde entonces, para que deje de contar |
+| Las denuncias: categoría, detalle y versión denunciada, en claro; si lo dejaron el link y un correo, sellados para que solo el operador los abra; y un resumen de la red de quien denuncia (un HMAC con una llave que cambia cada 180 días), para que cada red denuncie una sola vez | Moderar y enviarlas a quien corresponde | 180 días, o más si una orden o una autoridad lo pide. Si el operador comprueba que era falsa, el resumen de esa red queda 180 días desde entonces, para que deje de contar |
 
 **Sobre la firma:** tu llave pública permite saber que dos documentos son de la
 misma persona, aunque no quién eres.
@@ -96,6 +96,9 @@ borrarlos u oponerte a su uso. Como no hay cuentas, lo más directo es:
   en la siguiente limpieza, normalmente antes de una hora; durante un bloqueo por
   gasto o una falla puede tardar más. Una denuncia seria o una orden pueden
   obligar a conservarlo.
+- **El correo que dejaste en una denuncia:** escribe a <abuso@tisty.app> con el
+  id del documento y el operador lo borra. Sigue hasta 30 días en los respaldos
+  cifrados.
 - **Cualquier otra petición:** escribe a <rgdevment@tisty.app>. El resumen de
   tu IP no permite saber quién eres, así que en general no hay datos que
   puedan asociarse a ti.

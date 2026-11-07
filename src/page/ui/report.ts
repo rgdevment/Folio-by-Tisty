@@ -2,7 +2,7 @@ import { levelOfReport } from "../../core/limits";
 import { holdsALink } from "../../core/sealed-link";
 import { TOO_MANY_VISITS } from "./ask";
 import { element } from "./frame";
-import { sealLink } from "./seal";
+import { sealContact, sealLink } from "./seal";
 import { solved } from "./solve";
 
 export interface Reportable {
@@ -55,6 +55,7 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
   const dialog = element<HTMLDialogElement>("report-dialog");
   const form = element<HTMLFormElement>("report-form");
   const consent = element<HTMLElement>("report-consent");
+  const contactBox = element<HTMLElement>("report-contact");
   const handOver = element<HTMLInputElement>("report-hand-over");
   const handingOverSaid = element<HTMLElement>("report-consent-said");
   const said = element<HTMLElement>("report-said");
@@ -62,16 +63,19 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
 
   const categoryOf = (): string => new FormData(form).get("category")?.toString() ?? "";
   const detailOf = (): string => new FormData(form).get("detail")?.toString().trim() ?? "";
+  const contactOf = (): string => new FormData(form).get("contact")?.toString().trim() ?? "";
   const bodyOf = async (): Promise<string> => {
     const category = categoryOf();
     const detail = detailOf();
     const level = levelOfReport(category);
     const withLink = (level === "grave" || (handOver.checked && level !== "light")) && linkKey !== "";
+    const contact = level === "light" || level === null ? "" : contactOf();
     return JSON.stringify({
       category,
       ...(detail === "" ? {} : { detail }),
       ...(version === undefined ? {} : { version }),
       ...(withLink ? { sealedLink: await sealLink(id, linkKey, operatorKey) } : {}),
+      ...(contact === "" ? {} : { sealedContact: await sealContact(id, contact, operatorKey) }),
     });
   };
 
@@ -83,6 +87,7 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
     const level = levelOfReport(category);
     const wasRequired = handOver.disabled;
     consent.hidden = level === "light" || level === null;
+    contactBox.hidden = consent.hidden;
     handOver.disabled = level === "grave";
     if (level === "grave") handOver.checked = true;
     else if (wasRequired || consent.hidden) handOver.checked = false;

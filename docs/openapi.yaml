@@ -849,6 +849,11 @@ components:
           maxLength: 1024
           pattern: "^sealed1\\.[A-Za-z0-9_-]{150,}$"
           description: The link to read it, id#key and never the edit token, sealed with the operator's public key. The server cannot open it, and a light report does not bring it.
+        sealedContact:
+          type: string
+          maxLength: 512
+          pattern: "^contact1\\.[A-Za-z0-9_-]{80,}$"
+          description: An email the reporter chose to leave, sealed with the operator's public key. A light report does not bring it.
     Status:
       type: object
       required: [status]

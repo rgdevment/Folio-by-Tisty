@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 7, in force since November 6, 2026.**
+**Version 8, in force since November 6, 2026.**
 
 ## The short version
 
@@ -112,6 +112,15 @@ you are to report: it keeps a digest of the network.
   network reports once per document, and Folio asks its browser for a small
   piece of computing work to slow abuse. Whoever does not have the link can
   write to <abuso@tisty.app> or go to the PDI or the prosecutor.
+- **In a report of deceit or a grave one you may leave your email, if you
+  want.** It serves to clear up doubts and filter out false reports, and nobody
+  checks it is yours. It is encrypted so only the operator can read it, and it
+  is given to nobody except under a judge's order. It is erased with the report,
+  within 180 days or as long as a hold lasts, and stays in the encrypted backups
+  for up to 30 days more. You can ask for it to be erased sooner, writing to
+  <abuso@tisty.app> with the document's id. If there are doubts and you do not
+  answer, the operator may do nothing with a report of deceit, but not answering
+  does not make it false, and a grave one is reviewed anyway.
 - **A light report** (spam, or something annoying or offensive that is no crime)
   needs nobody to step in. With three networks from at least two providers,
   whoever shared it sees a warning in their manage link, also from Tisty, and
@@ -148,12 +157,12 @@ you are to report: it keeps a digest of the network.
   phishing and malware. One person does this, by hand.
 - **When reporting to an authority,** the operator blocks the document and holds
   it for 180 days, renewable for as long as the authority asks. The authority
-  gets a link that opens only the reported version for 30 days, with each opening
-  noted, and an encrypted package with the records Folio holds, without the
-  network of whoever reported. The operator may also use such a link to verify a
-  report about a document already blocked. Once the key is handed over, the
-  operator erases the one the report brought, which stays in the encrypted
-  backups for up to 30 days.
+  gets a link that opens only the reported version for 30 days, with each
+  opening noted, and an encrypted package with the records Folio holds, without
+  the network or the email of whoever reported. The operator may also use such a
+  link to verify a report about a document already blocked. Once the key is
+  handed over, the operator erases the one the report brought, which stays in
+  the encrypted backups for up to 30 days.
 - **The operator only opens what is encrypted** in four cases and always with
   the link to read it: when whoever shared it hands it over to show the block
   was a mistake, to review a grave report with the link it brought, to confirm

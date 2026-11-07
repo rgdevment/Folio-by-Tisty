@@ -4,6 +4,7 @@ export interface Doing {
   accept: (id: string) => void;
   reject: (id: string) => void;
   reportWasFalse: (id: string, net: string) => void;
+  forgetContact: (id: string, net: string) => void;
   opened: (id: string) => void;
   copy: (said: string) => void;
   panic: (id: string, version: number) => void;
@@ -72,6 +73,21 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
     buttons.unshift(
       button(page, "Copiar para abrir", () => doing.copy(openCommand(report.doc, sealed))),
       button(page, "Anotar apertura", () => doing.opened(report.doc)),
+    );
+  }
+  if (report.sealedContact) {
+    const contact = report.sealedContact;
+    card.append(
+      piece(
+        page,
+        "p",
+        "card-line",
+        "Trae un correo sin comprobar: al escribir, no nombres el documento ni lo denunciado.",
+      ),
+    );
+    buttons.unshift(
+      button(page, "Copiar para leer su correo", () => doing.copy(openCommand(report.doc, contact))),
+      button(page, "Borrar su correo", () => doing.forgetContact(report.doc, report.net)),
     );
   }
   card.append(actions(page, ...buttons));

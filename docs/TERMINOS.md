@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 7, vigente desde el 6 de noviembre de 2026.**
+**Versión 8, vigente desde el 6 de noviembre de 2026.**
 
 ## En corto
 
@@ -113,6 +113,15 @@ para denunciar: guarda un resumen de la red.
   red denuncia una vez por documento, y Folio le pide a su navegador un pequeño
   trabajo de cómputo para frenar los abusos. Quien no tenga el link puede
   escribir a <abuso@tisty.app> o acudir a la PDI o a la Fiscalía.
+- **En una denuncia de engaño o grave puedes dejar tu correo, si quieres.**
+  Sirve para aclarar dudas y filtrar denuncias falsas, y nadie comprueba que sea
+  tuyo. Va cifrado para que solo el operador lo lea, y no se entrega a nadie,
+  salvo por orden de un juez. Se borra con la denuncia, hasta 180 días o lo que
+  dure una retención, y sigue hasta 30 días más en los respaldos cifrados.
+  Puedes pedir que se borre antes, escribiendo a <abuso@tisty.app> con el id del
+  documento. Si hay dudas y no respondes, el operador puede no hacer nada con
+  una denuncia de engaño, pero no responder no la vuelve falsa, y una grave se
+  revisa igual.
 - **Una denuncia leve** (spam, o algo molesto u ofensivo sin ser delito) no
   necesita que nadie intervenga. Con tres redes de al menos dos proveedores,
   quien lo compartió ve un aviso en su link de administrar, también desde Tisty,
@@ -148,11 +157,11 @@ para denunciar: guarda un resumen de la red.
   Cloudflare. Lo hace una persona, a mano.
 - **Cuando denuncia a una autoridad,** el operador bloquea el documento y lo
   retiene 180 días, renovables mientras la autoridad lo pida. Le entrega un link
-  que abre solo la versión denunciada durante 30 días, con cada apertura anotada,
-  y un paquete cifrado con los registros que Folio tenga, sin la red de quien
-  denunció. También puede usar un link así para verificar una denuncia sobre un
-  documento ya bloqueado. Después de entregar la llave, borra la que trajo la
-  denuncia, que sigue hasta 30 días en los respaldos cifrados.
+  que abre solo la versión denunciada durante 30 días, con cada apertura
+  anotada, y un paquete cifrado con los registros que Folio tenga, sin la red ni
+  el correo de quien denunció. También puede usar un link así para verificar una
+  denuncia sobre un documento ya bloqueado. Después de entregar la llave, borra
+  la que trajo la denuncia, que sigue hasta 30 días en los respaldos cifrados.
 - **El operador solo abre lo cifrado** en cuatro casos y siempre con el link
   para leerlo: cuando quien lo compartió lo entrega para demostrar que el
   bloqueo fue un error, para revisar una denuncia grave con el link que trajo,

@@ -2,7 +2,7 @@ import { dayOf, type Limits, levelOfReport } from "./limits";
 import { netDigest } from "./net";
 import type { ReadTools } from "./read";
 import { askForProof, type Refused } from "./refused";
-import { holdsALink, isSealedLink } from "./sealed-link";
+import { holdsALink, isSealedContact, isSealedLink } from "./sealed-link";
 import { hourEnds, hourOf, proofIsFresh } from "./start";
 
 export interface ReportTools extends ReadTools {
@@ -13,6 +13,7 @@ export interface Said {
   category: string;
   detail?: string;
   sealedLink?: string;
+  sealedContact?: string;
   version?: number;
 }
 
@@ -37,14 +38,23 @@ const linkIsTaken = (link: unknown, category: string, limits: Limits): boolean =
 const detailIsTaken = (detail: unknown, limits: Limits): boolean =>
   isTextUpTo(detail, limits.reportDetailAtMost) && !holdsALink(String(detail ?? ""));
 
+const contactIsTaken = (contact: unknown, category: string): boolean =>
+  contact === undefined ||
+  (levelOfReport(category) !== "light" && typeof contact === "string" && isSealedContact(contact));
+
 const versionIsTaken = (version: unknown): boolean =>
   version === undefined || (Number.isSafeInteger(version) && (version as number) > 0);
 
 export const saidOf = (body: unknown, limits: Limits): Said | null => {
   if (typeof body !== "object" || body === null) return null;
-  const { category, detail, sealedLink, version } = body as Record<string, unknown>;
+  const { category, detail, sealedLink, sealedContact, version } = body as Record<string, unknown>;
   if (typeof category !== "string" || levelOfReport(category) === null) return null;
-  if (!detailIsTaken(detail, limits) || !linkIsTaken(sealedLink, category, limits) || !versionIsTaken(version)) {
+  if (
+    !detailIsTaken(detail, limits) ||
+    !linkIsTaken(sealedLink, category, limits) ||
+    !contactIsTaken(sealedContact, category) ||
+    !versionIsTaken(version)
+  ) {
     return null;
   }
   // Nobody could review a grave one without its link, so it would only be an accusation on record.
@@ -53,6 +63,7 @@ export const saidOf = (body: unknown, limits: Limits): Said | null => {
     category,
     ...(detail === undefined ? {} : { detail: detail as string }),
     ...(sealedLink === undefined ? {} : { sealedLink: sealedLink as string }),
+    ...(sealedContact === undefined ? {} : { sealedContact: sealedContact as string }),
     ...(version === undefined ? {} : { version: version as number }),
   };
 };
