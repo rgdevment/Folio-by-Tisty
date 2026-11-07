@@ -83,11 +83,37 @@ const told = (link: HTMLElement, said: string): void => {
   link.after(note);
 };
 
+const CONTROLS = /\p{C}/gu;
+const MAY_RUN_BY_NAME =
+  /\.(exe|msi|msp|msix|msixbundle|appx|appxbundle|application|bat|cmd|com|scr|pif|cpl|dll|msc|ps1|psm1|ps1xml|psc1|vb|vbs|vbe|js|jse|ws|wsf|wsh|hta|lnk|url|website|scf|inf|reg|chm|gadget|jar|apk|appimage|deb|rpm|dmg|pkg|app|command|sh|iso|img|vhdx?|html?|xhtml|mht|mhtml|svg|docm|dotm|xlsm|xltm|xlam|xll|pptm|potm|ppsm|ppam|sldm)[\s.]*$/i;
+const MAY_RUN_BY_START = [
+  [0x4d, 0x5a],
+  [0x7f, 0x45, 0x4c, 0x46],
+  [0xcf, 0xfa, 0xed, 0xfe],
+  [0xce, 0xfa, 0xed, 0xfe],
+  [0xca, 0xfe, 0xba, 0xbe],
+  [0x23, 0x21],
+];
+const NOT_SAVED = "No se descargó.";
+
+const plainName = (name: string): string => name.replace(CONTROLS, "");
+
+// By what it starts with too, since a name can say anything.
+export const mayRun = ({ name }: Pick<Attachment, "name">, bytes: Bytes): boolean =>
+  MAY_RUN_BY_NAME.test(plainName(name)) ||
+  MAY_RUN_BY_START.some((start) => start.every((byte, at) => bytes[at] === byte));
+
+const agreedToSave = (file: Pick<Attachment, "name">, bytes: Bytes): boolean =>
+  !mayRun(file, bytes) ||
+  confirm(
+    `«${plainName(file.name)}» puede ser un programa. Folio no revisa lo que se comparte, y abrirlo podría dañar tu equipo. ¿Descargarlo de todos modos?`,
+  );
+
 export const saved = ({ name }: Pick<Attachment, "name">, bytes: Bytes): void => {
   const address = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
   const saving = document.createElement("a");
   saving.href = address;
-  saving.download = name;
+  saving.download = plainName(name);
   saving.click();
   setTimeout(() => URL.revokeObjectURL(address), SAVED_ADDRESS_LASTS_MS);
 };
@@ -154,6 +180,10 @@ export const filePresser = (asking: FileAsking) => {
           couldNotPlay.add(file.at);
           told(link, COULD_NOT_PLAY);
         });
+        return;
+      }
+      if (!agreedToSave(file, bytes)) {
+        told(link, NOT_SAVED);
         return;
       }
       saved(file, bytes);

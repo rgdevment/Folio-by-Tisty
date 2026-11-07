@@ -22,6 +22,45 @@ export const pictureAddresses = (said: Picture[], bytes: Bytes[]): (string | nul
     return URL.createObjectURL(new Blob([held], { type: picture.kind }));
   });
 
+const urlOf = (where: string): URL | null => {
+  try {
+    return new URL(where);
+  } catch {
+    return null;
+  }
+};
+
+const hostOf = (where: string): string | null => urlOf(where)?.host ?? null;
+
+const XHTML = "http://www.w3.org/1999/xhtml";
+
+// A styled piece inside a link can hide words the reader never sees, so only bare words may name the address.
+const bareWords = (link: Element): string => (link.children.length === 0 ? (link.textContent ?? "") : "");
+
+const BARE_WWW = /^www\./;
+
+// A word in another alphabet can look like the address and read the same once parsed, so it has to say it literally.
+const saysItsHost = (said: string, host: string): boolean => {
+  const text = said.trim().toLowerCase();
+  const parsed = hostOf(text.includes("://") ? text : `https://${text}`);
+  return (
+    parsed !== null &&
+    text.includes(host.replace(BARE_WWW, "")) &&
+    parsed.replace(BARE_WWW, "") === host.replace(BARE_WWW, "")
+  );
+};
+
+const whereItGoes = (where: string, said: string): string | null => {
+  if (/^mailto:/i.test(where)) {
+    const address = where.slice("mailto:".length).split("?", 1)[0] ?? "";
+    return said.trim().toLowerCase() === address.toLowerCase() ? null : address;
+  }
+  const url = urlOf(where);
+  if (url === null || url.host === "") return null;
+  if (url.username !== "" || url.password !== "") return url.host;
+  return saysItsHost(said, url.host) ? null : url.host;
+};
+
 export const finished = (words: DocumentFragment, addresses: (string | null)[]): DocumentFragment => {
   for (const callout of words.querySelectorAll("blockquote[data-callout]")) {
     callout.setAttribute("data-said", CALLOUTS[callout.getAttribute("data-callout") ?? ""] ?? CALLOUTS.note ?? "");
@@ -37,6 +76,13 @@ export const finished = (words: DocumentFragment, addresses: (string | null)[]):
     if (LEAVES.test(where)) {
       link.setAttribute("target", "_blank");
       link.setAttribute("rel", "noopener noreferrer");
+      const goes = whereItGoes(where, bareWords(link));
+      if (goes) {
+        const shown = link.ownerDocument.createElement("span");
+        shown.className = "link-where";
+        shown.textContent = ` (${goes})`;
+        (link.namespaceURI === XHTML ? link : (link.closest("svg") ?? link)).after(shown);
+      }
     } else if (FILE.test(where)) {
       // A press asks for it, and no address ever does: what follows the # is the link key.
       link.removeAttribute("href");

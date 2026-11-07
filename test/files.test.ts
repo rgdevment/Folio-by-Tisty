@@ -5,7 +5,7 @@ import VECTORS from "@tisty/contracts/vectors.json";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { domPurifyCleaner } from "../src/page/ui/clean";
-import { filePresser, playerFor } from "../src/page/ui/files";
+import { filePresser, mayRun, playerFor, saved } from "../src/page/ui/files";
 import { finished } from "../src/page/ui/finish";
 import { drawFrame } from "../src/page/ui/frame";
 
@@ -30,6 +30,7 @@ let clicked: { name: string; href: string }[];
 let answers: Response[];
 let asked: string[];
 let playsHere: string;
+let agrees: ReturnType<typeof vi.fn>;
 
 const draw = (html: string, held = PLAYING.document): void => {
   const document = { ...held, html };
@@ -72,6 +73,8 @@ beforeEach(() => {
   vi.stubGlobal("AbortController", place.AbortController);
   vi.stubGlobal("location", { href: place.location.href, hash: `#${LINK_KEY}` });
   vi.stubGlobal("navigator", {});
+  agrees = vi.fn(() => true);
+  vi.stubGlobal("confirm", agrees);
   vi.stubGlobal("scrollTo", vi.fn());
   vi.stubGlobal("requestAnimationFrame", vi.fn());
   vi.stubGlobal(
@@ -145,6 +148,48 @@ describe("what a file is, by its first bytes", () => {
 });
 
 describe("pressing a file", () => {
+  describe("what may run", () => {
+    const named = (name: string, start: number[] = [1, 2, 3]) =>
+      mayRun({ name }, new Uint8Array([...start, 0, 0, 0, 0]));
+
+    it.each([
+      "a.exe",
+      "A.EXE",
+      "setup.msi",
+      "x.bat",
+      "x.ps1",
+      "x.apk",
+      "x.dmg",
+      "x.sh",
+      "x.html",
+      "x.command",
+      "x.vhdx",
+      "x.chm",
+      "x.url",
+      "x.mht",
+      "x.msix",
+      "x.docm",
+      "x.exe  ",
+      "x.exe.",
+      "a.e\u200Bxe",
+    ])("goes by the name of %j", (name) => {
+      expect(named(name)).toBe(true);
+    });
+
+    it.each([
+      ["a Windows program", [0x4d, 0x5a]],
+      ["a Linux program", [0x7f, 0x45, 0x4c, 0x46]],
+      ["a Mac program", [0xcf, 0xfa, 0xed, 0xfe]],
+      ["a script", [0x23, 0x21]],
+    ])("goes by what it starts with, for %s called a photo", (_, start) => {
+      expect(named("foto.jpg", start)).toBe(true);
+    });
+
+    it.each(["informe.pdf", "foto.jpg", "notas.txt", "exe", "datos.exe.txt"])("leaves %s alone", (name) => {
+      expect(named(name)).toBe(false);
+    });
+  });
+
   it("asks for nothing before it is pressed, and only for what its document names", async () => {
     draw(alone(0));
     expect(asked).toEqual([]);
@@ -291,6 +336,29 @@ describe("pressing a file", () => {
     await press(5);
     expect(root.querySelector("iframe, object, embed, audio, video")).toBeNull();
     expect(clicked).toEqual([{ name: "rina.html", href: "blob:https://tisty.cl/1" }]);
+    expect(agrees.mock.calls[0]?.[0]).toContain("rina.html");
+  });
+
+  it("does not save what may run when the reader says no, and says so", async () => {
+    agrees.mockReturnValue(false);
+    draw(alone(5));
+    await press(5);
+    expect(clicked).toEqual([]);
+    expect(fileAt(5).textContent).toContain("No se descargó.");
+  });
+});
+
+describe("the name a file is saved under", () => {
+  it("loses the invisible characters that could turn it around", () => {
+    const made: HTMLAnchorElement[] = [];
+    const real = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+      const one = real(tag);
+      made.push(one as HTMLAnchorElement);
+      return one;
+    }) as typeof document.createElement);
+    saved({ name: "foto\u202Egpj.exe" }, new Uint8Array([1]));
+    expect(made[0]?.download).toBe("fotogpj.exe");
   });
 });
 
