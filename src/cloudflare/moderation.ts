@@ -1,6 +1,6 @@
 import { caseNameOf } from "../core/case-records";
 import { dayOf, LEVEL_ONE, type Limits } from "../core/limits";
-import type { Queue, QueuedReport } from "../core/queue";
+import { GRAVEST_FIRST, type Queue, type QueuedReport } from "../core/queue";
 import { hourOf } from "../core/start";
 
 export type Acted = "done" | "missing";
@@ -78,7 +78,7 @@ export class CloudModeration {
     this.#limits = limits;
   }
 
-  async queue(now: number): Promise<Queue> {
+  async queue(now: number, reportsFrom = 0): Promise<Queue> {
     const [stage, keys, reports, reportsTotal, docs] = await this.#db.batch([
       this.#db.prepare("SELECT stage FROM service_stage WHERE id = 1"),
       this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS n FROM net_day WHERE day = ?").bind(dayOf(now)),
@@ -87,9 +87,11 @@ export class CloudModeration {
           `SELECT r.doc, r.net, r.category, r.level, r.detail, r.sealed_link, r.sealed_contact, r.version, r.at, r.asn,
              r.net IN (SELECT net FROM false_reporters) AS false_net
            ${REPORTS_TO_SEE}
-           ORDER BY r.category = 'csam' DESC, r.level = 'grave' DESC, r.at DESC, r.doc LIMIT ?`,
+           ORDER BY ROW_NUMBER() OVER (PARTITION BY r.net ORDER BY ${GRAVEST_FIRST}, r.at),
+             ${GRAVEST_FIRST}, false_net, r.at DESC, r.doc, r.net
+           LIMIT ?1 OFFSET ?2`,
         )
-        .bind(SEEN_AT_MOST),
+        .bind(SEEN_AT_MOST, reportsFrom),
       this.#db.prepare(`SELECT COUNT(*) AS n ${REPORTS_TO_SEE}`),
       this.#db
         .prepare(
@@ -113,6 +115,7 @@ export class CloudModeration {
       stage: (stage?.results?.[0] as { stage: string } | undefined)?.stage ?? "open",
       newKeys: (keys?.results?.[0] as { n: number } | undefined)?.n ?? 0,
       reportsTotal: (reportsTotal?.results?.[0] as { n: number } | undefined)?.n ?? 0,
+      reportsFrom,
       reports: (
         (reports?.results ?? []) as (Omit<QueuedReport, "sealedLink" | "sealedContact" | "fromFalseNet"> & {
           sealed_link: string | null;
@@ -282,18 +285,32 @@ export class CloudModeration {
     return this.#actedAndLogged([forgetting], this.#logIfChanged(id, "forget_contact", now));
   }
 
-  async reportWasFalse(id: string, net: string, now: number): Promise<Acted> {
-    const naming = this.#db
+  #namingFalse(id: string, net: string, now: number): D1PreparedStatement {
+    return this.#db
       .prepare(
-        `INSERT INTO false_reporters (net, at)
-         SELECT net, ?3 FROM reports WHERE doc = ?1 AND net = ?2 AND cleared = 0
+        `INSERT INTO false_reporters (net, at, since)
+         SELECT net, ?3, ?3 FROM reports WHERE doc = ?1 AND net = ?2 AND cleared = 0
          ON CONFLICT (net) DO UPDATE SET at = excluded.at`,
       )
       .bind(id, net, dayOf(now));
+  }
+
+  async reportWasFalse(id: string, net: string, now: number): Promise<Acted> {
     const clearing = this.#db
       .prepare("UPDATE reports SET cleared = 1 WHERE doc = ?1 AND net = ?2 AND cleared = 0")
       .bind(id, net);
-    return this.#actedAndLogged([naming, clearing], this.#logIfChanged(id, "false_report", now));
+    return this.#actedAndLogged(
+      [this.#namingFalse(id, net, now), clearing],
+      this.#logIfChanged(id, "false_report", now),
+    );
+  }
+
+  async networkWasFalse(id: string, net: string, now: number): Promise<Acted> {
+    const clearing = this.#db.prepare("UPDATE reports SET cleared = 1 WHERE net = ? AND cleared = 0").bind(net);
+    return this.#actedAndLogged(
+      [this.#namingFalse(id, net, now), clearing],
+      this.#logIfChanged(id, "false_network", now),
+    );
   }
 
   async opened(id: string, reason: string, now: number): Promise<Acted> {

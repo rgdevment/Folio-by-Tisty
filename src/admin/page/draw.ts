@@ -5,11 +5,13 @@ export interface Doing {
   reject: (id: string) => void;
   reportWasFalse: (id: string, net: string) => void;
   forgetContact: (id: string, net: string) => void;
+  networkWasFalse: (id: string, net: string) => void;
   opened: (id: string) => void;
   copy: (said: string) => void;
   panic: (id: string, version: number) => void;
   verifyLink: (id: string, version: number) => void;
   handedOver: (id: string) => void;
+  reportsPage: (from: number) => void;
 }
 
 const STAGES: Record<string, string> = {
@@ -67,6 +69,11 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
     button(page, "Era falsa", () => doing.reportWasFalse(report.doc, report.net)),
     button(page, "Botón de pánico", () => doing.panic(report.doc, report.version), true),
   ];
+  if (report.fromFalseNet) {
+    buttons.push(
+      button(page, "Descartar todas las de esta red", () => doing.networkWasFalse(report.doc, report.net), true),
+    );
+  }
   if (report.sealedLink) {
     const sealed = report.sealedLink;
     card.append(piece(page, "code", "sealed", sealed));
@@ -136,6 +143,20 @@ const filled = (place: Element, page: Document, cards: HTMLElement[], none: stri
   place.replaceChildren(...(cards.length > 0 ? cards : [piece(page, "p", "card-line", none)]));
 };
 
+const pagesOfReports = (page: Document, queue: Queue, doing: Doing): HTMLElement[] => {
+  const { reports, reportsFrom: from, reportsTotal: total } = queue;
+  if (from === 0 && total <= reports.length) return [];
+  const until = from + reports.length;
+  return [
+    piece(page, "p", "card-line", `Se ven de la ${from + 1} a la ${until} de ${total}.`),
+    actions(
+      page,
+      ...(from > 0 ? [button(page, "Volver al inicio", () => doing.reportsPage(0))] : []),
+      ...(until < total ? [button(page, "Ver las siguientes", () => doing.reportsPage(until))] : []),
+    ),
+  ];
+};
+
 export const drawQueue = (page: Document, queue: Queue, doing: Doing): void => {
   const place = (id: string): Element => page.getElementById(id) as Element;
   place("state").textContent = `Servicio ${STAGES[queue.stage] ?? queue.stage}. Llaves nuevas hoy: ${queue.newKeys}.`;
@@ -148,19 +169,7 @@ export const drawQueue = (page: Document, queue: Queue, doing: Doing): void => {
   filled(
     place("reports"),
     page,
-    [
-      ...queue.reports.map((one) => reportCard(page, one, doing)),
-      ...(queue.reportsTotal > queue.reports.length
-        ? [
-            piece(
-              page,
-              "p",
-              "card-line",
-              `Se ven las ${queue.reports.length} más graves y recientes de ${queue.reportsTotal}.`,
-            ),
-          ]
-        : []),
-    ],
+    [...queue.reports.map((one) => reportCard(page, one, doing)), ...pagesOfReports(page, queue, doing)],
     "Ninguna.",
   );
   filled(

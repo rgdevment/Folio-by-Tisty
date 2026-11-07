@@ -84,6 +84,8 @@ export interface Reported {
 
 export interface News {
   reports: { doc: string; category: string; nets: number }[];
+  reportsTotal: number;
+  reportLines: number;
   blocked: string[];
   appealed: string[];
   newKeys: number;
