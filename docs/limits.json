@@ -8,6 +8,8 @@
   ],
   "shares_at_most": 2,
   "languages_at_most": 20,
+  "days_a_key_is_new": 30,
+  "new_key_bytes_at_most": 25000000,
   "envelope_bytes_at_most": 24000000,
   "first_bytes_at_most": 2512000,
   "rest_bytes_at_most": 15572000,
@@ -30,8 +32,8 @@
   "oldest_contract_served": null,
   "terms": {
     "version": "13",
-    "es": "935b24125a86f3e4847f4b57eea5593f3f135ab2e6025aa1a858393781d0de33",
-    "en": "7ac3d54757968d7a2752cfeb9940500c063f37e684c0787a11e722b51b1d38eb"
+    "es": "9f81aa6c6cd568022186502d548b9de60048d52f53f4f8ac8394cc46d44c58dc",
+    "en": "894409bb5a69256388985aaae8094d8b6bd41828ad44db2cd45e286075bca4b6"
   },
   "sharing_open": true
 }

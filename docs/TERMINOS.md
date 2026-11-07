@@ -91,9 +91,10 @@ con lo que lees es tu responsabilidad.
   día no sube ninguna más. Cuenta la llave del dueño y la de quien firma la
   versión: si una es nueva, la versión también.
 - **Mientras tu llave es nueva, tus documentos guardan juntos hasta 25 MB,**
-  contando las versiones que conservan. Para subir más, espera a que alguno
-  caduque o deja de compartirlo. No cuenta la versión que espera un documento
-  cuyo reclamo se aceptó solo.
+  contando las versiones que conservan. Cada grupo distinto de adjuntos cuenta
+  como 5 MB, lo más que puede pesar. Para subir más, espera a que alguno caduque
+  o deja de compartirlo. No cuentan los documentos bloqueados ni la versión que
+  espera un documento cuyo reclamo se aceptó solo.
 - **Cuando Folio guarda 80 GB,** solo acepta versiones de llaves que no son
   nuevas, salvo la del dueño que espera un documento cuyo reclamo se aceptó
   solo. Con 100 GB no acepta ninguna hasta que se libere espacio.

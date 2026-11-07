@@ -90,9 +90,10 @@ but what you do with what you read is your responsibility.
   uploads more. Both the owner's key and the signer's count: if either is new,
   so is the version.
 - **While your key is new, your documents hold up to 25 MB together,**
-  counting the versions they keep. To upload more, wait for one to expire or
-  stop sharing it. The version a document awaits after its appeal was accepted
-  on its own does not count.
+  counting the versions they keep. Each distinct set of attachments counts as
+  5 MB, the most it may weigh. To upload more, wait for one to expire or stop
+  sharing it. Blocked documents do not count, nor the version a document awaits
+  after its appeal was accepted on its own.
 - **Once Folio holds 80 GB,** it only takes versions from keys that are not new,
   except the owner's version that a document awaits after its appeal was
   accepted on its own. At 100 GB it takes none until space frees up.
