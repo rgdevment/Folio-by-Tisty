@@ -22,6 +22,36 @@ export const pictureAddresses = (said: Picture[], bytes: Bytes[]): (string | nul
     return URL.createObjectURL(new Blob([held], { type: picture.kind }));
   });
 
+const hostOf = (where: string): string | null => {
+  try {
+    return new URL(where).host;
+  } catch {
+    return null;
+  }
+};
+
+const BARE_WWW = /^www\./;
+
+// A word in another alphabet can look like the address and read the same once parsed, so it has to say it literally.
+const saysItsHost = (said: string, host: string): boolean => {
+  const text = said.trim().toLowerCase();
+  const parsed = hostOf(text.includes("://") ? text : `https://${text}`);
+  return (
+    parsed !== null &&
+    text.includes(host.replace(BARE_WWW, "")) &&
+    parsed.replace(BARE_WWW, "") === host.replace(BARE_WWW, "")
+  );
+};
+
+const whereItGoes = (where: string, said: string): string | null => {
+  if (/^mailto:/i.test(where)) {
+    const address = where.slice("mailto:".length).split("?", 1)[0] ?? "";
+    return said.trim().toLowerCase() === address.toLowerCase() ? null : address;
+  }
+  const host = hostOf(where);
+  return host === null || saysItsHost(said, host) ? null : host;
+};
+
 export const finished = (words: DocumentFragment, addresses: (string | null)[]): DocumentFragment => {
   for (const callout of words.querySelectorAll("blockquote[data-callout]")) {
     callout.setAttribute("data-said", CALLOUTS[callout.getAttribute("data-callout") ?? ""] ?? CALLOUTS.note ?? "");
@@ -37,6 +67,13 @@ export const finished = (words: DocumentFragment, addresses: (string | null)[]):
     if (LEAVES.test(where)) {
       link.setAttribute("target", "_blank");
       link.setAttribute("rel", "noopener noreferrer");
+      const goes = whereItGoes(where, link.textContent ?? "");
+      if (goes) {
+        const shown = link.ownerDocument.createElement("span");
+        shown.className = "link-where";
+        shown.textContent = ` (${goes})`;
+        link.after(shown);
+      }
     } else if (FILE.test(where)) {
       // A press asks for it, and no address ever does: what follows the # is the link key.
       link.removeAttribute("href");

@@ -711,6 +711,12 @@ a[data-file]:not(.card) {
   text-decoration: underline dotted;
 }
 
+.link-where {
+  color: var(--tisty-faint);
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+
 .file-said {
   margin-left: 6px;
   color: var(--tisty-faint);

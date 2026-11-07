@@ -149,6 +149,47 @@ describe("a click on what the sheet links to", () => {
   });
 });
 
+describe("where a link goes", () => {
+  const whereOf = (html: string): string | null => {
+    const cleaner = domPurifyCleaner(place);
+    const words = finished(cleaner.clean(html), []);
+    return words.querySelector(".link-where")?.textContent ?? null;
+  };
+
+  it.each([
+    ["other words", '<a href="https://evil.example/x">tu banco</a>', " (evil.example)"],
+    ["another address in its words", '<a href="https://evil.example/">banco.cl</a>', " (evil.example)"],
+    ["a name before an at sign", '<a href="https://banco.cl@evil.example/">https://banco.cl</a>', " (evil.example)"],
+    [
+      "its address as part of another",
+      '<a href="https://banco.cl.evil.example/">banco.cl</a>',
+      " (banco.cl.evil.example)",
+    ],
+    ["look-alike letters", '<a href="https://xn--bnco-53d.cl/">b\u0430nco.cl</a>', " (xn--bnco-53d.cl)"],
+    ["its address among other words", '<a href="https://evil.example/">mira evil.example ahora</a>', " (evil.example)"],
+    ["a mail to someone else", '<a href="mailto:a@evil.example?subject=x">escríbenos</a>', " (a@evil.example)"],
+  ])("shows it for %s", (_, html, shown) => {
+    expect(whereOf(html)).toBe(shown);
+  });
+
+  it.each([
+    ["its own host", '<a href="https://tisty.app/x">tisty.app</a>'],
+    ["its own address", '<a href="https://tisty.app/x">https://tisty.app/x</a>'],
+    ["www or not", '<a href="https://www.tisty.app/">tisty.app</a>'],
+    ["capitals", '<a href="https://tisty.app/">Tisty.App</a>'],
+    ["a mail to that address", '<a href="mailto:a@b.example">A@b.example</a>'],
+    ["what stays in the document", '<a href="tisty:file/0">x</a>'],
+  ])("does not repeat it with %s", (_, html) => {
+    expect(whereOf(html)).toBeNull();
+  });
+
+  it("is written as words, never as markup", () => {
+    const words = finished(domPurifyCleaner(place).clean('<a href="mailto:&lt;img src=x&gt;@e.example">x</a>'), []);
+    expect(words.querySelector(".link-where img")).toBeNull();
+    expect(words.querySelector(".link-where")?.textContent).toContain("<img");
+  });
+});
+
 describe("a card in the words", () => {
   const withWords = (html: string): Document => ({
     ...HELD,
