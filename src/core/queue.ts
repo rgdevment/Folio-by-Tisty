@@ -1,3 +1,5 @@
+export const GRAVEST_FIRST = "category = 'csam' DESC, level = 'grave' DESC";
+
 export interface QueuedReport {
   doc: string;
   net: string;
@@ -28,6 +30,7 @@ export interface Queue {
   stage: string;
   newKeys: number;
   reportsTotal: number;
+  reportsFrom: number;
   reports: QueuedReport[];
   docs: QueuedDoc[];
 }

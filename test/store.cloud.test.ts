@@ -1352,7 +1352,7 @@ describe("reports", () => {
   it("carries a report found false to other documents, and does not let them hold one past its days", async () => {
     await store.create(newDoc("d1"), DAY);
     for (const net of ["a", "b", "c"]) await report(net);
-    for (const net of ["a", "b", "c"]) await foundFalse(net);
+    for (const net of ["a", "b", "c"]) await foundFalse(net, "d1", DAY - 1);
     await store.create(newDoc("d2", { owner: "o2" }), DAY);
     for (const net of ["a", "b", "c"]) expect((await report(net, "d2")).blocked).toBe(false);
     await store.sweep(DAY + 5);

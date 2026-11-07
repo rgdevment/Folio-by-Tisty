@@ -11,10 +11,9 @@ export interface DigestTools {
 
 const SEEN_AT_MOST = 50;
 
-const listOf = (title: string, lines: string[]): string[] => {
+const listOf = (title: string, lines: string[], more = lines.length >= SEEN_AT_MOST): string[] => {
   if (lines.length === 0) return [];
-  const more = lines.length >= SEEN_AT_MOST ? ["(hay más)"] : [];
-  return [title, ...lines, ...more, ""];
+  return [title, ...lines, ...(more ? ["(hay más)"] : []), ""];
 };
 
 const dateOf = (day: number): string => new Date(day * DAY_MS).toISOString().slice(0, 10);
@@ -24,8 +23,9 @@ const textOf = (stage: Stage, was: Stage, news: News, keysSaid: number, panel?: 
     ...(stage === was ? [] : [`Servicio: ${stage} (antes: ${was})`, ""]),
     ...(keysSaid > 0 ? [`Llaves nuevas el ${dateOf(news.newKeysDay)}: ${keysSaid}`, ""] : []),
     ...listOf(
-      "Denuncias nuevas:",
+      `Denuncias nuevas (${news.reportsTotal}):`,
       news.reports.map(({ doc, category, nets }) => `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}`),
+      news.reportLines > news.reports.length,
     ),
     ...listOf("Bloqueados:", news.blocked),
     ...listOf("Reclamos:", news.appealed),

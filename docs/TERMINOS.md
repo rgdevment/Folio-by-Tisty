@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 8, vigente desde el 6 de noviembre de 2026.**
+**Versión 9, vigente desde el 6 de noviembre de 2026.**
 
 ## En corto
 
@@ -139,9 +139,11 @@ para denunciar: guarda un resumen de la red.
   dejas de compartirlo, no se sirve, pero su copia queda hasta 180 días desde la
   denuncia, por si una autoridad la pide. Una orden puede pedir más.
 - **Una denuncia falsa se descarta.** Si el link que trae no abre el documento,
-  o el operador comprueba que era falsa, la descarta, y las denuncias de esa red
-  dejan de contar en todos los documentos hasta 180 días. Hasta entonces cuenta
-  como cualquier otra. Si se acepta un reclamo, las denuncias sobre esa versión
+  o el operador comprueba que era falsa, la descarta; hasta entonces cuenta como
+  cualquier otra. Desde entonces y hasta por 180 días, las denuncias de esa red
+  no cuentan para bloquear ni conservan nada. Lo que esa red denunció antes se
+  sigue conservando, porque una red suele ser compartida, salvo que el operador
+  también lo descarte. Si se acepta un reclamo, las denuncias sobre esa versión
   dejan de contar, pero una versión nueva se puede denunciar.
 - **Puedes reclamar una vez por documento** en tu link de administrar. Si todas
   las versiones denunciadas las firmó alguien a quien dejaste editar, y no hay
