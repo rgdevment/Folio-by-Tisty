@@ -980,7 +980,7 @@ describe("what stops a version", () => {
 
     it.each([
       ["says nothing of them", ""],
-      ["accepted an older version", "8"],
+      ["accepted one older than the last", "7"],
       ["is more than one ahead", "11"],
       ["names a version that will never exist", "9999999999999999"],
     ])("refuses a new document that %s, names the version, and keeps nothing", async (_what, terms) => {
@@ -991,9 +991,10 @@ describe("what stops a version", () => {
       expect(await keyRow(rootOf(fresh))).toBeNull();
     });
 
-    it("takes the version in force and the next, as numbers, while a deploy catches up", async () => {
+    it("takes the version in force, the next while a deploy catches up, and the last while caches do", async () => {
       expect((await sharing(await newPerson(), "9")).answer).toEqual({ stored: true, version: 1 });
       expect((await sharing(await newPerson(), "10")).answer).toEqual({ stored: true, version: 1 });
+      expect((await sharing(await newPerson(), "8")).answer).toEqual({ stored: true, version: 1 });
     });
 
     it("keeps the version beside a new key, to the hour, so it names no upload", async () => {
@@ -1070,10 +1071,10 @@ describe("what stops a version", () => {
       expect((await keyRow(rootOf(fresh)))?.terms_version).toBe("9");
     });
 
-    it("refuses the next version of what is shared when the terms moved on", async () => {
+    it("refuses the next version of what is shared when the terms moved on twice", async () => {
       const fresh = await newPerson();
       const { id } = await sharing(fresh, "9");
-      expect(await nextVersion(id, fresh, "8")).toEqual({ refused: "terms", version: "9" });
+      expect(await nextVersion(id, fresh, "7")).toEqual({ refused: "terms", version: "9" });
     });
 
     it("keeps reading what was shared under older terms", async () => {

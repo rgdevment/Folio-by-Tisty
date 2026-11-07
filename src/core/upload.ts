@@ -31,12 +31,12 @@ export interface UploadTools extends ReadTools {
   termsVersion: string;
 }
 
-// One ahead, for the time between publishing the signed file and deploying what reads it.
+// One ahead while a deploy catches up with the signed file, and one behind while readers' caches do: nobody waits on either.
 const termsAccepted = ({ terms }: Envelope, { termsVersion }: UploadTools): string | null => {
   if (terms === undefined) return null;
   const said = BigInt(terms);
   const inForce = BigInt(termsVersion);
-  return said === inForce || said === inForce + 1n ? terms : null;
+  return said >= inForce - 1n && said <= inForce + 1n ? terms : null;
 };
 
 export type UploadAnswer = { stored: true; version: number; filesWanted?: true } | Refused;
