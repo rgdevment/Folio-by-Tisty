@@ -782,6 +782,8 @@ describe("what stops a version", () => {
 
     it("uploads no new document, and keeps nothing of it", async () => {
       const fresh = await newPerson();
+      const before = await started();
+      await send(before.id, await sealedEnvelope({ id: before.id, version: 1, owner: fresh }), NOW, before);
       await blocked().blockKey(rootOf(fresh), "abuse", NOW);
       const first = await started();
       const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: fresh });
@@ -801,11 +803,20 @@ describe("what stops a version", () => {
 
     it("uploads again once lifted", async () => {
       const fresh = await newPerson();
+      const first = await started();
+      await send(first.id, await sealedEnvelope({ id: first.id, version: 1, owner: fresh }), NOW, first);
       await blocked().blockKey(rootOf(fresh), "abuse", NOW);
       await blocked().unblockKey(rootOf(fresh), NOW);
-      const first = await started();
-      const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: fresh });
-      expect(await send(first.id, bytes, NOW, first)).toEqual({ stored: true, version: 1 });
+      const next = await sealedEnvelope({ id: first.id, version: 2, owner: fresh });
+      expect(await send(first.id, next, LATER)).toEqual({ stored: true, version: 2 });
+    });
+
+    it("takes no version of its documents from an editor either", async () => {
+      const { pair, permit } = await newToken();
+      const id = await shared({ permit });
+      await blocked().blockKey(rootOf(mario), "abuse", NOW);
+      const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+      expect(await send(id, edited, LATER)).toEqual({ refused: "key_blocked" });
     });
   });
 

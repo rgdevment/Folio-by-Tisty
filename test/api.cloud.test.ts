@@ -528,6 +528,7 @@ const UPLOADING: Scenario[] = [
     upload: envelope(2),
     ready: async () => {
       await shareSigned();
+      await store.keepKeys([toBase64Url(owner.rootBytes)], TODAY);
       await new CloudModeration(testEnv.DB).blockKey(toBase64Url(owner.rootBytes), "abuse", Date.now());
     },
   },

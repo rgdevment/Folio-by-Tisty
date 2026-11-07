@@ -15,9 +15,9 @@ const answered = async (asking: () => Promise<Response>): Promise<Response | nul
   }
 };
 
-const sent = (path: string, body?: unknown, on = "docs"): Promise<Response | null> =>
+const sent = (path: string, body?: unknown): Promise<Response | null> =>
   answered(() =>
-    fetch(`/api/${on}/${path}`, {
+    fetch(`/api/${path}`, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Folio-Operator": "1", "Content-Type": "application/json" },
@@ -25,8 +25,8 @@ const sent = (path: string, body?: unknown, on = "docs"): Promise<Response | nul
     }),
   );
 
-const asked = async (path: string, note?: string, on?: string): Promise<boolean> =>
-  (await sent(path, note === undefined ? undefined : { note }, on))?.ok ?? false;
+const asked = async (path: string, note?: string): Promise<boolean> =>
+  (await sent(path, note === undefined ? undefined : { note }))?.ok ?? false;
 
 const showCaseLink = (link: string, says: string): void => {
   (document.getElementById("case-link-said") as HTMLElement).textContent = says;
@@ -48,7 +48,7 @@ const copying = (text: string, says: string): void => {
 
 const caseMade = async (id: string, version: number, says: string, records?: unknown): Promise<boolean> => {
   const made = await madeCase(id, version, records);
-  if (!(await sent(`${id}/case`, made.body))?.ok) return false;
+  if (!(await sent(`docs/${id}/case`, made.body))?.ok) return false;
   showCaseLink(made.link, says);
   return true;
 };
@@ -61,7 +61,7 @@ const verifying = async (id: string, version: number): Promise<void> => {
 
 const panicking = async (id: string, version: number, note: string): Promise<void> => {
   said.textContent = "Trabajando…";
-  const held = await sent(`${id}/panic`, { note });
+  const held = await sent(`docs/${id}/panic`, { note });
   if (!held?.ok) {
     said.textContent = COULD_NOT;
     return;
@@ -96,7 +96,7 @@ const purging = async (id: string): Promise<void> => {
   const note = prompt("¿Por qué se borran?");
   if (!note?.trim()) return;
   said.textContent = "Trabajando…";
-  const purge = await sent(`${id}/purge_owner`, { note });
+  const purge = await sent(`docs/${id}/purge_owner`, { note });
   if (!purge?.ok) {
     said.textContent = COULD_NOT;
     return;
@@ -122,25 +122,25 @@ const load = async (): Promise<void> => {
     return;
   }
   drawQueue(document, queue, {
-    accept: (id) => confirmed(`¿Aceptar y desbloquear ${id}?`, `${id}/accept`),
-    reject: (id) => confirmed(`¿Rechazar el reclamo de ${id}? Sigue bloqueado.`, `${id}/reject`),
+    accept: (id) => confirmed(`¿Aceptar y desbloquear ${id}?`, `docs/${id}/accept`),
+    reject: (id) => confirmed(`¿Rechazar el reclamo de ${id}? Sigue bloqueado.`, `docs/${id}/reject`),
     clearWarning: (id) =>
-      confirmed(`¿Quitar el aviso de ${id}? Sus denuncias leves dejan de contar.`, `${id}/clear_warning`),
+      confirmed(`¿Quitar el aviso de ${id}? Sus denuncias leves dejan de contar.`, `docs/${id}/clear_warning`),
     networkWasFalse: (id, net) =>
       confirmed(
         "¿Descartar todas las denuncias de esta red? Si es compartida, puede incluir denuncias reales, y sus documentos dejarán de retenerse.",
-        `${id}/reports/${net}/false_network`,
+        `docs/${id}/reports/${net}/false_network`,
       ),
     forgetContact: (id, net) =>
       confirmed(
         "¿Borrar el correo de esta denuncia? Sigue hasta 30 días en los respaldos cifrados.",
-        `${id}/reports/${net}/forget_contact`,
+        `docs/${id}/reports/${net}/forget_contact`,
       ),
     reportWasFalse: (id, net) =>
-      confirmed("¿Esta denuncia era falsa? Esa red dejará de contar.", `${id}/reports/${net}/false`),
+      confirmed("¿Esta denuncia era falsa? Esa red dejará de contar.", `docs/${id}/reports/${net}/false`),
     opened: (id) => {
       const reason = prompt("¿Por qué se abrió este documento?");
-      if (reason?.trim()) void doing(`${id}/opened`, reason);
+      if (reason?.trim()) void doing(`docs/${id}/opened`, reason);
     },
     panic: (id, version) => {
       const note = prompt(`¿Por qué bloquear y retener ${id}? Dejará de servirse y se retiene 180 días.`);
@@ -148,10 +148,10 @@ const load = async (): Promise<void> => {
     },
     blockKey: (root) => {
       const reason = prompt(`¿Por qué bloquear la llave ${root}? No podrá subir nada más, y lo ya compartido sigue.`);
-      if (reason?.trim()) void doing(`${root}/block`, reason, "keys");
+      if (reason?.trim()) void doing(`keys/${root}/block`, reason);
     },
     unblockKey: (root) => {
-      if (confirm(`¿Desbloquear la llave ${root}?`)) void doing(`${root}/unblock`, undefined, "keys");
+      if (confirm(`¿Desbloquear la llave ${root}?`)) void doing(`keys/${root}/unblock`);
     },
     purgeOwner: (id) => void purging(id),
     verifyLink: (id, version) => void verifying(id, version),
@@ -162,16 +162,16 @@ const load = async (): Promise<void> => {
     handedOver: (id) =>
       confirmed(
         "¿Ya entregaste el link de caso y la llave a la autoridad? Se borran las llaves selladas de este documento, aunque siguen hasta 30 días en los respaldos cifrados.",
-        `${id}/handed_over`,
+        `docs/${id}/handed_over`,
       ),
     copy: (command) => copying(command, "Copiado. Reemplaza <llave> por la ruta de tu llave y ábrelo en tu equipo."),
   });
   said.textContent = "";
 };
 
-const doing = async (path: string, note?: string, on?: string): Promise<void> => {
+const doing = async (path: string, note?: string): Promise<void> => {
   said.textContent = "Trabajando…";
-  if (await asked(path, note, on)) await load();
+  if (await asked(path, note)) await load();
   else said.textContent = COULD_NOT;
 };
 
@@ -188,14 +188,14 @@ const confirmed = (question: string, path: string): void => {
   event.preventDefault();
   const id = (document.getElementById("block-id") as HTMLInputElement).value.trim();
   const note = (document.getElementById("block-note") as HTMLInputElement).value;
-  if (confirm(`¿Bloquear ${id}? Dejará de servirse.`)) void doing(`${id}/block`, note);
+  if (confirm(`¿Bloquear ${id}? Dejará de servirse.`)) void doing(`docs/${id}/block`, note);
 });
 
 (document.getElementById("key-form") as HTMLFormElement).addEventListener("submit", (event) => {
   event.preventDefault();
   const root = (document.getElementById("key-root") as HTMLInputElement).value.trim();
   const note = (document.getElementById("key-note") as HTMLInputElement).value;
-  if (confirm(`¿Bloquear la llave ${root}? No podrá subir nada más.`)) void doing(`${root}/block`, note, "keys");
+  if (confirm(`¿Bloquear la llave ${root}? No podrá subir nada más.`)) void doing(`keys/${root}/block`, note);
 });
 
 void load();

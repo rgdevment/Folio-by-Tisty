@@ -95,6 +95,9 @@ const row = () =>
     .bind(ID)
     .first<{ blocked_at: number | null; appealed_at: number | null; appealed_hour: number | null }>();
 
+const knownKey = (root: string) =>
+  testEnv.DB.prepare("INSERT OR IGNORE INTO keys (root, first_day) VALUES (?, ?)").bind(root, TODAY).run();
+
 const logged = async () =>
   (
     await testEnv.DB.prepare("SELECT action, note FROM moderation ORDER BY action").all<{
@@ -360,6 +363,7 @@ describe("a block the operator placed", () => {
 describe("what it can do", () => {
   it("blocks a key with its reason on record, lists it, and lifts it", async () => {
     const root = "R".repeat(43);
+    await knownKey(root);
     expect((await acting(`/api/keys/${root}/block`, "abuse")).status).toBe(200);
     const held = await store.admitKey(root, "n", TODAY);
     expect(held.said).toBe("blocked");
@@ -376,17 +380,28 @@ describe("what it can do", () => {
     ]);
   });
 
-  it("will not block a key without a reason, or what is not a key", async () => {
+  it("will not block a key without a reason, what is not a key, or one Folio never saw", async () => {
+    await knownKey("R".repeat(43));
     expect((await acting(`/api/keys/${"R".repeat(43)}/block`)).status).toBe(400);
+    expect((await acting(`/api/keys/${"U".repeat(43)}/block`, "abuse")).status).toBe(404);
+    const kept = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM keys WHERE root = ?")
+      .bind("U".repeat(43))
+      .first<{ n: number }>();
+    expect(kept?.n).toBe(0);
     expect((await acting("/api/keys/short/block", "abuse")).status).toBe(404);
   });
 
   it("names the owner of what was reported, so its key can be blocked", async () => {
     await share();
     await reported();
+    await knownKey("o1");
     const queue = await moderation.queue(NOW);
-    expect(queue.reports[0]?.owner).toBeTruthy();
-    expect(queue.docs[0]?.owner).toBe(queue.reports[0]?.owner);
+    expect(queue.reports[0]?.ownerToBlock).toBe("o1");
+    expect(queue.docs[0]?.ownerToBlock).toBe("o1");
+    await moderation.blockKey("o1", "abuse", NOW);
+    const after = await moderation.queue(NOW);
+    expect(after.reports[0]?.ownerToBlock).toBeNull();
+    expect(after.docs[0]?.ownerToBlock).toBeNull();
   });
 
   it("lists a warning by light reports, and removes it with its reports", async () => {
@@ -610,6 +625,15 @@ describe("what it can do", () => {
       expect((await row())?.blocked_at).toBe(TODAY);
     });
 
+    it("puts the block of its owner's key in the records", async () => {
+      await share();
+      await knownKey("o1");
+      await moderation.blockKey("o1", "same farm", NOW);
+      const response = await acting(`/api/docs/${ID}/panic`, "looks real");
+      const { records } = (await response.json()) as { records: { actions: { action: string; note: string }[] } };
+      expect(records.actions).toContainEqual(expect.objectContaining({ action: "block_key", note: "same farm" }));
+    });
+
     it("will not panic without a reason, or over what does not exist", async () => {
       await share();
       expect((await acting(`/api/docs/${ID}/panic`)).status).toBe(400);
@@ -721,15 +745,17 @@ describe("what it can do", () => {
     expect(await openings()).toEqual([]);
   });
 
-  it("keeps them while an order holds the document", async () => {
+  it("keeps them while an order holds the document, its owner's key's too", async () => {
     await share();
+    await knownKey("o1");
+    await moderation.blockKey("o1", "farm", NOW);
     await acting(`/api/docs/${ID}/block`, "x");
     await acting(`/api/docs/${ID}/opened`, "y");
     await testEnv.DB.prepare("UPDATE docs SET legal_until = ? WHERE id = ?")
       .bind(TODAY + 400, ID)
       .run();
     await store.sweep(TODAY + 181);
-    expect(await logged()).toHaveLength(1);
+    expect(await logged()).toHaveLength(2);
     expect(await openings()).toEqual([ID]);
   });
 

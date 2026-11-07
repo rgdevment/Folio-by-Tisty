@@ -87,8 +87,8 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
       button(page, "Descartar todas las de esta red", () => doing.networkWasFalse(report.doc, report.net), true),
     );
   }
-  const { owner } = report;
-  if (owner) buttons.push(button(page, "Bloquear llave del dueño", () => doing.blockKey(owner), true));
+  const { ownerToBlock } = report;
+  if (ownerToBlock) buttons.push(button(page, "Bloquear llave del dueño", () => doing.blockKey(ownerToBlock), true));
   if (report.sealedLink) {
     const sealed = report.sealedLink;
     card.append(piece(page, "code", "sealed", sealed));
@@ -128,13 +128,14 @@ const docCard = (page: Document, doc: QueuedDoc, doing: Doing, waiting: boolean)
   );
   if (doc.mayCorrect)
     card.append(piece(page, "p", "card-line", "Reclamo aceptado solo: espera una versión de su dueño."));
+  const { ownerToBlock } = doc;
   card.append(
     actions(
       page,
       button(page, "Link para verificar", () => doing.verifyLink(doc.id, doc.versionToOpen)),
       button(page, "Botón de pánico", () => doing.panic(doc.id, doc.versionToOpen), true),
       button(page, "Borrar todo de esta llave", () => doing.purgeOwner(doc.id), true),
-      button(page, "Bloquear llave del dueño", () => doing.blockKey(doc.owner), true),
+      ...(ownerToBlock ? [button(page, "Bloquear llave del dueño", () => doing.blockKey(ownerToBlock), true)] : []),
       ...(doc.mayHandOver ? [button(page, "Ya lo entregué", () => doing.handedOver(doc.id))] : []),
     ),
   );

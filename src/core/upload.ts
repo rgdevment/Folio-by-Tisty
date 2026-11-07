@@ -279,7 +279,8 @@ const storeVersion = async (
   if (!sharing) {
     const hourSpent = await takeUploadHour(net, now, tools);
     if (hourSpent) return hourSpent;
-    const full = await keys.admit([signature.root], accepted);
+    // Its owner's key too, or a blocked owner's documents would carry on through an edit link.
+    const full = await keys.admit([held.owner, signature.root], accepted);
     if (full) return full;
   }
 

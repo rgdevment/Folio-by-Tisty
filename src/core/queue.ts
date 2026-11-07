@@ -2,7 +2,7 @@ export const GRAVEST_FIRST = "category = 'csam' DESC, level = 'grave' DESC";
 
 export interface QueuedReport {
   doc: string;
-  owner: string | null;
+  ownerToBlock: string | null;
   net: string;
   category: string;
   level: string;
@@ -18,7 +18,7 @@ export interface QueuedReport {
 
 export interface QueuedDoc {
   id: string;
-  owner: string;
+  ownerToBlock: string | null;
   latest: number;
   blockedAt: number;
   appealedAt: number | null;

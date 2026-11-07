@@ -86,6 +86,10 @@ export const acceptAppeal = async (
   await db.batch(acceptingAppeal(db, limits, id, today));
 };
 
+const OWNER_TO_BLOCK = (doc: string): string =>
+  `(SELECT d.owner FROM docs d WHERE d.id = ${doc}
+     AND NOT EXISTS (SELECT 1 FROM keys k WHERE k.root = d.owner AND k.blocked_at IS NOT NULL))`;
+
 export class CloudModeration {
   readonly #db: D1Database;
   readonly #limits: Limits;
@@ -101,7 +105,7 @@ export class CloudModeration {
       this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS n FROM net_day WHERE day = ?").bind(dayOf(now)),
       this.#db
         .prepare(
-          `SELECT r.doc, (SELECT owner FROM docs WHERE id = r.doc) AS owner, r.net, r.category, r.level, r.detail, r.sealed_link, r.sealed_contact, r.version, r.at, r.asn, r.over_cap,
+          `SELECT r.doc, ${OWNER_TO_BLOCK("r.doc")} AS owner_to_block, r.net, r.category, r.level, r.detail, r.sealed_link, r.sealed_contact, r.version, r.at, r.asn, r.over_cap,
              r.net IN (SELECT net FROM false_reporters) AS false_net
            ${REPORTS_TO_SEE}
            ORDER BY ROW_NUMBER() OVER (PARTITION BY r.net ORDER BY ${GRAVEST_FIRST}, r.at),
@@ -113,6 +117,7 @@ export class CloudModeration {
       this.#db
         .prepare(
           `SELECT id, owner, latest, versions, blocked_at, appealed_at, appealed_hour, counts_from, blocked_by_operator,
+             ${OWNER_TO_BLOCK("docs.id")} AS owner_to_block,
              COALESCE(
                (SELECT MAX(r.version) FROM reports r
                 WHERE r.doc = docs.id AND r.cleared = 0 AND r.level <> 'light'
@@ -144,7 +149,11 @@ export class CloudModeration {
       reportsTotal: (reportsTotal?.results?.[0] as { n: number } | undefined)?.n ?? 0,
       reportsFrom,
       reports: (
-        (reports?.results ?? []) as (Omit<QueuedReport, "sealedLink" | "sealedContact" | "fromFalseNet"> & {
+        (reports?.results ?? []) as (Omit<
+          QueuedReport,
+          "sealedLink" | "sealedContact" | "fromFalseNet" | "ownerToBlock"
+        > & {
+          owner_to_block: string | null;
           sealed_link: string | null;
           sealed_contact: string | null;
           false_net: number;
@@ -152,6 +161,7 @@ export class CloudModeration {
         })[]
       ).map(
         ({
+          owner_to_block: ownerToBlock,
           sealed_link: sealedLink,
           sealed_contact: sealedContact,
           false_net: falseNet,
@@ -159,6 +169,7 @@ export class CloudModeration {
           ...report
         }) => ({
           ...report,
+          ownerToBlock,
           sealedLink,
           sealedContact,
           fromFalseNet: falseNet === 1,
@@ -170,6 +181,7 @@ export class CloudModeration {
         (docs?.results ?? []) as {
           id: string;
           owner: string;
+          owner_to_block: string | null;
           latest: number;
           versions: string;
           blocked_at: number;
@@ -182,7 +194,7 @@ export class CloudModeration {
         }[]
       ).map((row) => ({
         id: row.id,
-        owner: row.owner,
+        ownerToBlock: row.owner_to_block,
         latest: row.latest,
         blockedAt: row.blocked_at,
         appealedAt: row.appealed_at,
@@ -243,11 +255,8 @@ export class CloudModeration {
 
   async blockKey(root: string, note: string, now: number): Promise<Acted> {
     const blocking = this.#db
-      .prepare(
-        `INSERT INTO keys (root, first_day, blocked_at) VALUES (?1, ?2, ?2)
-         ON CONFLICT (root) DO UPDATE SET blocked_at = ?2 WHERE blocked_at IS NULL`,
-      )
-      .bind(root, dayOf(now));
+      .prepare("UPDATE keys SET blocked_at = ? WHERE root = ? AND blocked_at IS NULL")
+      .bind(dayOf(now), root);
     return this.#actedAndLogged([blocking], this.#logIfChanged(root, "block_key", now, note));
   }
 
@@ -350,7 +359,10 @@ export class CloudModeration {
         )
         .bind(id, REPORT_ROWS_AT_MOST),
       this.#db
-        .prepare("SELECT at, action, note FROM moderation WHERE doc = ? ORDER BY at DESC LIMIT ?")
+        .prepare(
+          `SELECT at, action, note FROM moderation WHERE doc = ?1 OR doc = (SELECT owner FROM docs WHERE id = ?1)
+           ORDER BY at DESC LIMIT ?2`,
+        )
         .bind(id, RECORD_ROWS_AT_MOST),
       this.#db
         .prepare("SELECT at, reason FROM openings WHERE doc = ? ORDER BY at DESC LIMIT ?")

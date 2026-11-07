@@ -15,7 +15,7 @@ const QUEUE: Queue = {
   reports: [
     {
       doc: "AbCdEfGh",
-      owner: "OWNERROOT",
+      ownerToBlock: "OWNERROOT",
       net: "n1",
       category: "csam",
       level: "grave",
@@ -30,7 +30,7 @@ const QUEUE: Queue = {
     },
     {
       doc: "IjKlMnOp",
-      owner: "OWNERROOT",
+      ownerToBlock: null,
       net: "n2",
       category: "phishing",
       level: "medium",
@@ -47,7 +47,7 @@ const QUEUE: Queue = {
   docs: [
     {
       id: "AbCdEfGh",
-      owner: "OWNERROOT",
+      ownerToBlock: "OWNERROOT",
       latest: 2,
       blockedAt: 20_000,
       appealedAt: 20_001,
@@ -62,7 +62,7 @@ const QUEUE: Queue = {
     },
     {
       id: "QrStUvWx",
-      owner: "OWNERROOT",
+      ownerToBlock: null,
       latest: 1,
       blockedAt: 20_000,
       appealedAt: 20_001,
@@ -74,7 +74,7 @@ const QUEUE: Queue = {
     },
     {
       id: "YzAbCdEf",
-      owner: "OWNERROOT",
+      ownerToBlock: "OWNERROOT",
       latest: 1,
       blockedAt: 20_000,
       appealedAt: null,
@@ -471,12 +471,7 @@ describe("the panel", () => {
     const cards = blocked.querySelectorAll(".card");
     expect(cards[0]?.textContent).toContain("espera una versión de su dueño");
     const offered = [...(cards[0] as Element).querySelectorAll("button")].map((one) => one.textContent);
-    expect(offered).toEqual([
-      "Link para verificar",
-      "Botón de pánico",
-      "Borrar todo de esta llave",
-      "Bloquear llave del dueño",
-    ]);
+    expect(offered).toEqual(["Link para verificar", "Botón de pánico", "Borrar todo de esta llave"]);
     pressing("blocked", "Desbloquear");
     expect(doing.accept).toHaveBeenCalledWith("YzAbCdEf");
   });
@@ -553,6 +548,15 @@ describe("the panel", () => {
     expect(doing.blockKey).toHaveBeenCalledWith("OWNERROOT");
     pressing("appeals", "Bloquear llave del dueño");
     expect(doing.blockKey).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not offer to block a key that is already blocked", () => {
+    const cards = (page.getElementById("reports") as Element).querySelectorAll(".card");
+    expect(cards[1]?.textContent).toContain("IjKlMnOp");
+    expect(cards[1]?.textContent).not.toContain("Bloquear llave del dueño");
+    const blocked = (page.getElementById("blocked") as Element).querySelectorAll(".card");
+    expect(blocked[0]?.textContent).toContain("QrStUvWx");
+    expect(blocked[1]?.textContent).toContain("Bloquear llave del dueño");
   });
 
   it("lists the blocked keys, each with a way to lift it", () => {

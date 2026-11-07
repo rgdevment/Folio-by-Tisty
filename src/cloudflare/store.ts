@@ -930,7 +930,10 @@ export class Cloud implements Store {
           .bind(today - this.#limits.evidenceDays, today),
         ...["moderation", "openings"].map((log) =>
           this.#db
-            .prepare(`DELETE FROM ${log} WHERE at < ?1 AND doc NOT IN (SELECT id FROM docs WHERE legal_until >= ?2)`)
+            .prepare(
+              `DELETE FROM ${log} WHERE at < ?1
+               AND doc NOT IN (SELECT id FROM docs WHERE legal_until >= ?2 UNION SELECT owner FROM docs WHERE legal_until >= ?2)`,
+            )
             .bind((today - this.#limits.evidenceDays) * DAY_MS, today),
         ),
       ]);
