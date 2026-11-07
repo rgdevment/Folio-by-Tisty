@@ -20,6 +20,7 @@ interface Env extends Bindings, SpendBindings, MailBindings {
   DIGEST_HEARTBEAT_URL?: string;
   ADMIN_URL?: string;
   SHARING_OPEN?: string;
+  TESTER_ROOTS?: string;
   FOLIO_TAG?: string;
 }
 
@@ -53,6 +54,7 @@ export default {
         limits: LEVEL_ONE,
         secret: env.FOLIO_SECRET,
         sharingOpen: env.SHARING_OPEN === "true",
+        testerRoots: new Set((env.TESTER_ROOTS ?? "").split(/[\s,]+/).filter((root) => root !== "")),
         termsVersion: SIGNED_LIMITS.terms.version,
         limiter: { allows: async (key) => (await env.READS.limit({ key })).success },
         syncLimiter: { allows: async (key) => (await env.SYNCS.limit({ key })).success },
