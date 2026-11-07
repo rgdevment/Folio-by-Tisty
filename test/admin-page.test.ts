@@ -10,6 +10,7 @@ const QUEUE: Queue = {
   newKeys: 7,
   reportsTotal: 2,
   reportsFrom: 0,
+  warned: [{ id: "WaRnEdDc", fixBy: 20_003, nets: 12 }],
   reports: [
     {
       doc: "AbCdEfGh",
@@ -103,6 +104,7 @@ beforeEach(() => {
     forgetContact: vi.fn(),
     reportsPage: vi.fn(),
     networkWasFalse: vi.fn(),
+    clearWarning: vi.fn(),
   };
   drawQueue(page, QUEUE, doing as unknown as Doing);
 });
@@ -199,6 +201,22 @@ describe("erasing a key from the panel", () => {
     await vi.waitFor(() => expect(SAID_OF()).toContain("Se conservan 2"));
     expect(questions).toEqual([]);
     expect(erasing()).toHaveLength(0);
+  });
+});
+
+describe("a warning by light reports", () => {
+  it("shows how many networks and until when, and can be removed", () => {
+    const shown = page.getElementById("warned")?.textContent;
+    expect(shown).toContain("WaRnEdDc");
+    expect(shown).toContain("12 redes");
+    expect(shown).toContain(new Date(20_003 * 86_400_000).toISOString().slice(0, 10));
+    pressing("warned", "Quitar aviso");
+    expect(doing.clearWarning).toHaveBeenCalledWith("WaRnEdDc");
+  });
+
+  it("says when there is none", () => {
+    drawQueue(page, { ...QUEUE, warned: [] }, doing as unknown as Doing);
+    expect(page.getElementById("warned")?.textContent).toBe("Ninguno.");
   });
 });
 
@@ -463,7 +481,7 @@ describe("the panel", () => {
   it("says when there is nothing", () => {
     drawQueue(
       page,
-      { stage: "open", newKeys: 0, reportsTotal: 0, reportsFrom: 0, reports: [], docs: [] },
+      { stage: "open", newKeys: 0, reportsTotal: 0, reportsFrom: 0, reports: [], docs: [], warned: [] },
       doing as unknown as Doing,
     );
     expect(page.getElementById("reports")?.textContent).toBe("Ninguna.");

@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 9, in force since November 6, 2026.**
+**Version 10, in force since November 6, 2026.**
 
 ## The short version
 
@@ -110,8 +110,9 @@ you are to report: it keeps a digest of the network.
 
 - **Anyone with the link can report** from the page where it is read. Each
   network reports once per document, and Folio asks its browser for a small
-  piece of computing work to slow abuse. Whoever does not have the link can
-  write to <abuso@tisty.app> or go to the PDI or the prosecutor.
+  piece of computing work to slow abuse. A report of deceit or a grave one must
+  say why in a sentence. Whoever does not have the link can write to
+  <abuso@tisty.app> or go to the PDI or the prosecutor.
 - **In a report of deceit or a grave one you may leave your email, if you
   want.** It serves to clear up doubts and filter out false reports, and nobody
   checks it is yours. It is encrypted so only the operator can read it, and it
@@ -122,10 +123,11 @@ you are to report: it keeps a digest of the network.
   answer, the operator may do nothing with a report of deceit, but not answering
   does not make it false, and a grave one is reviewed anyway.
 - **A light report** (spam, or something annoying or offensive that is no crime)
-  needs nobody to step in. With three networks from at least two providers,
-  whoever shared it sees a warning in their manage link, also from Tisty, and
-  has three days to upload a new version. If they do not, it stops being served
-  until one arrives. A new version takes those reports back to zero.
+  needs nobody to step in. With ten networks from at least two providers in a
+  day, whoever shared it sees a warning in their manage link, also from Tisty,
+  and has three days to upload a new version. If they do not, it stops being
+  served until one arrives. A new version takes those reports back to zero, and
+  the operator can also remove the warning.
 - **A report of deceit** (phishing, malware or a scam) may bring the link to
   read it, if the reporter agrees. With three networks from at least two
   providers, the document is blocked: it stops being served, but is not deleted.
@@ -137,7 +139,7 @@ you are to report: it keeps a digest of the network.
 - **A single report of deceit or a grave one keeps the document:** if it expires
   or you stop sharing it, it is not served, but its copy stays for up to 180
   days from the report, in case an authority asks for it. An order can ask for
-  more.
+  more. Reporting what already expired extends nothing.
 - **A false report is discarded.** If the link it brings does not open the
   document, or the operator finds it false, the operator discards it; until then
   it counts like any other. From then on and for up to 180 days, reports from

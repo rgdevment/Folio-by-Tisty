@@ -26,6 +26,12 @@ export interface QueuedDoc {
   signers: { n: number; byOwner: boolean }[];
 }
 
+export interface QueuedWarning {
+  id: string;
+  fixBy: number;
+  nets: number;
+}
+
 export interface Queue {
   stage: string;
   newKeys: number;
@@ -33,4 +39,5 @@ export interface Queue {
   reportsFrom: number;
   reports: QueuedReport[];
   docs: QueuedDoc[];
+  warned: QueuedWarning[];
 }

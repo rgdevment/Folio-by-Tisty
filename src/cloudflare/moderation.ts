@@ -1,6 +1,6 @@
 import { caseNameOf } from "../core/case-records";
 import { dayOf, LEVEL_ONE, type Limits } from "../core/limits";
-import { GRAVEST_FIRST, type Queue, type QueuedReport } from "../core/queue";
+import { GRAVEST_FIRST, type Queue, type QueuedReport, type QueuedWarning } from "../core/queue";
 import { hourOf } from "../core/start";
 
 export type Acted = "done" | "missing";
@@ -96,7 +96,7 @@ export class CloudModeration {
   }
 
   async queue(now: number, reportsFrom = 0): Promise<Queue> {
-    const [stage, keys, reports, reportsTotal, docs] = await this.#db.batch([
+    const [stage, keys, reports, reportsTotal, docs, warned] = await this.#db.batch([
       this.#db.prepare("SELECT stage FROM service_stage WHERE id = 1"),
       this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS n FROM net_day WHERE day = ?").bind(dayOf(now)),
       this.#db
@@ -127,6 +127,13 @@ export class CloudModeration {
            ORDER BY appealed_hour IS NULL, blocked_at DESC, id LIMIT ?1`,
         )
         .bind(SEEN_AT_MOST, dayOf(now)),
+      this.#db
+        .prepare(
+          `SELECT id, fix_by AS fixBy,
+             (SELECT COUNT(*) FROM reports r WHERE r.doc = docs.id AND r.level = 'light' AND r.cleared = 0) AS nets
+           FROM docs WHERE fix_by IS NOT NULL AND blocked_at IS NULL ORDER BY fix_by, id LIMIT ?`,
+        )
+        .bind(SEEN_AT_MOST),
     ]);
     return {
       stage: (stage?.results?.[0] as { stage: string } | undefined)?.stage ?? "open",
@@ -145,6 +152,7 @@ export class CloudModeration {
         sealedContact,
         fromFalseNet: falseNet === 1,
       })),
+      warned: (warned?.results ?? []) as unknown as QueuedWarning[],
       docs: (
         (docs?.results ?? []) as {
           id: string;
@@ -331,6 +339,17 @@ export class CloudModeration {
       actions: actions?.results ?? [],
       openings: openings?.results ?? [],
     };
+  }
+
+  async clearWarning(id: string, now: number): Promise<Acted> {
+    const clearing = this.#db
+      .prepare(
+        `UPDATE reports SET cleared = 1 WHERE doc = ?1 AND level = 'light' AND cleared = 0
+           AND EXISTS (SELECT 1 FROM docs WHERE id = ?1 AND fix_by IS NOT NULL)`,
+      )
+      .bind(id);
+    const lifting = this.#db.prepare("UPDATE docs SET fix_by = NULL WHERE id = ? AND fix_by IS NOT NULL").bind(id);
+    return this.#actedAndLogged([clearing, lifting], this.#logIfChanged(id, "clear_warning", now));
   }
 
   async forgetContact(id: string, net: string, now: number): Promise<Acted> {

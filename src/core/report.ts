@@ -39,6 +39,11 @@ const linkIsTaken = (link: unknown, category: string, limits: Limits): boolean =
 const detailIsTaken = (detail: unknown, limits: Limits): boolean =>
   isTextUpTo(detail, limits.reportDetailAtMost) && !holdsALink(String(detail ?? ""));
 
+// Whoever reviews it has to know what to look for, and a light report reaches nobody.
+const detailIsEnough = (detail: unknown, category: string, limits: Limits): boolean =>
+  levelOfReport(category) === "light" ||
+  (typeof detail === "string" && detail.trim().length >= limits.reportDetailAtLeast);
+
 const contactIsTaken = (contact: unknown, category: string): boolean =>
   contact === undefined ||
   (levelOfReport(category) !== "light" && typeof contact === "string" && isSealedContact(contact));
@@ -52,6 +57,7 @@ export const saidOf = (body: unknown, limits: Limits): Said | null => {
   if (typeof category !== "string" || levelOfReport(category) === null) return null;
   if (
     !detailIsTaken(detail, limits) ||
+    !detailIsEnough(detail, category, limits) ||
     !linkIsTaken(sealedLink, category, limits) ||
     !contactIsTaken(sealedContact, category) ||
     !versionIsTaken(version)

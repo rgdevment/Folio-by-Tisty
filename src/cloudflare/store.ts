@@ -87,7 +87,13 @@ const LIGHT_REPORT = `${COUNTED_REPORT} AND r.level = 'light'`;
 const WEIGHT_OF = (level: string): string => `CASE ${level} WHEN 'grave' THEN 2 WHEN 'medium' THEN 1 ELSE 0 END`;
 const REPORT_RISES = `${WEIGHT_OF("excluded.level")} > ${WEIGHT_OF("reports.level")}`;
 // Cleared stays cleared for what it was about, so the same networks cannot undo an accepted appeal; a newer version is news.
-const REPORT_REPLACES = `(CASE WHEN reports.cleared = 1 THEN reports.level = 'light' OR excluded.version > reports.version ELSE ${REPORT_RISES} END)`;
+const AFTER_WHAT_WAS_ANSWERED =
+  "excluded.version >= (SELECT d.counts_from FROM docs d WHERE d.id = excluded.doc) AND reports.version < (SELECT d.counts_from FROM docs d WHERE d.id = excluded.doc)";
+const REPORT_REPLACES = `(CASE WHEN reports.cleared = 1 THEN reports.level = 'light' OR excluded.version > reports.version ELSE ${REPORT_RISES} OR (${AFTER_WHAT_WAS_ANSWERED}) END)`;
+// A document stopped today waits for the sweep, and what is reported until then still reaches it.
+const STILL_LIVES = (doc: string, today: string): string =>
+  `(${doc}.dies_on >= ${today} - 1 OR EXISTS (SELECT 1 FROM holds h WHERE h.held = ${doc}.id)
+    OR EXISTS (SELECT 1 FROM docs a WHERE a.id = ${doc}.anchor AND a.dies_on >= ${today} - 1))`;
 const REPORT_MOVES = `(${REPORT_REPLACES} OR (reports.cleared = 0 AND reports.sealed_link IS NULL AND excluded.sealed_link IS NOT NULL))`;
 
 // What keeps a document past its days, not served and not deleted (decision 42). Reports leave once their days pass.
@@ -698,7 +704,7 @@ export class Cloud implements Store {
              CASE WHEN EXISTS (SELECT 1 FROM json_each(d.versions) v WHERE json_extract(v.value, '$.n') = ?10)
                THEN ?10 ELSE d.latest END,
              ?11
-           FROM docs d WHERE d.id = ?1
+           FROM docs d WHERE d.id = ?1 AND ${STILL_LIVES("d", "?3")}
            ON CONFLICT (doc, net) DO UPDATE
              SET at = CASE WHEN reports.cleared = 1 THEN excluded.at
                    WHEN EXISTS (SELECT 1 FROM false_reporters f WHERE f.net = excluded.net) THEN reports.at
@@ -730,25 +736,27 @@ export class Cloud implements Store {
           report.version ?? null,
           report.sealedContact ?? null,
         ),
-      level === "light" ? this.#warnAuthor(report.doc, today) : this.#blockWhenItCounts(report.doc, today, hour),
+      level === "light" ? this.#warnAuthor(report.doc, today, hour) : this.#blockWhenItCounts(report.doc, today, hour),
     ]);
     return { blocked: level !== "light" && (moved?.meta.changes ?? 0) > 0 };
   }
 
-  #warnAuthor(doc: string, today: number): D1PreparedStatement {
+  #warnAuthor(doc: string, today: number, hour: number): D1PreparedStatement {
+    const inTheWindow = `${LIGHT_REPORT} AND r.at_hour > ?6`;
     return this.#db
       .prepare(
         `UPDATE docs SET fix_by = ?1 + ?2
          WHERE id = ?3 AND fix_by IS NULL AND blocked_at IS NULL
-           AND (SELECT COUNT(*) FROM reports r WHERE r.doc = ?3 AND ${LIGHT_REPORT}) >= ?4
-           AND (SELECT COUNT(DISTINCT r.asn) FROM reports r WHERE r.doc = ?3 AND ${LIGHT_REPORT}) >= ?5`,
+           AND (SELECT COUNT(*) FROM reports r WHERE r.doc = ?3 AND ${inTheWindow}) >= ?4
+           AND (SELECT COUNT(DISTINCT r.asn) FROM reports r WHERE r.doc = ?3 AND ${inTheWindow}) >= ?5`,
       )
       .bind(
         today,
         this.#limits.lightFixDays,
         doc,
         this.#limits.lightReportsToWarn,
-        this.#limits.reportOperatorsToBlock,
+        this.#limits.lightOperatorsToWarn,
+        hour - this.#limits.lightWarnHours,
       );
   }
 

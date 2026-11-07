@@ -357,6 +357,38 @@ describe("a block the operator placed", () => {
 });
 
 describe("what it can do", () => {
+  it("lists a warning by light reports, and removes it with its reports", async () => {
+    await share();
+    await testEnv.DB.prepare("UPDATE docs SET fix_by = ? WHERE id = ?")
+      .bind(TODAY + 3, ID)
+      .run();
+    await reported("spam", ["n1", "n2"]);
+    const before = await moderation.queue(NOW);
+    expect(before.warned).toEqual([{ id: ID, fixBy: TODAY + 3, nets: 2 }]);
+    expect((await asked(`/api/docs/${ID}/clear_warning`, { method: "POST" })).status).toBe(403);
+    expect((await acting(`/api/docs/${ID}/clear_warning`)).status).toBe(200);
+    expect((await moderation.queue(NOW)).warned).toEqual([]);
+    const left = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE cleared = 0").first<{ n: number }>();
+    expect(left?.n).toBe(0);
+    expect(await logged()).toEqual([{ action: "clear_warning", note: null }]);
+    expect((await acting(`/api/docs/${ID}/clear_warning`)).status).toBe(404);
+  });
+
+  it("keeps other reports when a warning is removed, and lists no blocked document as warned", async () => {
+    await share();
+    await testEnv.DB.prepare("UPDATE docs SET fix_by = ? WHERE id = ?")
+      .bind(TODAY + 3, ID)
+      .run();
+    await reported("phishing", ["n1"]);
+    await acting(`/api/docs/${ID}/clear_warning`);
+    const left = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE cleared = 0").first<{ n: number }>();
+    expect(left?.n).toBe(1);
+    await testEnv.DB.prepare("UPDATE docs SET fix_by = ?, blocked_at = ? WHERE id = ?")
+      .bind(TODAY + 3, TODAY, ID)
+      .run();
+    expect((await moderation.queue(NOW)).warned).toEqual([]);
+  });
+
   it("discards all of a network's reports only for the operator", async () => {
     await share();
     await reported("phishing", ["n1"]);

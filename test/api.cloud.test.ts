@@ -258,7 +258,7 @@ const FILES_PATH = "/docs/{id}/files";
 const NAMED_FILES_PATH = "/docs/{id}/files/{hash}";
 const PERMIT_PATH = "/docs/{id}/permit";
 
-const REPORT = JSON.stringify({ category: "phishing" });
+const REPORT = JSON.stringify({ category: "phishing", detail: "imita a un banco" });
 const REPORT_PATH = "/docs/{id}/report";
 const APPEAL_PATH = "/docs/{id}/appeal";
 
@@ -623,7 +623,7 @@ const SCENARIOS: Scenario[] = [
     path: REPORT_PATH,
     status: 500,
     refused: "failed",
-    body: JSON.stringify({ category: "csam", sealedLink: `sealed1.${"A".repeat(150)}` }),
+    body: JSON.stringify({ category: "csam", detail: "imita a un banco", sealedLink: `sealed1.${"A".repeat(150)}` }),
     solves: true,
     ready: async () => {
       await share();
