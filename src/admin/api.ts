@@ -3,7 +3,10 @@ import type { AccessSettings, Certs } from "./access";
 import { isOperator } from "./access";
 
 export interface AdminApi {
-  moderation: Pick<CloudModeration, "queue" | "accept" | "reject" | "block" | "reportWasFalse" | "opened">;
+  moderation: Pick<
+    CloudModeration,
+    "queue" | "accept" | "reject" | "block" | "reportWasFalse" | "opened" | "blockKey" | "unblockKey"
+  >;
   access: AccessSettings;
   certs: Certs;
   now: number;
@@ -11,6 +14,7 @@ export interface AdminApi {
 
 const ACTION_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened)$/;
 const FALSE_REPORT_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/false$/;
+const KEY_PATH = /^\/api\/keys\/([A-Za-z0-9_-]{43})\/(block|unblock)$/;
 const SAID_AT_MOST = 500;
 const HEADERS = {
   "Cache-Control": "no-store",
@@ -36,6 +40,13 @@ const noteOf = async (request: Request): Promise<string | null> => {
 const act = async (request: Request, path: string, { moderation, now }: AdminApi): Promise<Response> => {
   const [, reportDoc, net] = FALSE_REPORT_PATH.exec(path) ?? [];
   if (reportDoc && net) return answerOf(await moderation.reportWasFalse(reportDoc, net, now));
+  const [, root, onKey] = KEY_PATH.exec(path) ?? [];
+  if (root && onKey === "unblock") return answerOf(await moderation.unblockKey(root, now));
+  if (root) {
+    const reason = await noteOf(request);
+    if (!reason) return json(400, { refused: "no_reason" });
+    return answerOf(await moderation.blockKey(root, reason, now));
+  }
   const [, id, action] = ACTION_PATH.exec(path) ?? [];
   if (!id) return json(404, { refused: "missing" });
   if (action === "accept") return answerOf(await moderation.accept(id, now));

@@ -35,6 +35,15 @@
           <button type="submit">Bloquear</button>
         </form>
       </section>
+      <section aria-labelledby="keys-title">
+        <h2 id="keys-title">Llaves bloqueadas</h2>
+        <div id="blocked-keys"></div>
+        <form id="key-form" class="block-form">
+          <label>Llave <input id="key-root" required pattern="[A-Za-z0-9_\-]{43}" autocomplete="off" /></label>
+          <label>Motivo <input id="key-note" required maxlength="500" autocomplete="off" /></label>
+          <button type="submit">Bloquear llave</button>
+        </form>
+      </section>
     </main>
   </body>
 </html>

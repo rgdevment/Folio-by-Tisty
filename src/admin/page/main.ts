@@ -14,9 +14,9 @@ const answered = async (asking: () => Promise<Response>): Promise<Response | nul
   }
 };
 
-const asked = async (path: string, note?: string): Promise<boolean> => {
+const asked = async (address: string, note?: string): Promise<boolean> => {
   const response = await answered(() =>
-    fetch(`/api/docs/${path}`, {
+    fetch(address, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Folio-Operator": "1", "Content-Type": "application/json" },
@@ -41,6 +41,13 @@ const load = async (): Promise<void> => {
       const reason = prompt("¿Por qué se abrió este documento?");
       if (reason?.trim()) void doing(`${id}/opened`, reason);
     },
+    blockKey: (root) => {
+      const reason = prompt(`¿Por qué bloquear la llave ${root}? No podrá subir nada más, y lo ya compartido sigue.`);
+      if (reason?.trim()) void doingOnKey(`${root}/block`, reason);
+    },
+    unblockKey: (root) => {
+      if (confirm(`¿Desbloquear la llave ${root}?`)) void doingOnKey(`${root}/unblock`);
+    },
     copy: (command) => {
       void navigator.clipboard.writeText(command).then(
         () => {
@@ -58,7 +65,13 @@ const load = async (): Promise<void> => {
 
 const doing = async (path: string, note?: string): Promise<void> => {
   said.textContent = "Trabajando…";
-  if (await asked(path, note)) await load();
+  if (await asked(`/api/docs/${path}`, note)) await load();
+  else said.textContent = COULD_NOT;
+};
+
+const doingOnKey = async (path: string, note?: string): Promise<void> => {
+  said.textContent = "Trabajando…";
+  if (await asked(`/api/keys/${path}`, note)) await load();
   else said.textContent = COULD_NOT;
 };
 
@@ -71,6 +84,13 @@ const confirmed = (question: string, path: string): void => {
   const id = (document.getElementById("block-id") as HTMLInputElement).value.trim();
   const note = (document.getElementById("block-note") as HTMLInputElement).value;
   if (confirm(`¿Bloquear ${id}? Dejará de servirse.`)) void doing(`${id}/block`, note);
+});
+
+(document.getElementById("key-form") as HTMLFormElement).addEventListener("submit", (event) => {
+  event.preventDefault();
+  const root = (document.getElementById("key-root") as HTMLInputElement).value.trim();
+  const note = (document.getElementById("key-note") as HTMLInputElement).value;
+  if (confirm(`¿Bloquear la llave ${root}? No podrá subir nada más.`)) void doingOnKey(`${root}/block`, note);
 });
 
 void load();

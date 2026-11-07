@@ -235,6 +235,7 @@ paths:
                   - $ref: "#/components/schemas/PausedOrBlocked"
                   - $ref: "#/components/schemas/NotYours"
                   - $ref: "#/components/schemas/Revoked"
+                  - $ref: "#/components/schemas/KeyBlocked"
         "404": { $ref: "#/components/responses/Missing" }
         "409":
           description: Another version arrived first, or this person keeps as many documents as they may.
@@ -673,6 +674,12 @@ components:
       required: [refused]
       properties:
         refused: { const: bad_revocation }
+    KeyBlocked:
+      type: object
+      required: [refused]
+      description: The operator stopped this key from uploading. What it already shared is not touched by this.
+      properties:
+        refused: { const: key_blocked }
     Revoked:
       type: object
       required: [refused]

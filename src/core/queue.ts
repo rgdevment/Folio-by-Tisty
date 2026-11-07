@@ -1,5 +1,6 @@
 export interface QueuedReport {
   doc: string;
+  owner: string | null;
   net: string;
   category: string;
   level: string;
@@ -13,6 +14,7 @@ export interface QueuedReport {
 
 export interface QueuedDoc {
   id: string;
+  owner: string;
   latest: number;
   blockedAt: number;
   appealedAt: number | null;
@@ -27,4 +29,5 @@ export interface Queue {
   reportsTotal: number;
   reports: QueuedReport[];
   docs: QueuedDoc[];
+  blockedKeys: { root: string; blockedAt: number }[];
 }

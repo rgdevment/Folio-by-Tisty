@@ -136,6 +136,7 @@ const keyAdmission = (net: string, today: number, { store }: ReadTools): KeyAdmi
     admit: async (roots, accepted) => {
       for (const root of new Set(roots)) {
         const { said, terms } = await store.admitKey(root, net, today);
+        if (said === "blocked") return { refused: "key_blocked" };
         if (said === "full") return { refused: "quota", until: (today + 1) * DAY_MS };
         if (said === "new") fresh.push(root);
         if (root === accepted.root && (terms === null || BigInt(accepted.version) > BigInt(terms))) toWrite = accepted;

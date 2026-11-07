@@ -371,10 +371,10 @@ export class Cloud implements Store {
 
   async admitKey(root: string, net: string, today: number): Promise<KeyAdmitted> {
     const known = await this.#db
-      .prepare("SELECT terms_version FROM keys WHERE root = ?")
+      .prepare("SELECT terms_version, blocked_at FROM keys WHERE root = ?")
       .bind(root)
-      .first<{ terms_version: string | null }>();
-    if (known) return { said: "known", terms: known.terms_version };
+      .first<{ terms_version: string | null; blocked_at: number | null }>();
+    if (known) return { said: known.blocked_at === null ? "known" : "blocked", terms: known.terms_version };
     const taken = await this.#db
       .prepare(
         `INSERT INTO net_day (day, net, docs, bytes, keys) VALUES (?1, ?2, 0, 0, 1)

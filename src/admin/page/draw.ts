@@ -5,6 +5,8 @@ export interface Doing {
   reject: (id: string) => void;
   reportWasFalse: (id: string, net: string) => void;
   opened: (id: string) => void;
+  blockKey: (root: string) => void;
+  unblockKey: (root: string) => void;
   copy: (said: string) => void;
 }
 
@@ -59,6 +61,8 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
     card.append(piece(page, "p", "card-line", "Esta red ya tuvo una denuncia falsa: no cuenta para bloquear."));
   if (report.detail) card.append(piece(page, "p", "card-line", report.detail));
   const buttons = [button(page, "Era falsa", () => doing.reportWasFalse(report.doc, report.net))];
+  const { owner } = report;
+  if (owner) buttons.push(button(page, "Bloquear llave del dueño", () => doing.blockKey(owner), true));
   if (report.sealedLink) {
     const sealed = report.sealedLink;
     card.append(piece(page, "code", "sealed", sealed));
@@ -81,12 +85,14 @@ const docCard = (page: Document, doc: QueuedDoc, doing: Doing, waiting: boolean)
   );
   if (doc.mayCorrect)
     card.append(piece(page, "p", "card-line", "Reclamo aceptado solo: espera una versión de su dueño."));
+  const blockOwner = button(page, "Bloquear llave del dueño", () => doing.blockKey(doc.owner), true);
   if (waiting) {
     card.append(
       actions(
         page,
         button(page, "Aceptar y desbloquear", () => doing.accept(doc.id)),
         button(page, "Rechazar", () => doing.reject(doc.id), true),
+        blockOwner,
       ),
     );
   } else if (!doc.mayCorrect) {
@@ -94,8 +100,11 @@ const docCard = (page: Document, doc: QueuedDoc, doing: Doing, waiting: boolean)
       actions(
         page,
         button(page, "Desbloquear", () => doing.accept(doc.id)),
+        blockOwner,
       ),
     );
+  } else {
+    card.append(actions(page, blockOwner));
   }
   return card;
 };
@@ -104,8 +113,28 @@ const filled = (place: Element, page: Document, cards: HTMLElement[], none: stri
   place.replaceChildren(...(cards.length > 0 ? cards : [piece(page, "p", "card-line", none)]));
 };
 
+const keyCard = (page: Document, { root, blockedAt }: Queue["blockedKeys"][number], doing: Doing): HTMLElement => {
+  const card = page.createElement("article");
+  card.className = "card";
+  card.append(
+    piece(page, "code", "sealed", root),
+    piece(page, "p", "card-line", `Bloqueada el ${dayText(blockedAt)}`),
+    actions(
+      page,
+      button(page, "Desbloquear llave", () => doing.unblockKey(root)),
+    ),
+  );
+  return card;
+};
+
 export const drawQueue = (page: Document, queue: Queue, doing: Doing): void => {
   const place = (id: string): Element => page.getElementById(id) as Element;
+  filled(
+    place("blocked-keys"),
+    page,
+    queue.blockedKeys.map((one) => keyCard(page, one, doing)),
+    "Ninguna.",
+  );
   place("state").textContent = `Servicio ${STAGES[queue.stage] ?? queue.stage}. Llaves nuevas hoy: ${queue.newKeys}.`;
   filled(
     place("appeals"),

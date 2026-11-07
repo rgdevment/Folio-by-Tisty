@@ -7,11 +7,13 @@ import type { Queue } from "../src/core/queue";
 const HARM = '<img src=x onerror="alert(1)">';
 const QUEUE: Queue = {
   stage: "warned",
+  blockedKeys: [{ root: "BLOCKEDROOT", blockedAt: 20400 }],
   newKeys: 7,
   reportsTotal: 2,
   reports: [
     {
       doc: "AbCdEfGh",
+      owner: "OWNERROOT",
       net: "n1",
       category: "csam",
       level: "grave",
@@ -24,6 +26,7 @@ const QUEUE: Queue = {
     },
     {
       doc: "IjKlMnOp",
+      owner: "OWNERROOT",
       net: "n2",
       category: "phishing",
       level: "medium",
@@ -38,6 +41,7 @@ const QUEUE: Queue = {
   docs: [
     {
       id: "AbCdEfGh",
+      owner: "OWNERROOT",
       latest: 2,
       blockedAt: 20_000,
       appealedAt: 20_001,
@@ -50,6 +54,7 @@ const QUEUE: Queue = {
     },
     {
       id: "QrStUvWx",
+      owner: "OWNERROOT",
       latest: 1,
       blockedAt: 20_000,
       appealedAt: 20_001,
@@ -59,6 +64,7 @@ const QUEUE: Queue = {
     },
     {
       id: "YzAbCdEf",
+      owner: "OWNERROOT",
       latest: 1,
       blockedAt: 20_000,
       appealedAt: null,
@@ -81,7 +87,15 @@ const pressing = (place: string, said: string, at = 0): void => {
 
 beforeEach(() => {
   page = new JSDOM(readFileSync("src/admin/page/index.html", "utf8")).window.document;
-  doing = { accept: vi.fn(), reject: vi.fn(), reportWasFalse: vi.fn(), opened: vi.fn(), copy: vi.fn() };
+  doing = {
+    blockKey: vi.fn(),
+    unblockKey: vi.fn(),
+    accept: vi.fn(),
+    reject: vi.fn(),
+    reportWasFalse: vi.fn(),
+    opened: vi.fn(),
+    copy: vi.fn(),
+  };
   drawQueue(page, QUEUE, doing as unknown as Doing);
 });
 
@@ -141,7 +155,7 @@ describe("the panel", () => {
     const blocked = page.getElementById("blocked") as Element;
     const cards = blocked.querySelectorAll(".card");
     expect(cards[0]?.textContent).toContain("espera una versión de su dueño");
-    expect(cards[0]?.querySelector("button")).toBeNull();
+    expect(cards[0]?.textContent).not.toContain("Desbloquear");
     pressing("blocked", "Desbloquear");
     expect(doing.accept).toHaveBeenCalledWith("YzAbCdEf");
   });
@@ -172,8 +186,29 @@ describe("the panel", () => {
     expect(page.getElementById("reports")?.textContent).toContain("Se ven las 2 más graves y recientes de 900.");
   });
 
+  it("offers to block the owner's key from a report and from a blocked document", () => {
+    pressing("reports", "Bloquear llave del dueño");
+    expect(doing.blockKey).toHaveBeenCalledWith("OWNERROOT");
+    pressing("appeals", "Bloquear llave del dueño");
+    expect(doing.blockKey).toHaveBeenCalledTimes(2);
+  });
+
+  it("lists the blocked keys, each with a way to lift it", () => {
+    expect(page.getElementById("blocked-keys")?.textContent).toContain("BLOCKEDROOT");
+    pressing("blocked-keys", "Desbloquear llave");
+    expect(doing.unblockKey).toHaveBeenCalledWith("BLOCKEDROOT");
+  });
+
+  it("offers a form for a key that is on no card", () => {
+    expect(page.getElementById("key-form")).not.toBeNull();
+  });
+
   it("says when there is nothing", () => {
-    drawQueue(page, { stage: "open", newKeys: 0, reportsTotal: 0, reports: [], docs: [] }, doing as unknown as Doing);
+    drawQueue(
+      page,
+      { stage: "open", newKeys: 0, reportsTotal: 0, reports: [], docs: [], blockedKeys: [] },
+      doing as unknown as Doing,
+    );
     expect(page.getElementById("reports")?.textContent).toBe("Ninguna.");
     expect(page.getElementById("appeals")?.textContent).toBe("Ninguno.");
   });

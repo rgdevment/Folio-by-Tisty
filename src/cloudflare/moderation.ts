@@ -62,12 +62,13 @@ export class CloudModeration {
   }
 
   async queue(now: number): Promise<Queue> {
-    const [stage, keys, reports, reportsTotal, docs] = await this.#db.batch([
+    const [stage, keys, reports, reportsTotal, docs, blockedKeys] = await this.#db.batch([
       this.#db.prepare("SELECT stage FROM service_stage WHERE id = 1"),
       this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS n FROM net_day WHERE day = ?").bind(dayOf(now)),
       this.#db
         .prepare(
-          `SELECT r.doc, r.net, r.category, r.level, r.detail, r.sealed_link, r.version, r.at, r.asn,
+          `SELECT r.doc, (SELECT owner FROM docs WHERE id = r.doc) AS owner, r.net, r.category, r.level, r.detail,
+             r.sealed_link, r.version, r.at, r.asn,
              r.net IN (SELECT net FROM false_reporters) AS false_net
            ${REPORTS_TO_SEE}
            ORDER BY r.category = 'csam' DESC, r.level = 'grave' DESC, r.at DESC, r.doc LIMIT ?`,
@@ -80,6 +81,9 @@ export class CloudModeration {
            FROM docs WHERE blocked_at IS NOT NULL
            ORDER BY appealed_hour IS NULL, blocked_at DESC, id LIMIT ?`,
         )
+        .bind(SEEN_AT_MOST),
+      this.#db
+        .prepare("SELECT root, blocked_at FROM keys WHERE blocked_at IS NOT NULL ORDER BY blocked_at DESC LIMIT ?")
         .bind(SEEN_AT_MOST),
     ]);
     return {
@@ -110,6 +114,7 @@ export class CloudModeration {
         }[]
       ).map((row) => ({
         id: row.id,
+        owner: row.owner,
         latest: row.latest,
         blockedAt: row.blocked_at,
         appealedAt: row.appealed_at,
@@ -119,6 +124,10 @@ export class CloudModeration {
           n,
           byOwner: signer === row.owner,
         })),
+      })),
+      blockedKeys: ((blockedKeys?.results ?? []) as { root: string; blocked_at: number }[]).map((row) => ({
+        root: row.root,
+        blockedAt: row.blocked_at,
       })),
     };
   }
@@ -148,6 +157,23 @@ export class CloudModeration {
       )
       .bind(dayOf(now), hourOf(now), this.#limits.evidenceDays, id);
     return this.#actedAndLogged([blocking], this.#logIfChanged(id, "block", now, note));
+  }
+
+  async blockKey(root: string, note: string, now: number): Promise<Acted> {
+    const blocking = this.#db
+      .prepare(
+        `INSERT INTO keys (root, first_day, blocked_at) VALUES (?1, ?2, ?2)
+         ON CONFLICT (root) DO UPDATE SET blocked_at = ?2 WHERE blocked_at IS NULL`,
+      )
+      .bind(root, dayOf(now));
+    return this.#actedAndLogged([blocking], this.#logIfChanged(root, "block_key", now, note));
+  }
+
+  async unblockKey(root: string, now: number): Promise<Acted> {
+    const lifting = this.#db
+      .prepare("UPDATE keys SET blocked_at = NULL WHERE root = ? AND blocked_at IS NOT NULL")
+      .bind(root);
+    return this.#actedAndLogged([lifting], this.#logIfChanged(root, "unblock_key", now));
   }
 
   async reportWasFalse(id: string, net: string, now: number): Promise<Acted> {

@@ -120,6 +120,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   for (const table of [
     "docs",
+    "keys",
     "reports",
     "false_reporters",
     "moderation",
@@ -337,6 +338,37 @@ describe("a block the operator placed", () => {
 });
 
 describe("what it can do", () => {
+  it("blocks a key with its reason on record, lists it, and lifts it", async () => {
+    const root = "R".repeat(43);
+    expect((await acting(`/api/keys/${root}/block`, "abuse")).status).toBe(200);
+    const held = await store.admitKey(root, "n", TODAY);
+    expect(held.said).toBe("blocked");
+    const queue = await new CloudModeration(testEnv.DB).queue(TODAY * 86_400_000);
+    expect(queue.blockedKeys.map((one) => one.root)).toEqual([root]);
+
+    expect((await acting(`/api/keys/${root}/block`, "again")).status).toBe(404);
+    expect((await acting(`/api/keys/${root}/unblock`)).status).toBe(200);
+    expect((await store.admitKey(root, "n", TODAY)).said).toBe("known");
+    expect((await acting(`/api/keys/${root}/unblock`)).status).toBe(404);
+    expect(await logged()).toEqual([
+      { action: "block_key", note: "abuse" },
+      { action: "unblock_key", note: null },
+    ]);
+  });
+
+  it("will not block a key without a reason, or what is not a key", async () => {
+    expect((await acting(`/api/keys/${"R".repeat(43)}/block`)).status).toBe(400);
+    expect((await acting("/api/keys/short/block", "abuse")).status).toBe(404);
+  });
+
+  it("names the owner of what was reported, so its key can be blocked", async () => {
+    await share();
+    await reported();
+    const queue = await new CloudModeration(testEnv.DB).queue(TODAY * 86_400_000);
+    expect(queue.reports[0]?.owner).toBeTruthy();
+    expect(queue.docs[0]?.owner).toBe(queue.reports[0]?.owner);
+  });
+
   it("accepts an appeal: lifts the block, and those networks stop counting", async () => {
     await share();
     await reported();
