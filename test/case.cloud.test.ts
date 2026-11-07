@@ -194,7 +194,7 @@ describe("the panic button", () => {
       latest: 2,
       legal_until: TODAY + 180,
       ownerKey: { terms_version: "7", terms_hour: 99 },
-      reports: [{ category: "csam", level: "grave", detail: "said", version: 1 }],
+      reports: [{ category: "csam", level: "grave", detail: "said", version: 1, over_cap: 0 }],
       actions: [{ action: "panic", note: "looks real" }],
       openings: [{ reason: "to verify" }],
     });

@@ -25,7 +25,10 @@ const textOf = (stage: Stage, was: Stage, news: News, keysSaid: number, panel?: 
     ...(news.newKeysNearTheirTop ? [`Tope de subidas nuevas casi agotado el ${dateOf(news.newKeysDay)}.`, ""] : []),
     ...listOf(
       `Denuncias nuevas (${news.reportsTotal}):`,
-      news.reports.map(({ doc, category, nets }) => `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}`),
+      news.reports.map(
+        ({ doc, category, nets, uncounted }) =>
+          `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}${uncounted > 0 ? `, ${uncounted} sin contar` : ""}`,
+      ),
       news.reportLines > news.reports.length,
     ),
     ...listOf("Bloqueados:", news.blocked),

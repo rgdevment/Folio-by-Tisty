@@ -42,6 +42,20 @@ beforeEach(async () => {
   await share(OTHER);
 });
 
+describe("the mail on networks that do not count", () => {
+  it("says how many, and lists first what clean networks say", async () => {
+    await report(ID, "n1", "phishing");
+    await report(ID, "n2", "phishing");
+    await report(OTHER, "n3", "phishing");
+    await testEnv.DB.prepare("UPDATE reports SET over_cap = 1 WHERE net IN ('n1', 'n2')").run();
+    const { send } = await digest();
+    const text = (send.mock.calls[0] as [string, string])[1];
+    expect(text).toContain(`phishing: ${ID}, 2 redes, 2 sin contar`);
+    expect(text).toContain(`phishing: ${OTHER}, 1 red\n`);
+    expect(text.indexOf(OTHER)).toBeLessThan(text.indexOf(ID));
+  });
+});
+
 describe("the mail", () => {
   it("does not go when there is nothing to tell, and writes nothing", async () => {
     const { sent, send } = await digest();
@@ -190,7 +204,7 @@ describe("the mail", () => {
 describe("the round", () => {
   const scheduled = (more: object) =>
     worker.scheduled(
-      { cron: "0 0,12 * * *", scheduledTime: NOW, noRetry: () => {} } as never,
+      { cron: "0 0,6,12,18 * * *", scheduledTime: NOW, noRetry: () => {} } as never,
       { ...testEnv, ...more } as never,
     );
 

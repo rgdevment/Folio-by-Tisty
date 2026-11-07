@@ -10,6 +10,7 @@ const crons = [...(/^crons = \[(.*)\]$/m.exec(WRANGLER)?.[1] ?? "").matchAll(/"(
 describe("the Worker's schedules", () => {
   it("are all there", () => {
     expect(crons).toHaveLength(4);
+    expect(crons).toContain("0 0,6,12,18 * * *");
   });
 
   it.each(crons)("%s is written as Cloudflare takes it, whose week goes from 1 to 7", (cron) => {

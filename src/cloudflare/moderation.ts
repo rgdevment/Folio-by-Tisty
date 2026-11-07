@@ -101,7 +101,7 @@ export class CloudModeration {
       this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS n FROM net_day WHERE day = ?").bind(dayOf(now)),
       this.#db
         .prepare(
-          `SELECT r.doc, r.net, r.category, r.level, r.detail, r.sealed_link, r.sealed_contact, r.version, r.at, r.asn,
+          `SELECT r.doc, r.net, r.category, r.level, r.detail, r.sealed_link, r.sealed_contact, r.version, r.at, r.asn, r.over_cap,
              r.net IN (SELECT net FROM false_reporters) AS false_net
            ${REPORTS_TO_SEE}
            ORDER BY ROW_NUMBER() OVER (PARTITION BY r.net ORDER BY ${GRAVEST_FIRST}, r.at),
@@ -145,13 +145,23 @@ export class CloudModeration {
           sealed_link: string | null;
           sealed_contact: string | null;
           false_net: number;
+          over_cap: number;
         })[]
-      ).map(({ sealed_link: sealedLink, sealed_contact: sealedContact, false_net: falseNet, ...report }) => ({
-        ...report,
-        sealedLink,
-        sealedContact,
-        fromFalseNet: falseNet === 1,
-      })),
+      ).map(
+        ({
+          sealed_link: sealedLink,
+          sealed_contact: sealedContact,
+          false_net: falseNet,
+          over_cap: overCap,
+          ...report
+        }) => ({
+          ...report,
+          sealedLink,
+          sealedContact,
+          fromFalseNet: falseNet === 1,
+          overCap: overCap === 1,
+        }),
+      ),
       warned: (warned?.results ?? []) as unknown as QueuedWarning[],
       docs: (
         (docs?.results ?? []) as {
@@ -310,7 +320,7 @@ export class CloudModeration {
         .bind(id),
       this.#db
         .prepare(
-          `SELECT category, level, detail, version, at, cleared FROM reports WHERE doc = ?
+          `SELECT category, level, detail, version, at, cleared, over_cap FROM reports WHERE doc = ?
            ORDER BY category = 'csam' DESC, level = 'grave' DESC, at LIMIT ?`,
         )
         .bind(id, REPORT_ROWS_AT_MOST),

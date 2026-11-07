@@ -1661,13 +1661,13 @@ describe("what each event writes, from start to end", () => {
     expect(spent.written).toBe(7);
   });
 
-  it("a report and a rejected report write one row and none", async () => {
+  it("a report and a rejected report write a row with its index and none", async () => {
     await store.create(newDoc("d1"), DAY);
     const { spent, cloud } = counting();
     await cloud.report({ doc: "d1", net: "a", category: "phishing", asn: 1 }, DAY, DAY * 24);
-    expect(spent.written).toBe(1);
+    expect(spent.written).toBe(2);
     await cloud.report({ doc: "d1", net: "a", category: "phishing", asn: 1 }, DAY, DAY * 24);
-    expect(spent.written).toBe(1);
+    expect(spent.written).toBe(2);
   });
 
   it("an idle sweep writes only what creating tomorrow's table costs", async () => {

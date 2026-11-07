@@ -12,6 +12,7 @@ export interface QueuedReport {
   at: number;
   asn: number;
   fromFalseNet: boolean;
+  overCap: boolean;
 }
 
 export interface QueuedDoc {

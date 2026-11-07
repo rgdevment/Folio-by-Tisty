@@ -24,6 +24,7 @@ const QUEUE: Queue = {
       at: 20_000,
       asn: 3,
       fromFalseNet: false,
+      overCap: false,
     },
     {
       doc: "IjKlMnOp",
@@ -37,6 +38,7 @@ const QUEUE: Queue = {
       at: 20_000,
       asn: 4,
       fromFalseNet: true,
+      overCap: false,
     },
   ],
   docs: [
@@ -217,6 +219,30 @@ describe("a warning by light reports", () => {
   it("says when there is none", () => {
     drawQueue(page, { ...QUEUE, warned: [] }, doing as unknown as Doing);
     expect(page.getElementById("warned")?.textContent).toBe("Ninguno.");
+  });
+});
+
+describe("a network past its documents", () => {
+  it("says so on its report, and only there", () => {
+    expect(page.getElementById("reports")?.textContent).not.toContain("pasó su tope");
+    const [first, ...rest] = QUEUE.reports;
+    drawQueue(
+      page,
+      { ...QUEUE, reports: [{ ...(first as (typeof QUEUE.reports)[number]), overCap: true }, ...rest] },
+      doing as unknown as Doing,
+    );
+    expect(page.getElementById("reports")?.textContent).toContain("pasó su tope");
+  });
+});
+
+describe("checking a key", () => {
+  it("copies a command that opens nothing, only where a link came", () => {
+    pressing("reports", "Comprobar sin abrir");
+    expect(doing.copy).toHaveBeenCalledWith(
+      'node scripts/report-key.mjs check <llave> AbCdEfGh sealed1.opaque "<link para verificar>"',
+    );
+    const buttons = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
+    expect(buttons.filter((one) => one.textContent === "Comprobar sin abrir")).toHaveLength(1);
   });
 });
 
