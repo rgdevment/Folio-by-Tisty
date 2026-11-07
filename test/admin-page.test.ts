@@ -154,7 +154,7 @@ describe("the page when no answer comes, as when the session of Access ended", (
 
 describe("blocking a key from the panel", () => {
   const posted = async (press: () => void) => {
-    const fetching = vi.fn(async () => new Response(JSON.stringify(QUEUE)));
+    const fetching = vi.fn(async (_path: string, _init?: RequestInit) => new Response(JSON.stringify(QUEUE)));
     vi.resetModules();
     vi.stubGlobal("document", page);
     vi.stubGlobal("fetch", fetching);
