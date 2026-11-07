@@ -131,6 +131,17 @@ export interface Swept {
 }
 
 // What the rules need of wherever Folio runs, so the core never knows it is Cloudflare (decisions 16 and 108).
+export interface KeyAdmitted {
+  said: "known" | "new" | "full";
+  terms: string | null;
+}
+
+export interface AcceptedTerms {
+  root: string;
+  version: string;
+  hour: number;
+}
+
 export interface Store {
   create(doc: NewDoc, today: number): Promise<Created>;
   upload(upload: Upload, today: number, held?: Held): Promise<Uploaded>;
@@ -148,8 +159,8 @@ export interface Store {
   filesOf(id: string, hash: string): Promise<ReadableStream | null>;
   dayKey(today: number): Promise<string>;
   evidenceKey(today: number): Promise<string>;
-  admitKey(root: string, net: string, today: number): Promise<"known" | "new" | "full">;
-  keepKeys(roots: string[], today: number): Promise<void>;
+  admitKey(root: string, net: string, today: number): Promise<KeyAdmitted>;
+  keepKeys(roots: string[], today: number, accepted?: AcceptedTerms): Promise<void>;
   giveKeysBack(count: number, net: string, today: number): Promise<void>;
   takeHourly(net: string, action: string, hour: number, atMost: number, taking?: number): Promise<boolean>;
   report(report: Report, today: number, hour: number): Promise<Reported>;

@@ -22,6 +22,7 @@ export type Refused =
         | "bad_revocation";
     }
   | { refused: "envelope"; why: EnvelopeRefusal }
+  | { refused: "terms"; version: string }
   | { refused: "slow" | "quota"; until: number }
   | { refused: "proof"; salt: string; bits: number };
 

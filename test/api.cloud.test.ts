@@ -471,6 +471,14 @@ const UPLOADING: Scenario[] = [
   {
     method: "PUT",
     path: UPLOAD_PATH,
+    status: 428,
+    refused: "terms",
+    upload: () => sealedEnvelope({ id: ID, version: 2, owner, terms: "0" }),
+    ready: shareSigned,
+  },
+  {
+    method: "PUT",
+    path: UPLOAD_PATH,
     status: 426,
     refused: "outdated",
     upload: envelope(2),
