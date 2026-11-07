@@ -152,6 +152,37 @@ describe("the page when no answer comes, as when the session of Access ended", (
   });
 });
 
+describe("blocking a key from the panel", () => {
+  const posted = async (press: () => void) => {
+    const fetching = vi.fn(async () => new Response(JSON.stringify(QUEUE)));
+    vi.resetModules();
+    vi.stubGlobal("document", page);
+    vi.stubGlobal("fetch", fetching);
+    vi.stubGlobal("confirm", () => true);
+    vi.stubGlobal("prompt", () => "granja de spam");
+    await import("../src/admin/page/main");
+    await vi.waitFor(() => expect(page.getElementById("blocked-keys")?.querySelector("button")).not.toBeNull());
+    press();
+    await vi.waitFor(() => expect(fetching.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
+    return fetching.mock.calls.filter(([, init]) => init?.method === "POST");
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends the owner's key with its reason", async () => {
+    const sent = await posted(() => pressing("reports", "Bloquear llave del dueño"));
+    expect(sent[0]?.[0]).toBe("/api/keys/OWNERROOT/block");
+    expect(JSON.parse(String(sent[0]?.[1]?.body))).toEqual({ note: "granja de spam" });
+  });
+
+  it("lifts a blocked key", async () => {
+    const sent = await posted(() => pressing("blocked-keys", "Desbloquear llave"));
+    expect(sent[0]?.[0]).toBe("/api/keys/BLOCKEDROOT/unblock");
+  });
+});
+
 describe("erasing a key from the panel", () => {
   const SAID_OF = () => page.getElementById("said")?.textContent;
   const BUTTON = "Borrar todo de esta llave";
