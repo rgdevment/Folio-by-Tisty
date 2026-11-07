@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 10, vigente desde el 6 de noviembre de 2026.**
+**Versión 11, vigente desde el 6 de noviembre de 2026.**
 
 ## En corto
 
@@ -137,6 +137,9 @@ para denunciar: guarda un resumen de la red.
   siempre trae el link para leerlo, cifrado para que solo el operador lo abra, y
   nunca la parte que permite editar. Bloquea con las mismas tres redes, o cuando
   el operador lo decida.
+- **Hay topes contra los abusos.** Una red cuenta en hasta 20 documentos cada
+  180 días, y hasta 10 documentos al día se bloquean solos. Lo que pase de ahí
+  sigue registrado y espera a que lo revise el operador.
 - **Una sola denuncia de engaño o grave conserva el documento:** si caduca o
   dejas de compartirlo, no se sirve, pero su copia queda hasta 180 días desde la
   denuncia, por si una autoridad la pide. Una orden puede pedir más. Denunciar

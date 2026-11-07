@@ -42,6 +42,26 @@ beforeEach(async () => {
   await share(OTHER);
 });
 
+describe("the mail when the day's blocks ran out", () => {
+  it("says the rest waits in the panel", async () => {
+    await testEnv.DB.batch(
+      Array.from({ length: 10 }, (_, at) =>
+        testEnv.DB.prepare(
+          "INSERT INTO docs (id, owner, admin_hash, ttl_days, dies_on, active_day, blocked_at, blocked_hour) VALUES (?, 'x', 'a', 3, ?, ?, ?, ?)",
+        ).bind(`Filled${String(at).padStart(2, "0")}`, TODAY + 3, TODAY, TODAY, HOUR - 1),
+      ),
+    );
+    const { send } = await digest();
+    expect((send.mock.calls[0] as [string, string])[1]).toContain("tope diario");
+  });
+
+  it("says nothing of it otherwise", async () => {
+    await report(ID, "n1", "phishing");
+    const { send } = await digest();
+    expect((send.mock.calls[0] as [string, string])[1]).not.toContain("tope diario");
+  });
+});
+
 describe("the mail", () => {
   it("does not go when there is nothing to tell, and writes nothing", async () => {
     const { sent, send } = await digest();
@@ -179,7 +199,7 @@ describe("the mail", () => {
 describe("the round", () => {
   const scheduled = (more: object) =>
     worker.scheduled(
-      { cron: "0 0,12 * * *", scheduledTime: NOW, noRetry: () => {} } as never,
+      { cron: "0 0,6,12,18 * * *", scheduledTime: NOW, noRetry: () => {} } as never,
       { ...testEnv, ...more } as never,
     );
 

@@ -56,6 +56,9 @@ const signersText = ({ signers }: QueuedDoc): string => {
 const openCommand = (doc: string, sealed: string): string =>
   `node scripts/report-key.mjs open <llave> ${doc} ${sealed}`;
 
+const checkCommand = (doc: string, sealed: string): string =>
+  `node scripts/report-key.mjs check <llave> ${doc} ${sealed}`;
+
 const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLElement => {
   const card = page.createElement("article");
   card.className = report.level === "grave" ? "card is-grave" : "card";
@@ -63,6 +66,10 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
     piece(page, "p", "card-title", `${report.category} · ${report.doc}`),
     piece(page, "p", "card-line", `Versión ${report.version} · operador ${report.asn} · ${dayText(report.at)}`),
   );
+  if (report.overCap)
+    card.append(
+      piece(page, "p", "card-line", "Esta red pasó su tope de documentos: no cuenta para bloquear ni retener."),
+    );
   if (report.fromFalseNet)
     card.append(piece(page, "p", "card-line", "Esta red ya tuvo una denuncia falsa: no cuenta para bloquear."));
   if (report.detail) card.append(piece(page, "p", "card-line", report.detail));
@@ -80,6 +87,7 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
     const sealed = report.sealedLink;
     card.append(piece(page, "code", "sealed", sealed));
     buttons.unshift(
+      button(page, "Comprobar sin abrir", () => doing.copy(checkCommand(report.doc, sealed))),
       button(page, "Copiar para abrir", () => doing.copy(openCommand(report.doc, sealed))),
       button(page, "Anotar apertura", () => doing.opened(report.doc)),
     );

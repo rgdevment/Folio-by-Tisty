@@ -27,6 +27,9 @@ const textOf = (stage: Stage, was: Stage, news: News, keysSaid: number, panel?: 
       news.reports.map(({ doc, category, nets }) => `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}`),
       news.reportLines > news.reports.length,
     ),
+    ...(news.autoBlocksFull
+      ? ["Se alcanzó el tope diario de bloqueos automáticos: lo demás espera en el panel.", ""]
+      : []),
     ...listOf("Bloqueados:", news.blocked),
     ...listOf("Reclamos:", news.appealed),
     ...(panel ? [`Panel: ${panel}`] : []),

@@ -36,6 +36,8 @@ export interface Limits {
   pausedDays: number;
   evidenceDays: number;
   reportsToBlock: number;
+  autoBlocksADay: number;
+  docsANetCountsIn: number;
   reportOperatorsToBlock: number;
   lightReportsToWarn: number;
   lightOperatorsToWarn: number;
@@ -86,6 +88,8 @@ export const LEVEL_ONE: Limits = {
   pausedDays: 30,
   evidenceDays: 180,
   reportsToBlock: 3,
+  autoBlocksADay: 10,
+  docsANetCountsIn: 20,
   reportOperatorsToBlock: 2,
   lightReportsToWarn: 10,
   lightOperatorsToWarn: 2,

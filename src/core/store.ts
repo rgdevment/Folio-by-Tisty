@@ -90,6 +90,7 @@ export interface News {
   appealed: string[];
   newKeys: number;
   newKeysDay: number;
+  autoBlocksFull: boolean;
 }
 
 // What a read needs of a document, in one row.

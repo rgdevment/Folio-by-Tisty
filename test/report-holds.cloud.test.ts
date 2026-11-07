@@ -1,6 +1,7 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
 
 const testEnv = env as unknown as {
@@ -12,19 +13,21 @@ const DAY = 20_000;
 const LINK = `sealed1.${"A".repeat(150)}`;
 const store = new Cloud(testEnv);
 
-const upload = (id: string, n: number, signer = "owner") =>
+const ownerOf = (id: string): string => `owner-${id}`;
+
+const upload = (id: string, n: number, signer = ownerOf(id)) =>
   store.upload(
     {
       id,
       n,
       hash: `h${n}`,
       body: "sealed",
-      net: "n",
+      net: `up-${id}`,
       at: DAY,
       signer,
       machine: "m1",
       contract: "1.5.0",
-      byOwner: signer === "owner",
+      byOwner: signer === ownerOf(id),
       permit: null,
       ownerMark: "m1.t",
     },
@@ -32,7 +35,7 @@ const upload = (id: string, n: number, signer = "owner") =>
   );
 
 const shared = async (id: string, ttlDays = 15) => {
-  await store.create({ id, owner: "owner", adminHash: "a", ttlDays, net: "n" }, DAY);
+  await store.create({ id, owner: ownerOf(id), adminHash: "a", ttlDays, net: `up-${id}` }, DAY);
   await upload(id, 1);
 };
 
@@ -90,16 +93,99 @@ describe("how long a report can hold a document", () => {
   it("takes reports on a page whose document still lives", async () => {
     await shared("Mainmain", 15);
     await store.create(
-      { id: "Pagepage", owner: "owner", adminHash: "a", ttlDays: 15, net: "n", anchor: "Mainmain" },
+      { id: "Pagepage", owner: ownerOf("Mainmain"), adminHash: "a", ttlDays: 15, net: "up-page", anchor: "Mainmain" },
       DAY,
     );
-    await upload("Pagepage", 1);
+    await upload("Pagepage", 1, ownerOf("Mainmain"));
     await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'Pagepage'")
       .bind(DAY - 5)
       .run();
     await report("Pagepage", "a", "phishing", DAY);
     const taken = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports").first<{ n: number }>();
     expect(taken?.n).toBe(1);
+  });
+});
+
+describe("the caps", () => {
+  const cards = async (count: number, net: string, category = "phishing") => {
+    for (let at = 0; at < count; at += 1) {
+      const id = `Capdoc${String(at).padStart(2, "0")}`;
+      if (!(await row(id))) await shared(id);
+      await report(id, net, category, DAY, { detail: "imita a un banco" });
+    }
+  };
+  const overCap = async (doc: string, net: string) =>
+    (
+      await testEnv.DB.prepare("SELECT over_cap FROM reports WHERE doc = ? AND net = ?")
+        .bind(doc, net)
+        .first<{ over_cap: number }>()
+    )?.over_cap;
+
+  it("counts a network on its first documents, and keeps the rest on record", async () => {
+    await cards(21, "n");
+    expect(await overCap("Capdoc19", "n")).toBe(0);
+    expect(await overCap("Capdoc20", "n")).toBe(1);
+    const stayed = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports").first<{ n: number }>();
+    expect(stayed?.n).toBe(21);
+    const { reports } = await new CloudModeration(testEnv.DB).queue(DAY * 86_400_000);
+    expect(reports.filter((one) => one.overCap).map((one) => one.doc)).toEqual(["Capdoc20"]);
+  });
+
+  it("does not let what is past the cap block or hold", async () => {
+    await cards(21, "n");
+    await shared("OverLast");
+    await report("OverLast", "n", "phishing", DAY);
+    await report("OverLast", "b", "phishing", DAY);
+    const { blocked } = await report("OverLast", "c", "phishing", DAY);
+    expect(blocked).toBe(false);
+    await testEnv.DB.prepare("DELETE FROM reports WHERE net IN ('b', 'c')").run();
+    await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'OverLast'")
+      .bind(DAY + 1)
+      .run();
+    await store.sweep(DAY + 10);
+    expect(await row("OverLast")).toBeNull();
+  });
+
+  it("does not count cleared reports toward the cap, so a mistake does not close it", async () => {
+    await cards(20, "n");
+    await testEnv.DB.prepare("UPDATE reports SET cleared = 1").run();
+    await shared("Afterclr");
+    await report("Afterclr", "n", "phishing", DAY);
+    expect(await overCap("Afterclr", "n")).toBe(0);
+  });
+
+  it("stops blocking on its own past the day's documents, and the mail says so", async () => {
+    const reportedBy3 = async (id: string) => {
+      await shared(id);
+      let last = { blocked: false };
+      for (const net of ["a", "b", "c"]) last = await report(id, net, "phishing", DAY);
+      return last.blocked;
+    };
+    for (let at = 0; at < 10; at += 1) expect(await reportedBy3(`Blocks${String(at).padStart(2, "0")}`)).toBe(true);
+    expect((await store.news(0, DAY * 24 + 1, 50)).autoBlocksFull).toBe(true);
+    expect(await reportedBy3("Blocks10")).toBe(false);
+    const stillThere = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE doc = 'Blocks10'").first<{
+      n: number;
+    }>();
+    expect(stillThere?.n).toBe(3);
+  });
+
+  it("starts the count again the next day, and an operator's block does not use it", async () => {
+    for (let at = 0; at < 10; at += 1) await shared(`Operator${at}`);
+    await testEnv.DB.prepare("UPDATE docs SET blocked_at = ?, blocked_by_operator = 1").bind(DAY).run();
+    expect((await store.news(0, DAY * 24 + 1, 50)).autoBlocksFull).toBe(false);
+    for (let at = 0; at < 10; at += 1) {
+      const id = `Blocks${String(at).padStart(2, "0")}`;
+      await shared(id);
+      for (const net of ["a", "b", "c"]) await report(id, net, "phishing", DAY);
+    }
+    await shared("Nextdayy");
+    await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'Nextdayy'")
+      .bind(DAY + 20)
+      .run();
+    let last = { blocked: false };
+    for (const net of ["a", "b", "c"]) last = await report("Nextdayy", net, "phishing", DAY + 1);
+    expect(last.blocked).toBe(true);
   });
 });
 

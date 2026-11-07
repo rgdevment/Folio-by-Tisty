@@ -24,7 +24,7 @@ interface Env extends Bindings, SpendBindings, MailBindings {
 
 const WEEKLY = "0 4 * * SUN";
 const SPEND = "*/15 * * * *";
-const DIGEST = "0 0,12 * * *";
+const DIGEST = "0 0,6,12,18 * * *";
 const dayKeys = new DayKeys();
 const evidenceKeys = new DayKeys();
 
