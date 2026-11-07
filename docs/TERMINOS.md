@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 8, vigente desde el 6 de noviembre de 2026.**
+**Versión 7, vigente desde el 6 de noviembre de 2026.**
 
 ## En corto
 

@@ -694,7 +694,7 @@ body::before {
   transition: color var(--quick);
 }
 
-.leaf:hover {
+.leaf:hover:enabled {
   color: var(--tisty-ink);
 }
 
@@ -705,6 +705,11 @@ body::before {
     0 1px 2px var(--shade-near);
   color: var(--tisty-ink);
   font-weight: 500;
+}
+
+.leaf:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 /* A long list is a window on itself, so the page keeps the only scrollbar anyone sees, and fading edges show there is more. */

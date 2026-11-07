@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 8, in force since November 6, 2026.**
+**Version 7, in force since November 6, 2026.**
 
 ## The short version
 

@@ -77,15 +77,15 @@
         </section>
 
         <section class="panel paper" id="panel-paper" aria-label="Papel">
-          <fieldset class="leaves" id="leaves" aria-label="Tamaño del papel">
+          <button class="tool" id="sheets" type="button" aria-pressed="false" aria-label="Hojas" title="Hojas">
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="1.5" width="9" height="5.5" rx="1" /><rect x="3.5" y="9" width="9" height="5.5" rx="1" /></svg>
+          </button>
+          <fieldset class="leaves" id="leaves" aria-label="Tamaño del papel" disabled>
             <button class="leaf" type="button" data-paper="a4">A4</button>
             <button class="leaf" type="button" data-paper="letter">Carta</button>
             <button class="leaf" type="button" data-paper="folio">Oficio</button>
             <button class="leaf" type="button" data-paper="tabloid" hidden>Tabloide</button>
           </fieldset>
-          <button class="tool" id="sheets" type="button" aria-pressed="false" aria-label="Hojas" title="Hojas">
-            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="1.5" width="9" height="5.5" rx="1" /><rect x="3.5" y="9" width="9" height="5.5" rx="1" /></svg>
-          </button>
           <button class="tool" id="landscape" type="button" aria-pressed="false" aria-label="Horizontal" title="Horizontal" hidden>
             <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="4" width="13" height="8" rx="1" /></svg>
           </button>
