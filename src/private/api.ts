@@ -41,6 +41,7 @@ export const STATUS: Record<Refused["refused"], number> = {
   not_yours: 403,
   shares_full: 409,
   languages_full: 409,
+  room_full: 409,
   machines_full: 409,
   bad_upload: 400,
   uploads_off: 503,

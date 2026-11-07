@@ -16,6 +16,7 @@ export type Refused =
         | "not_yours"
         | "shares_full"
         | "languages_full"
+        | "room_full"
         | "machines_full"
         | "bad_upload"
         | "uploads_off"

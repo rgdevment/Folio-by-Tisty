@@ -523,6 +523,19 @@ const UPLOADING: Scenario[] = [
   {
     method: "PUT",
     path: UPLOAD_PATH,
+    status: 409,
+    refused: "room_full",
+    upload: envelope(1),
+    first: true,
+    admin: TOKEN,
+    solves: true,
+    ready: async () => {
+      LEVEL_ONE.newKeyBytesAtMost = 0;
+    },
+  },
+  {
+    method: "PUT",
+    path: UPLOAD_PATH,
     status: 403,
     refused: "key_blocked",
     upload: envelope(2),
@@ -703,6 +716,7 @@ beforeEach(async () => {
   LEVEL_ONE.oldestContractServed = null;
   LEVEL_ONE.revocationsAnHour = 30;
   LEVEL_ONE.uploadsAnHour = 60;
+  LEVEL_ONE.newKeyBytesAtMost = 25_000_000;
   for (const table of [
     "docs",
     "keys",

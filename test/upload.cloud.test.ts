@@ -10,7 +10,13 @@ import { latestVersion, readDoc, readFiles } from "../src/core/read";
 import { takeRevocations } from "../src/core/revocations";
 import { saltFor, solveProof, startNow, toBase64Url, tokenHash } from "../src/core/start";
 import type { Stage, Version } from "../src/core/store";
-import { type FirstUpload, type UploadTools, uploadDoc, uploadFiles } from "../src/core/upload";
+import {
+  type FirstUpload,
+  filesEnvelopeBytesAtMost,
+  type UploadTools,
+  uploadDoc,
+  uploadFiles,
+} from "../src/core/upload";
 import { keptVersions, listFreesAt, uploadAllowedAt } from "../src/core/versions";
 import {
   filesHashOf,
@@ -773,6 +779,139 @@ describe("what stops a version", () => {
     await testEnv.DB.prepare("UPDATE docs SET paused_at = NULL, blocked_at = 1 WHERE id = ?").bind(id).run();
     expect(await send(id, await sealedEnvelope({ id, version: 2, owner: mario }), LATER)).toEqual({
       refused: "blocked",
+    });
+  });
+
+  describe("what a new key holds", () => {
+    const roomOf = (bytes: number) => ({ ...tools, limits: { ...LIMITS, newKeyBytesAtMost: bytes } });
+    const sendTo = (to: UploadTools, id: string, bytes: Bytes, now = NOW, first?: FirstUpload) =>
+      uploadDoc({ id, now, ip: "203.0.113.9", bytes: async () => bytes, ...(first ? { first } : {}) }, to);
+    const twoOf = async (owner: Person) => {
+      const one = await started();
+      const two = await started();
+      return {
+        one,
+        two,
+        first: await sealedEnvelope({ id: one.id, version: 1, owner }),
+        second: await sealedEnvelope({ id: two.id, version: 1, owner }),
+      };
+    };
+
+    it("takes up to its room, and a first version past it leaves nothing", async () => {
+      const fresh = await newPerson();
+      const { one, two, first, second } = await twoOf(fresh);
+      const room = roomOf(first.length + second.length - 1);
+      expect(await sendTo(room, one.id, first, NOW, one)).toEqual({ stored: true, version: 1 });
+      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ refused: "room_full" });
+      expect(await row(two.id)).toBeNull();
+      expect(await sendTo(roomOf(first.length + second.length), two.id, second, NOW, two)).toEqual({
+        stored: true,
+        version: 1,
+      });
+    });
+
+    it("counts a new version with what its document already holds", async () => {
+      const fresh = await newPerson();
+      const one = await started();
+      const first = await sealedEnvelope({ id: one.id, version: 1, owner: fresh });
+      const next = await sealedEnvelope({ id: one.id, version: 2, owner: fresh });
+      const room = roomOf(first.length + next.length - 1);
+      expect(await sendTo(room, one.id, first, NOW, one)).toEqual({ stored: true, version: 1 });
+      expect(await sendTo(room, one.id, next, LATER)).toEqual({ refused: "room_full" });
+    });
+
+    it("frees what stopped being shared", async () => {
+      const fresh = await newPerson();
+      const { one, two, first, second } = await twoOf(fresh);
+      const room = roomOf(first.length + second.length - 1);
+      await sendTo(room, one.id, first, NOW, one);
+      await store.stop(one.id, dayOf(NOW));
+      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ stored: true, version: 1 });
+    });
+
+    it("does not count a blocked document, which its owner cannot stop sharing", async () => {
+      const fresh = await newPerson();
+      const { one, two, first, second } = await twoOf(fresh);
+      const room = roomOf(first.length + second.length - 1);
+      await sendTo(room, one.id, first, NOW, one);
+      await testEnv.DB.prepare("UPDATE docs SET blocked_at = ? WHERE id = ?").bind(dayOf(NOW), one.id).run();
+      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ stored: true, version: 1 });
+    });
+
+    it("counts each new set of attachments at the most it may weigh", async () => {
+      const fresh = await newPerson();
+      const one = await started();
+      const first = await sealedEnvelope({ id: one.id, version: 1, owner: fresh });
+      const next = await sealedEnvelope({ id: one.id, version: 2, owner: fresh });
+      const weight = first.length + next.length + filesEnvelopeBytesAtMost(LIMITS);
+      await sendTo(roomOf(weight), one.id, first, NOW, one);
+      const withFiles = (room: number) =>
+        uploadDoc(
+          { id: one.id, now: LATER, ip: "203.0.113.9", bytes: async () => next, files: "F".repeat(43) },
+          roomOf(room),
+        );
+      expect(await withFiles(weight - 1)).toEqual({ refused: "room_full" });
+      expect(await withFiles(weight)).toMatchObject({ stored: true, version: 2 });
+    });
+
+    it("counts the same attachments once, however many versions name them", async () => {
+      const fresh = await newPerson();
+      const one = await started();
+      const [first, second, third] = await Promise.all(
+        [1, 2, 3].map((version) => sealedEnvelope({ id: one.id, version, owner: fresh })),
+      );
+      const [a, b, c] = [first, second, third].map((one) => (one as Bytes).length) as [number, number, number];
+      const room = roomOf(a + b + c + filesEnvelopeBytesAtMost(LIMITS));
+      const named = (bytes: Bytes, now: number) =>
+        uploadDoc({ id: one.id, now, ip: "203.0.113.9", bytes: async () => bytes, files: "F".repeat(43) }, room);
+      await sendTo(room, one.id, first as Bytes, NOW, one);
+      expect(await named(second as Bytes, LATER)).toMatchObject({ stored: true, version: 2 });
+      expect(await named(third as Bytes, LATER + DAY_MS)).toMatchObject({ stored: true, version: 3 });
+    });
+
+    it("does not count the versions the new one lets go", async () => {
+      const fresh = await newPerson();
+      const one = { ...(await started()), ttlDays: 7 };
+      const at = [NOW, NOW + 3_600_000, NOW + 4 * DAY_MS, NOW + 8 * DAY_MS];
+      const versions = await Promise.all(
+        at.map((_, n) => sealedEnvelope({ id: one.id, version: n + 1, owner: fresh })),
+      );
+      const [v1, v2, v3, v4] = versions.map((one) => one.length) as [number, number, number, number];
+      const room = roomOf(v2 + v3 + v4 + Math.floor(v1 / 2));
+      expect(await sendTo(room, one.id, versions[0] as Bytes, at[0], one)).toEqual({ stored: true, version: 1 });
+      for (const n of [1, 2, 3]) {
+        expect(await sendTo(room, one.id, versions[n] as Bytes, at[n])).toEqual({ stored: true, version: n + 1 });
+      }
+    });
+
+    it("does not count an old owner's document when a new editor uploads", async () => {
+      const { pair, permit } = await newToken();
+      const id = await shared({ permit });
+      await testEnv.DB.prepare("UPDATE keys SET first_day = first_day - ? WHERE root = ?")
+        .bind(LIMITS.daysAKeyIsNew, toBase64Url(mario.rootBytes))
+        .run();
+      const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+      expect(await sendTo(roomOf(1), id, edited, LATER)).toEqual({ stored: true, version: 2 });
+    });
+
+    it("lets its owner's correction through, as the terms promise", async () => {
+      const fresh = await newPerson();
+      const one = await started();
+      await send(one.id, await sealedEnvelope({ id: one.id, version: 1, owner: fresh }), NOW, one);
+      await testEnv.DB.prepare("UPDATE docs SET blocked_at = ?, counts_from = 2 WHERE id = ?")
+        .bind(dayOf(NOW), one.id)
+        .run();
+      const fixed = await sealedEnvelope({ id: one.id, version: 2, owner: fresh });
+      expect(await sendTo(roomOf(1), one.id, fixed, LATER)).toEqual({ stored: true, version: 2 });
+    });
+
+    it("is no longer counted once the key is old", async () => {
+      const fresh = await newPerson();
+      const { one, two, first, second } = await twoOf(fresh);
+      const room = roomOf(first.length + second.length - 1);
+      await sendTo(room, one.id, first, NOW, one);
+      await testEnv.DB.prepare("UPDATE keys SET first_day = first_day - ?").bind(LIMITS.daysAKeyIsNew).run();
+      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ stored: true, version: 1 });
     });
   });
 

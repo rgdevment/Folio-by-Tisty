@@ -496,9 +496,9 @@ describe("expiring", () => {
 
   it("knows keys by the day they first signed", async () => {
     await store.keepKeys(["o1", "o2"], DAY);
-    expect(await store.allKeysSignedBy(["o1", "o2", "o1"], DAY)).toBe(true);
-    expect(await store.allKeysSignedBy(["o1"], DAY - 1)).toBe(false);
-    expect(await store.allKeysSignedBy(["o1", "nobody"], DAY)).toBe(false);
+    expect(await store.newRootsOf(["o1", "o2", "o1"], DAY)).toEqual([]);
+    expect(await store.newRootsOf(["o1"], DAY - 1)).toEqual(["o1"]);
+    expect(await store.newRootsOf(["o1", "nobody", "nobody"], DAY)).toEqual(["nobody"]);
   });
 
   it("takes a language with its anchor, and never on its own", async () => {
