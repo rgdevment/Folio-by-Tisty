@@ -26,31 +26,43 @@ const revocationsIn = (said: string | null): Revocation[] => {
   }
 };
 
-export const asking = (path: string, proof?: string): Promise<Response> =>
+export const asking = (path: string, proof?: string, caseToken?: string): Promise<Response> =>
   fetch(path, {
     credentials: "omit",
     cache: "no-store",
     ...(proof === undefined ? {} : { headers: { "Folio-Proof": proof } }),
+    ...(caseToken === undefined ? {} : { headers: { "Folio-Case": caseToken } }),
   });
+
+const arrivedFrom = async (response: Response): Promise<Arrived | NotArrived> => {
+  if (!response.ok) return (await response.json()) as NotArrived;
+  const arrivedAt = Number(response.headers.get("Folio-Arrived"));
+  const diesOn = Number(response.headers.get("Folio-Dies-On"));
+  // Without its dates a signature would be weighed against 1970, so it is not taken as an answer.
+  if (!(arrivedAt > 0 && diesOn > 0)) return { refused: "unreachable" };
+  const revocations = revocationsIn(response.headers.get("Folio-Revocations"));
+  const version = Number(response.headers.get("Folio-Version"));
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    arrivedAt,
+    diesOn,
+    revocations,
+    ...(version > 0 ? { version } : {}),
+  };
+};
 
 // Loaded before anything else on the page, so the envelope is already coming while the reader's code is.
 export const askFor = async (id: string, proof?: string): Promise<Arrived | NotArrived> => {
   try {
-    const response = await asking(`/api/v1/docs/${id}`, proof);
-    if (!response.ok) return (await response.json()) as NotArrived;
-    const arrivedAt = Number(response.headers.get("Folio-Arrived"));
-    const diesOn = Number(response.headers.get("Folio-Dies-On"));
-    // Without its dates a signature would be weighed against 1970, so it is not taken as an answer.
-    if (!(arrivedAt > 0 && diesOn > 0)) return { refused: "unreachable" };
-    const revocations = revocationsIn(response.headers.get("Folio-Revocations"));
-    const version = Number(response.headers.get("Folio-Version"));
-    return {
-      bytes: new Uint8Array(await response.arrayBuffer()),
-      arrivedAt,
-      diesOn,
-      revocations,
-      ...(version > 0 ? { version } : {}),
-    };
+    return await arrivedFrom(await asking(`/api/v1/docs/${id}`, proof));
+  } catch {
+    return { refused: "unreachable" };
+  }
+};
+
+export const askForCase = async (id: string, caseToken: string): Promise<Arrived | NotArrived> => {
+  try {
+    return await arrivedFrom(await asking(`/api/v1/cases/${id}`, undefined, caseToken));
   } catch {
     return { refused: "unreachable" };
   }

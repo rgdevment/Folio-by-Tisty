@@ -94,7 +94,7 @@ describe("the report form", () => {
 
   it("says what happens to the link, which nobody opens on child abuse", () => {
     choose("csam");
-    expect(element("report-consent-said").textContent).toContain("sin ver imágenes");
+    expect(element("report-consent-said").textContent).toContain("autoridades pertinentes");
     choose("threat");
     expect(element("report-consent-said").textContent).toContain("siempre entrega el link");
   });

@@ -1,5 +1,6 @@
 import "./panel.css";
 import type { Queue } from "../../core/queue";
+import { madeCase } from "./case";
 import { drawQueue } from "./draw";
 
 const said = document.getElementById("said") as HTMLElement;
@@ -14,16 +15,63 @@ const answered = async (asking: () => Promise<Response>): Promise<Response | nul
   }
 };
 
-const asked = async (path: string, note?: string): Promise<boolean> => {
-  const response = await answered(() =>
+const sent = (path: string, body?: unknown): Promise<Response | null> =>
+  answered(() =>
     fetch(`/api/docs/${path}`, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Folio-Operator": "1", "Content-Type": "application/json" },
-      ...(note === undefined ? {} : { body: JSON.stringify({ note }) }),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     }),
   );
-  return response?.ok ?? false;
+
+const asked = async (path: string, note?: string): Promise<boolean> =>
+  (await sent(path, note === undefined ? undefined : { note }))?.ok ?? false;
+
+const showCaseLink = (link: string, says: string): void => {
+  (document.getElementById("case-link-said") as HTMLElement).textContent = says;
+  (document.getElementById("case-link-code") as HTMLElement).textContent = link;
+  (document.getElementById("case-link") as HTMLElement).hidden = false;
+};
+
+const copying = (text: string, says: string): void => {
+  void navigator.clipboard.writeText(text).then(
+    () => {
+      said.textContent = says;
+    },
+    () => {
+      said.textContent = "No se pudo copiar. Es este:";
+      said.append(" ", text);
+    },
+  );
+};
+
+const caseMade = async (id: string, version: number, says: string, records?: unknown): Promise<boolean> => {
+  const made = await madeCase(id, version, records);
+  if (!(await sent(`${id}/case`, made.body))?.ok) return false;
+  showCaseLink(made.link, says);
+  return true;
+};
+
+const verifying = async (id: string, version: number): Promise<void> => {
+  said.textContent = "Trabajando…";
+  const made = await caseMade(id, version, "Link para verificar, se muestra una vez. Pide la llave al abrirlo:");
+  said.textContent = made ? "" : COULD_NOT;
+};
+
+const panicking = async (id: string, version: number, note: string): Promise<void> => {
+  said.textContent = "Trabajando…";
+  const held = await sent(`${id}/panic`, { note });
+  if (!held?.ok) {
+    said.textContent = COULD_NOT;
+    return;
+  }
+  const { records } = (await held.json()) as { records: unknown };
+  await load();
+  const says = "Bloqueado y retenido. Link de caso para la autoridad, se muestra una vez. Entrégalo con la llave:";
+  if (!(await caseMade(id, version, says, records))) {
+    said.textContent = "Quedó bloqueado y retenido, pero no se pudo crear el link. Presiona de nuevo el botón.";
+  }
 };
 
 const load = async (): Promise<void> => {
@@ -41,17 +89,17 @@ const load = async (): Promise<void> => {
       const reason = prompt("¿Por qué se abrió este documento?");
       if (reason?.trim()) void doing(`${id}/opened`, reason);
     },
-    copy: (command) => {
-      void navigator.clipboard.writeText(command).then(
-        () => {
-          said.textContent = "Copiado. Reemplaza <llave> por la ruta de tu llave y ábrelo en tu equipo.";
-        },
-        () => {
-          said.textContent = "No se pudo copiar. El comando es este:";
-          said.append(" ", command);
-        },
-      );
+    panic: (id, version) => {
+      const note = prompt(`¿Por qué bloquear y retener ${id}? Dejará de servirse y se retiene 180 días.`);
+      if (note?.trim()) void panicking(id, version, note);
     },
+    verifyLink: (id, version) => void verifying(id, version),
+    handedOver: (id) =>
+      confirmed(
+        "¿Ya entregaste el link de caso y la llave a la autoridad? Se borran las llaves selladas de este documento, aunque siguen hasta 30 días en los respaldos cifrados.",
+        `${id}/handed_over`,
+      ),
+    copy: (command) => copying(command, "Copiado. Reemplaza <llave> por la ruta de tu llave y ábrelo en tu equipo."),
   });
   said.textContent = "";
 };
@@ -65,6 +113,11 @@ const doing = async (path: string, note?: string): Promise<void> => {
 const confirmed = (question: string, path: string): void => {
   if (confirm(question)) void doing(path);
 };
+
+(document.getElementById("case-link-copy") as HTMLElement).addEventListener("click", () => {
+  const link = (document.getElementById("case-link-code") as HTMLElement).textContent ?? "";
+  copying(link, "Link copiado.");
+});
 
 (document.getElementById("block-form") as HTMLFormElement).addEventListener("submit", (event) => {
   event.preventDefault();

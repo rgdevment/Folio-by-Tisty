@@ -366,6 +366,74 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UploadsOff" }
+  /cases/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Reading]
+      operationId: readCase
+      summary: Gives the version a case link opens, even on a blocked document.
+      description: |
+        For whoever verifies a report or investigates it. `Folio-Case` carries the token the operator handed
+        over, which lasts 30 days. It opens no more than a reader's link does: the key is still needed. Each
+        answer on this path and those below it is noted as an opening, and no reader is counted.
+      parameters:
+        - $ref: "#/components/parameters/CaseToken"
+      responses:
+        "200":
+          description: The envelope of that version, with the same headers as reading a document.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Missing" }
+        "429": { $ref: "#/components/responses/Slow" }
+        "500": { $ref: "#/components/responses/Failed" }
+  /cases/{id}/records:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Reading]
+      operationId: readCaseRecords
+      summary: Gives the document's records, sealed, when the case link was made for an authority.
+      description: The key is in the case link, and the server never had it.
+      parameters:
+        - $ref: "#/components/parameters/CaseToken"
+      responses:
+        "200":
+          description: The sealed records.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sealed]
+                properties:
+                  sealed: { type: string }
+        "404": { $ref: "#/components/responses/Missing" }
+        "429": { $ref: "#/components/responses/Slow" }
+        "500": { $ref: "#/components/responses/Failed" }
+  /cases/{id}/files/{hash}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+      - name: hash
+        in: path
+        required: true
+        description: The `files_hash` of the version the case opens.
+        schema: { type: string, pattern: "^[A-Za-z0-9_-]{43}$" }
+    get:
+      tags: [Reading]
+      operationId: readCaseFiles
+      summary: Gives the sealed files envelope of the version a case link opens.
+      parameters:
+        - $ref: "#/components/parameters/CaseToken"
+      responses:
+        "200":
+          description: The envelope as it was uploaded.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Missing" }
+        "429": { $ref: "#/components/responses/Slow" }
+        "500": { $ref: "#/components/responses/Failed" }
   /docs/{id}/files/{hash}:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -613,6 +681,12 @@ components:
       in: path
       required: true
       schema: { type: string, pattern: "^[A-Za-z0-9]{8}$" }
+    CaseToken:
+      name: Folio-Case
+      in: header
+      required: true
+      description: The token of a case link.
+      schema: { type: string, pattern: "^[A-Za-z0-9_-]{43}$" }
     Proof:
       name: Folio-Proof
       in: header

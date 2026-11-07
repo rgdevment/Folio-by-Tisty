@@ -120,6 +120,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   for (const table of [
     "docs",
+    "cases",
     "reports",
     "false_reporters",
     "moderation",
@@ -337,6 +338,59 @@ describe("a block the operator placed", () => {
 });
 
 describe("what it can do", () => {
+  describe("a case", () => {
+    const HASH = "H".repeat(43);
+    const sendingCase = (id: string, body: unknown) =>
+      asked(`/api/docs/${id}/case`, {
+        method: "POST",
+        headers: { "Folio-Operator": "1" },
+        body: JSON.stringify(body),
+      });
+
+    it("panics with its reason, and answers the records", async () => {
+      await share();
+      const response = await acting(`/api/docs/${ID}/panic`, "looks real");
+      expect(response.status).toBe(200);
+      expect(((await response.json()) as { records: { id: string } }).records.id).toBe(ID);
+      expect((await row())?.blocked_at).toBe(TODAY);
+    });
+
+    it("will not panic without a reason, or over what does not exist", async () => {
+      await share();
+      expect((await acting(`/api/docs/${ID}/panic`)).status).toBe(400);
+      expect((await row())?.blocked_at).toBeNull();
+      expect((await acting("/api/docs/Nothing1/panic", "looks real")).status).toBe(404);
+    });
+
+    it("takes a case and says when the version is not there", async () => {
+      await share();
+      expect((await sendingCase(ID, { version: 1, tokenHash: HASH, sealedRecords: "case1.abc" })).status).toBe(200);
+      expect((await sendingCase(ID, { version: 9, tokenHash: "J".repeat(43) })).status).toBe(404);
+    });
+
+    it.each([
+      ["no version", { tokenHash: HASH }],
+      ["version zero", { version: 0, tokenHash: HASH }],
+      ["a broken version", { version: 1.5, tokenHash: HASH }],
+      ["no hash", { version: 1 }],
+      ["a short hash", { version: 1, tokenHash: "short" }],
+      ["records in the clear", { version: 1, tokenHash: HASH, sealedRecords: '{"reports":[]}' }],
+    ])("refuses a case with %s", async (_, body) => {
+      await share();
+      expect((await sendingCase(ID, body)).status).toBe(400);
+    });
+
+    it("hands over only for the operator, and answers what it did", async () => {
+      await share();
+      await reported("csam", ["n1"], "sealed1.x");
+      await acting(`/api/docs/${ID}/panic`, "looks real");
+      await sendingCase(ID, { version: 1, tokenHash: HASH, sealedRecords: "case1.abc" });
+      expect((await asked(`/api/docs/${ID}/handed_over`, { method: "POST" })).status).toBe(403);
+      expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(200);
+      expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(404);
+    });
+  });
+
   it("accepts an appeal: lifts the block, and punishes no network for reporting", async () => {
     await share();
     await reported();

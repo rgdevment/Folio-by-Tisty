@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 6, vigente desde el 6 de noviembre de 2026.**
+**Versión 7, vigente desde el 6 de noviembre de 2026.**
 
 ## En corto
 
@@ -146,6 +146,13 @@ para denunciar: guarda un resumen de la red.
 - **El operador puede denunciar** a la PDI o a la Fiscalía lo que, al revisarlo,
   parezca delito, y avisar de phishing y malware a Google Safe Browsing y a
   Cloudflare. Lo hace una persona, a mano.
+- **Cuando denuncia a una autoridad,** el operador bloquea el documento y lo
+  retiene 180 días, renovables mientras la autoridad lo pida. Le entrega un link
+  que abre solo la versión denunciada durante 30 días, con cada apertura anotada,
+  y un paquete cifrado con los registros que Folio tenga, sin la red de quien
+  denunció. También puede usar un link así para verificar una denuncia sobre un
+  documento ya bloqueado. Después de entregar la llave, borra la que trajo la
+  denuncia, que sigue hasta 30 días en los respaldos cifrados.
 - **El operador solo abre lo cifrado** en cuatro casos y siempre con el link
   para leerlo: cuando quien lo compartió lo entrega para demostrar que el
   bloqueo fue un error, para revisar una denuncia grave con el link que trajo,
@@ -153,11 +160,13 @@ para denunciar: guarda un resumen de la red.
   Anota cada apertura. En un navegador, el código que descifra viene del mismo
   servidor; la [política de privacidad](PRIVACIDAD.md) dice de qué no protege
   eso.
-- **Una denuncia de abuso infantil la revisa una persona,** sin ver imágenes,
-  videos ni otros archivos: lee solo el texto, con las imágenes apagadas. Si es
-  falsa, la descarta. Si no, o si no se puede saber sin verlos, la denuncia a mano
-  a la PDI o a la Fiscalía y les entrega el link y la copia cifrada. Quien denuncia
-  no debe descargar, copiar, reenviar ni mandar por correo ese material.
+- **Una denuncia de abuso infantil la revisa una persona,** que abre el documento
+  solo para verificarla, sin malicia ni intenciones deshonestas, y no puede guardar
+  copia en su equipo. Si es falsa, la descarta. Si no, bloquea el documento y lo
+  denuncia a las autoridades pertinentes, las únicas que reciben la llave, junto
+  con los registros que Folio tenga. La copia queda cifrada en Folio hasta 180
+  días, o lo que pida una orden. Quien denuncia no debe descargar, copiar, reenviar
+  ni mandar por correo ese material.
 - **Los derechos de autor los reclama su titular** en <abuso@tisty.app>. Un
   retiro obligatorio requiere orden judicial, como dice la Ley 17.336, y el
   operador también puede atender un aviso DMCA. El operador puede dejar de

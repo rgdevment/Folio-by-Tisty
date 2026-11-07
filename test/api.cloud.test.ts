@@ -70,6 +70,7 @@ interface Scenario {
   status: number;
   refused?: string;
   admin?: string;
+  caseToken?: string;
   body?: string;
   braked?: boolean;
   broken?: boolean;
@@ -82,7 +83,7 @@ interface Scenario {
 }
 
 const send = async (
-  { method, path, admin, body, braked, broken, upload, first }: Scenario,
+  { method, path, admin, caseToken, body, braked, broken, upload, first }: Scenario,
   proof?: string,
   ip?: string,
 ) => {
@@ -93,6 +94,7 @@ const send = async (
     headers.set("Folio-Ttl-Days", "3");
   }
   if (admin) headers.set("Folio-Admin", admin);
+  if (caseToken) headers.set("Folio-Case", caseToken);
   if (proof) headers.set("Folio-Proof", proof);
   const limit = async () => {
     if (broken) throw new Error("broken on purpose");
@@ -214,6 +216,30 @@ const shareNamingSentFiles = async (who = (): Person => owner) => {
   await shareSigned();
   await namingFiles(await filesHashOf(ID, sentFiles));
 };
+const CASE_TOKEN = "T".repeat(43);
+const caseOpens = async () => {
+  await testEnv.DB.prepare(
+    "INSERT OR REPLACE INTO cases (token_hash, doc, version, until, sealed_records) VALUES (?, ?, 1, ?, ?)",
+  )
+    .bind(await tokenHash(CASE_TOKEN), ID, TODAY + 1, "case1.abc")
+    .run();
+};
+const blockedCase = async () => {
+  await block();
+  await caseOpens();
+};
+const blockedCaseWithFiles = async () => {
+  await shareWithFiles();
+  await testEnv.DB.prepare(`UPDATE docs SET blocked_at = ? WHERE id = '${ID}'`).bind(TODAY).run();
+  await caseOpens();
+};
+const caseRoute = (path: string, ready: () => Promise<void>): Scenario[] => [
+  { method: "GET", path, status: 200, caseToken: CASE_TOKEN, ready },
+  { method: "GET", path, status: 404, refused: "missing", caseToken: "U".repeat(43), ready },
+  { method: "GET", path, status: 429, refused: "slow", caseToken: CASE_TOKEN, braked: true },
+  { method: "GET", path, status: 500, refused: "failed", caseToken: CASE_TOKEN, broken: true },
+];
+
 const PERMIT = JSON.stringify({ permit: "A".repeat(43) });
 const UPLOAD_PATH = "/docs/{id}";
 const LATEST_PATH = "/docs/{id}/latest";
@@ -524,6 +550,9 @@ const UPLOADING: Scenario[] = [
 ];
 
 const SCENARIOS: Scenario[] = [
+  ...caseRoute("/cases/{id}", blockedCase),
+  ...caseRoute("/cases/{id}/records", blockedCase),
+  ...caseRoute("/cases/{id}/files/{hash}", blockedCaseWithFiles),
   ...FILES,
   ...UPLOADING,
   { method: "POST", path: "/start", status: 200 },

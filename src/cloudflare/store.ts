@@ -1,4 +1,5 @@
 import type { Revocation } from "@tisty/contracts";
+import { caseNameOf } from "../core/case-records";
 import { DAY_MS, LEVEL_ONE, type Limits, levelOfReport } from "../core/limits";
 import { momentOf } from "../core/moment";
 import { toBase64Url } from "../core/start";
@@ -12,6 +13,7 @@ import type {
   KeyAdmitted,
   NewDoc,
   News,
+  OpenedCase,
   Owned,
   Reading,
   Report,
@@ -28,12 +30,19 @@ import { keptVersions } from "../core/versions";
 import { acceptAppeal, mayCorrect } from "./moderation";
 
 // Two rows by their key at most: the machine that signed the last version and its owner's, the start of owner_mark.
-const REVOCATIONS_OF_THE_LAST_VERSION = `(
+const revocationsOf = (version: string): string => `(
   SELECT json_group_array(json_object('root', r.root, 'machine', r.machine, 'at', r.at, 'signed', r.signed))
   FROM revocations r
-  WHERE (r.root = json_extract(d.versions, '$[#-1].signer') AND r.machine = json_extract(d.versions, '$[#-1].machine'))
+  WHERE (r.root = json_extract(${version}, '$.signer') AND r.machine = json_extract(${version}, '$.machine'))
     OR (r.root = d.owner AND r.machine = substr(d.owner_mark, 1, instr(d.owner_mark, '.') - 1))
 )`;
+const REVOCATIONS_OF_THE_LAST_VERSION = revocationsOf("json_extract(d.versions, '$[#-1]')");
+
+const revocationsIn = (said: string): Revocation[] =>
+  (JSON.parse(said) as (Omit<Revocation, "at"> & { at: number })[]).map((one) => ({
+    ...one,
+    at: momentOf(one.at * 1000),
+  }));
 
 export interface Bindings {
   DB: D1Database;
@@ -504,10 +513,39 @@ export class Cloud implements Store {
       pausedAt: row.paused_at,
       blockedAt: row.blocked_at,
       fixBy: row.fix_by,
-      revocations: (JSON.parse(row.revocations) as (Omit<Revocation, "at"> & { at: number })[]).map((one) => ({
-        ...one,
-        at: momentOf(one.at * 1000),
-      })),
+      revocations: revocationsIn(row.revocations),
+    };
+  }
+
+  async openedCase(id: string, hash: string, today: number, now: number): Promise<OpenedCase | null> {
+    const [found] = await this.#db.batch<{
+      version: string;
+      dies_on: number;
+      revocations: string;
+      sealed_records: string | null;
+    }>([
+      this.#db
+        .prepare(
+          `SELECT v.value AS version, d.dies_on, c.sealed_records, ${revocationsOf("v.value")} AS revocations
+           FROM cases c JOIN docs d ON d.id = c.doc
+             JOIN json_each(d.versions) v ON json_extract(v.value, '$.n') = c.version
+           WHERE c.token_hash = ?1 AND c.doc = ?2 AND c.until >= ?3`,
+        )
+        .bind(hash, id, today),
+      this.#db
+        .prepare(
+          `INSERT OR IGNORE INTO openings (doc, at, reason)
+           SELECT ?2, ?4, ?5 FROM cases WHERE token_hash = ?1 AND doc = ?2 AND until >= ?3`,
+        )
+        .bind(hash, id, today, now, `case ${caseNameOf(hash)}`),
+    ]);
+    const row = found?.results[0];
+    if (!row) return null;
+    return {
+      version: JSON.parse(row.version) as Version,
+      diesOn: row.dies_on,
+      revocations: revocationsIn(row.revocations),
+      sealedRecords: row.sealed_records,
     };
   }
 
@@ -769,6 +807,7 @@ export class Cloud implements Store {
         this.#db.prepare("DELETE FROM net_day WHERE day < ?").bind(today - 1),
         this.#db.prepare("DELETE FROM net_hour WHERE hour < ?").bind(today * HOURS_IN_A_DAY),
         this.#db.prepare("DELETE FROM false_reporters WHERE at < ?").bind(today - this.#limits.evidenceDays),
+        this.#db.prepare("DELETE FROM cases WHERE until < ?").bind(today),
         this.#db
           .prepare(
             `DELETE FROM reports WHERE at < ?1

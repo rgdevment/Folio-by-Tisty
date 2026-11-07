@@ -90,6 +90,13 @@ export interface News {
 }
 
 // What a read needs of a document, in one row.
+export interface OpenedCase {
+  version: Version;
+  diesOn: number;
+  revocations: Revocation[];
+  sealedRecords: string | null;
+}
+
 export interface Shown {
   owner: string;
   version: Version | null;
@@ -153,6 +160,7 @@ export interface Store {
   admit(reading: Reading, today: number): Promise<Admitted>;
   note(reading: Reading, today: number): Promise<void>;
   shown(id: string, today: number): Promise<Shown | null>;
+  openedCase(id: string, hash: string, today: number, now: number): Promise<OpenedCase | null>;
   envelope(id: string, version: Version): Promise<ReadableStream | null>;
   hasFiles(id: string, hash: string): Promise<boolean>;
   keepFiles(files: KeptFiles, today: number): Promise<"stored" | "quota">;
