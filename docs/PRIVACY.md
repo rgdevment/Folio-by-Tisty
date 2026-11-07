@@ -96,6 +96,9 @@ most direct ways are:
   server at the next cleanup, normally within an hour; during a spending block or
   a failure it can take longer. A serious report or an order can require keeping
   it.
+- **The email you left in a report:** write to <abuso@tisty.app> with the
+  document's id and the operator erases it. It stays in the encrypted backups for
+  up to 30 days.
 - **Anything else:** write to <rgdevment@tisty.app>. The digest of your IP does
   not reveal who you are, so in general there is no data that can be tied to
   you.

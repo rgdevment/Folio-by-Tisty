@@ -6,7 +6,16 @@ import { isOperator } from "./access";
 export interface AdminApi {
   moderation: Pick<
     CloudModeration,
-    "queue" | "accept" | "reject" | "block" | "reportWasFalse" | "opened" | "panic" | "makeCase" | "handedOver"
+    | "queue"
+    | "accept"
+    | "reject"
+    | "block"
+    | "reportWasFalse"
+    | "opened"
+    | "panic"
+    | "makeCase"
+    | "handedOver"
+    | "forgetContact"
   >;
   access: AccessSettings;
   certs: Certs;
@@ -15,7 +24,7 @@ export interface AdminApi {
 
 const ACTION_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|case|handed_over)$/;
 const TOKEN_HASH = /^[A-Za-z0-9_-]{43}$/;
-const FALSE_REPORT_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/false$/;
+const REPORT_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/(false|forget_contact)$/;
 const SAID_AT_MOST = 500;
 const HEADERS = {
   "Cache-Control": "no-store",
@@ -48,8 +57,11 @@ const newCaseOf = async (request: Request): Promise<NewCase | null> => {
 };
 
 const act = async (request: Request, path: string, { moderation, now }: AdminApi): Promise<Response> => {
-  const [, reportDoc, net] = FALSE_REPORT_PATH.exec(path) ?? [];
-  if (reportDoc && net) return answerOf(await moderation.reportWasFalse(reportDoc, net, now));
+  const [, reportDoc, net, onReport] = REPORT_PATH.exec(path) ?? [];
+  if (reportDoc && net) {
+    const acting = onReport === "false" ? moderation.reportWasFalse : moderation.forgetContact;
+    return answerOf(await acting.call(moderation, reportDoc, net, now));
+  }
   const [, id, action] = ACTION_PATH.exec(path) ?? [];
   if (!id) return json(404, { refused: "missing" });
   if (action === "accept") return answerOf(await moderation.accept(id, now));

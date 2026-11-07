@@ -214,12 +214,12 @@ describe("what it shows", () => {
     expect(queue.reports[0]?.sealedLink).toBe("sealed1.opaque");
     expect(queue.reports[0]?.sealedContact).toBeNull();
     await store.report(
-      { doc: ID, net: "n4", asn: 9, category: "csam", version: 1, sealedContact: "sealed1.mail" },
+      { doc: ID, net: "n4", asn: 9, category: "csam", version: 1, sealedContact: "contact1.mail" },
       TODAY,
       HOUR,
     );
     const again = await new CloudModeration(testEnv.DB).queue(NOW);
-    expect(again.reports.map((one) => one.sealedContact)).toContain("sealed1.mail");
+    expect(again.reports.map((one) => one.sealedContact)).toContain("contact1.mail");
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
@@ -346,6 +346,26 @@ describe("a block the operator placed", () => {
 });
 
 describe("what it can do", () => {
+  it("erases a reporter's email when asked, that one alone, and says so on record", async () => {
+    await share();
+    for (const net of ["n1", "n2"]) {
+      await store.report(
+        { doc: ID, net, asn: 1, category: "phishing", version: 1, sealedContact: "contact1.mail" },
+        TODAY,
+        HOUR,
+      );
+    }
+    expect((await acting(`/api/docs/${ID}/reports/n1/forget_contact`)).status).toBe(200);
+    const left = await testEnv.DB.prepare("SELECT net, sealed_contact FROM reports ORDER BY net").all();
+    expect(left.results).toEqual([
+      { net: "n1", sealed_contact: null },
+      { net: "n2", sealed_contact: "contact1.mail" },
+    ]);
+    expect((await acting(`/api/docs/${ID}/reports/n1/forget_contact`)).status).toBe(404);
+    expect(await logged()).toEqual([{ action: "forget_contact", note: null }]);
+    expect((await asked(`/api/docs/${ID}/reports/n2/forget_contact`, { method: "POST" })).status).toBe(403);
+  });
+
   describe("a case", () => {
     const HASH = "H".repeat(43);
     const sendingCase = (id: string, body: unknown) =>

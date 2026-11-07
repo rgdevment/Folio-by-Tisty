@@ -852,8 +852,8 @@ components:
         sealedContact:
           type: string
           maxLength: 512
-          pattern: "^sealed1\\.[A-Za-z0-9_-]{80,}$"
-          description: An email the reporter chose to leave, sealed with the operator's public key. Any level may bring it.
+          pattern: "^contact1\\.[A-Za-z0-9_-]{80,}$"
+          description: An email the reporter chose to leave, sealed with the operator's public key. A light report does not bring it.
     Status:
       type: object
       required: [status]

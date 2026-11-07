@@ -83,6 +83,11 @@ const load = async (): Promise<void> => {
   drawQueue(document, (await response.json()) as Queue, {
     accept: (id) => confirmed(`¿Aceptar y desbloquear ${id}?`, `${id}/accept`),
     reject: (id) => confirmed(`¿Rechazar el reclamo de ${id}? Sigue bloqueado.`, `${id}/reject`),
+    forgetContact: (id, net) =>
+      confirmed(
+        "¿Borrar el correo de esta denuncia? Sigue hasta 30 días en los respaldos cifrados.",
+        `${id}/reports/${net}/forget_contact`,
+      ),
     reportWasFalse: (id, net) =>
       confirmed("¿Esta denuncia era falsa? Esa red dejará de contar.", `${id}/reports/${net}/false`),
     opened: (id) => {

@@ -84,17 +84,41 @@ describe("the report form", () => {
     expect(bodySent(0).sealedLink).toMatch(/^sealed1\./);
   });
 
-  it("seals the email it was given, and sends none when it was left empty", async () => {
-    choose("spam");
-    const contact = place.document.querySelector('input[name="contact"]') as HTMLInputElement;
-    contact.value = "  quien@example.test ";
-    await submitted();
-    expect(bodySent(0).sealedContact).toMatch(/^sealed1\./);
-    expect(asked.mock.calls[0]?.[1].body).not.toContain("quien@example.test");
-    contact.value = "";
-    element<HTMLButtonElement>("report-send").disabled = false;
-    await submitted();
-    expect(bodySent(1)).not.toHaveProperty("sealedContact");
+  describe("the email", () => {
+    const contact = () => place.document.querySelector('input[name="contact"]') as HTMLInputElement;
+
+    it("is offered only on what someone can read", () => {
+      expect(element("report-contact").hidden).toBe(true);
+      choose("spam");
+      expect(element("report-contact").hidden).toBe(true);
+      choose("phishing");
+      expect(element("report-contact").hidden).toBe(false);
+      choose("csam");
+      expect(element("report-contact").hidden).toBe(false);
+    });
+
+    it("is not offered for the browser to fill in or remember", () => {
+      expect(contact().autocomplete).toBe("off");
+    });
+
+    it("goes sealed under its own label, and not when it was left empty", async () => {
+      choose("phishing");
+      contact().value = "  quien@example.test ";
+      await submitted();
+      expect(bodySent(0).sealedContact).toMatch(/^contact1\./);
+      expect(asked.mock.calls[0]?.[1].body).not.toContain("quien@example.test");
+      contact().value = "";
+      element<HTMLButtonElement>("report-send").disabled = false;
+      await submitted();
+      expect(bodySent(1)).not.toHaveProperty("sealedContact");
+    });
+
+    it("does not leave on a light report, even if the browser restored it", async () => {
+      contact().value = "quien@example.test";
+      choose("spam");
+      await submitted();
+      expect(bodySent(0)).not.toHaveProperty("sealedContact");
+    });
   });
 
   it("gives the choice back when the reader moves off a grave report", () => {

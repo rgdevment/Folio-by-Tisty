@@ -55,6 +55,7 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
   const dialog = element<HTMLDialogElement>("report-dialog");
   const form = element<HTMLFormElement>("report-form");
   const consent = element<HTMLElement>("report-consent");
+  const contactBox = element<HTMLElement>("report-contact");
   const handOver = element<HTMLInputElement>("report-hand-over");
   const handingOverSaid = element<HTMLElement>("report-consent-said");
   const said = element<HTMLElement>("report-said");
@@ -68,7 +69,7 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
     const detail = detailOf();
     const level = levelOfReport(category);
     const withLink = (level === "grave" || (handOver.checked && level !== "light")) && linkKey !== "";
-    const contact = contactOf();
+    const contact = level === "light" || level === null ? "" : contactOf();
     return JSON.stringify({
       category,
       ...(detail === "" ? {} : { detail }),
@@ -86,6 +87,7 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
     const level = levelOfReport(category);
     const wasRequired = handOver.disabled;
     consent.hidden = level === "light" || level === null;
+    contactBox.hidden = consent.hidden;
     handOver.disabled = level === "grave";
     if (level === "grave") handOver.checked = true;
     else if (wasRequired || consent.hidden) handOver.checked = false;

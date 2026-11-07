@@ -17,7 +17,7 @@ const QUEUE: Queue = {
       level: "grave",
       detail: HARM,
       sealedLink: "sealed1.opaque",
-      sealedContact: "sealed1.contact",
+      sealedContact: "contact1.opaque",
       version: 2,
       at: 20_000,
       asn: 3,
@@ -98,6 +98,7 @@ beforeEach(() => {
     panic: vi.fn(),
     verifyLink: vi.fn(),
     handedOver: vi.fn(),
+    forgetContact: vi.fn(),
   };
   drawQueue(page, QUEUE, doing as unknown as Doing);
 });
@@ -270,12 +271,20 @@ describe("the panel", () => {
     expect(page.getElementById("reports")?.textContent).toContain("Se ven las 2 más graves y recientes de 900.");
   });
 
+  it("warns that nobody checked the address, and offers to erase it", () => {
+    expect(page.getElementById("reports")?.textContent).toContain("correo sin comprobar");
+    pressing("reports", "Borrar su correo");
+    expect(doing.forgetContact).toHaveBeenCalledWith("AbCdEfGh", "n1");
+    const offered = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
+    expect(offered.filter((one) => one.textContent === "Borrar su correo")).toHaveLength(1);
+  });
+
   it("hands over a sealed email only as a command, on the report that brought one", () => {
     pressing("reports", "Copiar para leer su correo");
     expect(doing.copy).toHaveBeenCalledWith(
-      expect.stringContaining("report-key.mjs open <llave> AbCdEfGh sealed1.contact"),
+      expect.stringContaining("report-key.mjs open <llave> AbCdEfGh contact1.opaque"),
     );
-    expect(page.getElementById("reports")?.textContent).not.toContain("sealed1.contact");
+    expect(page.getElementById("reports")?.textContent).not.toContain("contact1.opaque");
     const offered = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
     expect(offered.filter((one) => one.textContent === "Copiar para leer su correo")).toHaveLength(1);
   });

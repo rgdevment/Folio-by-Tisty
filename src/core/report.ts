@@ -38,8 +38,9 @@ const linkIsTaken = (link: unknown, category: string, limits: Limits): boolean =
 const detailIsTaken = (detail: unknown, limits: Limits): boolean =>
   isTextUpTo(detail, limits.reportDetailAtMost) && !holdsALink(String(detail ?? ""));
 
-const contactIsTaken = (contact: unknown): boolean =>
-  contact === undefined || (typeof contact === "string" && isSealedContact(contact));
+const contactIsTaken = (contact: unknown, category: string): boolean =>
+  contact === undefined ||
+  (levelOfReport(category) !== "light" && typeof contact === "string" && isSealedContact(contact));
 
 const versionIsTaken = (version: unknown): boolean =>
   version === undefined || (Number.isSafeInteger(version) && (version as number) > 0);
@@ -51,7 +52,7 @@ export const saidOf = (body: unknown, limits: Limits): Said | null => {
   if (
     !detailIsTaken(detail, limits) ||
     !linkIsTaken(sealedLink, category, limits) ||
-    !contactIsTaken(sealedContact) ||
+    !contactIsTaken(sealedContact, category) ||
     !versionIsTaken(version)
   ) {
     return null;

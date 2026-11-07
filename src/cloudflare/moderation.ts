@@ -275,6 +275,13 @@ export class CloudModeration {
     };
   }
 
+  async forgetContact(id: string, net: string, now: number): Promise<Acted> {
+    const forgetting = this.#db
+      .prepare("UPDATE reports SET sealed_contact = NULL WHERE doc = ? AND net = ? AND sealed_contact IS NOT NULL")
+      .bind(id, net);
+    return this.#actedAndLogged([forgetting], this.#logIfChanged(id, "forget_contact", now));
+  }
+
   async reportWasFalse(id: string, net: string, now: number): Promise<Acted> {
     const naming = this.#db
       .prepare(

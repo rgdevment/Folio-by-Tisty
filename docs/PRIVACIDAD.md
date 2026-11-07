@@ -96,6 +96,9 @@ borrarlos u oponerte a su uso. Como no hay cuentas, lo más directo es:
   en la siguiente limpieza, normalmente antes de una hora; durante un bloqueo por
   gasto o una falla puede tardar más. Una denuncia seria o una orden pueden
   obligar a conservarlo.
+- **El correo que dejaste en una denuncia:** escribe a <abuso@tisty.app> con el
+  id del documento y el operador lo borra. Sigue hasta 30 días en los respaldos
+  cifrados.
 - **Cualquier otra petición:** escribe a <rgdevment@tisty.app>. El resumen de
   tu IP no permite saber quién eres, así que en general no hay datos que
   puedan asociarse a ti.

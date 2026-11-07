@@ -140,10 +140,12 @@
                 <textarea name="detail" rows="3" maxlength="2000"></textarea>
               </label>
               <p class="report-note">Esto se guarda sin cifrar: no pegues aquí el link ni partes del documento.</p>
-              <label class="report-detail">Tu correo (opcional)
-                <input type="email" name="contact" maxlength="254" autocomplete="email" />
-              </label>
-              <p class="report-note">Sirve para aclarar dudas y filtrar denuncias falsas. Va cifrado: solo el operador puede leerlo.</p>
+              <div id="report-contact" hidden>
+                <label class="report-detail">Tu correo (opcional)
+                  <input type="email" name="contact" maxlength="254" autocomplete="off" />
+                </label>
+                <p class="report-note">Sirve para aclarar dudas y filtrar denuncias falsas. Va cifrado: solo el operador puede leerlo, y se borra con la denuncia.</p>
+              </div>
               <div id="report-consent" hidden>
                 <label><input type="checkbox" id="report-hand-over" /> Entrego el link para que una persona lo revise</label>
                 <p id="report-consent-said"></p>

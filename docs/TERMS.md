@@ -112,12 +112,15 @@ you are to report: it keeps a digest of the network.
   network reports once per document, and Folio asks its browser for a small
   piece of computing work to slow abuse. Whoever does not have the link can
   write to <abuso@tisty.app> or go to the PDI or the prosecutor.
-- **You may leave your email when reporting, if you want.** It serves to clear
-  up doubts and filter out false reports. It is encrypted so only the operator
-  can read it, it is erased with the report, and it is given to nobody except
-  under a judge's order. If there are doubts and you do not answer, the operator
-  may do nothing with the report, but not answering does not make it false, and
-  a report of child abuse or threats is reviewed anyway.
+- **In a report of deceit or a grave one you may leave your email, if you
+  want.** It serves to clear up doubts and filter out false reports, and nobody
+  checks it is yours. It is encrypted so only the operator can read it, and it
+  is given to nobody except under a judge's order. It is erased with the report,
+  within 180 days or as long as a hold lasts, and stays in the encrypted backups
+  for up to 30 days more. You can ask for it to be erased sooner, writing to
+  <abuso@tisty.app> with the document's id. If there are doubts and you do not
+  answer, the operator may do nothing with a report of deceit, but not answering
+  does not make it false, and a grave one is reviewed anyway.
 - **A light report** (spam, or something annoying or offensive that is no crime)
   needs nobody to step in. With three networks from at least two providers,
   whoever shared it sees a warning in their manage link, also from Tisty, and

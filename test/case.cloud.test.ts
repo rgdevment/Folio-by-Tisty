@@ -175,7 +175,7 @@ describe("the panic button", () => {
         category: "csam",
         version: 1,
         sealedLink: "sealed1.secret-link",
-        sealedContact: "sealed1.secret-mail",
+        sealedContact: "contact1.secret-mail",
         detail: "said",
       },
       TODAY,

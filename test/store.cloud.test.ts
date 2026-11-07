@@ -1121,39 +1121,100 @@ describe("reports", () => {
         DAY * 24,
       );
 
-    it("is kept sealed, at any level", async () => {
+    it("is kept as it came", async () => {
       await store.create(newDoc("d1"), DAY);
       await store.report(
-        { doc: "d1", net: "a", category: "spam", asn: 1, sealedContact: "sealed1.one" },
+        { doc: "d1", net: "a", category: "spam", asn: 1, sealedContact: "contact1.one" },
         DAY,
         DAY * 24,
       );
-      expect(await contactOf()).toBe("sealed1.one");
+      expect(await contactOf()).toBe("contact1.one");
     });
 
     it("can arrive on a second report, without moving anything else", async () => {
       await store.create(newDoc("d1"), DAY);
       await reporting("a");
-      await reporting("a", "sealed1.one");
-      expect(await contactOf()).toBe("sealed1.one");
+      await reporting("a", "contact1.one");
+      expect(await contactOf()).toBe("contact1.one");
     });
 
     it("stays when the same network reports again without one", async () => {
       await store.create(newDoc("d1"), DAY);
-      await reporting("a", "sealed1.one");
-      await store.report({ doc: "d1", net: "a", category: "csam", asn: 1, sealedLink: "sealed1.link" }, DAY, DAY * 24);
-      const row = await testEnv.DB.prepare("SELECT category FROM reports WHERE net = 'a'").first<{
-        category: string;
-      }>();
-      expect(row?.category).toBe("csam");
-      expect(await contactOf()).toBe("sealed1.one");
+      await reporting("a", "contact1.one");
+      await store.report({ doc: "d1", net: "a", category: "malware", asn: 1 }, DAY, DAY * 24);
+      expect(await contactOf()).toBe("contact1.one");
+    });
+
+    it("does not take another person's on the same network", async () => {
+      await store.create(newDoc("d1"), DAY);
+      await reporting("a", "contact1.one");
+      await reporting("a", "contact1.two");
+      expect(await contactOf()).toBe("contact1.one");
+    });
+
+    it("keeps the first when a link arrives with another address", async () => {
+      await store.create(newDoc("d1"), DAY);
+      await reporting("a", "contact1.one");
+      await store.report(
+        {
+          doc: "d1",
+          net: "a",
+          category: "phishing",
+          asn: 1,
+          sealedLink: "sealed1.link",
+          sealedContact: "contact1.two",
+        },
+        DAY,
+        DAY * 24,
+      );
+      expect(await contactOf()).toBe("contact1.one");
+    });
+
+    it("goes with who raised the report, so nobody is asked about what another said", async () => {
+      await store.create(newDoc("d1"), DAY);
+      await reporting("a", "contact1.one");
+      const raising = { doc: "d1", net: "a", category: "csam", asn: 1, sealedLink: "sealed1.link" };
+      await store.report({ ...raising, sealedContact: "contact1.two" }, DAY, DAY * 24);
+      expect(await contactOf()).toBe("contact1.two");
+      await store.create(newDoc("d2"), DAY);
+      await store.report(
+        { doc: "d2", net: "b", category: "phishing", asn: 1, sealedContact: "contact1.one" },
+        DAY,
+        DAY * 24,
+      );
+      await store.report({ doc: "d2", net: "b", category: "csam", asn: 1, sealedLink: "sealed1.link" }, DAY, DAY * 24);
+      expect(await contactOf("b")).toBeNull();
+    });
+
+    it("moves nothing else when it arrives alone", async () => {
+      await store.create(newDoc("d1"), DAY);
+      await store.report({ doc: "d1", net: "a", category: "phishing", asn: 1, detail: "first" }, DAY, DAY * 24);
+      await store.report(
+        { doc: "d1", net: "a", category: "phishing", asn: 2, detail: "second", sealedContact: "contact1.one" },
+        DAY + 170,
+        (DAY + 170) * 24,
+      );
+      const row = await testEnv.DB.prepare("SELECT at, at_hour, asn, detail, sealed_contact FROM reports").first();
+      expect(row).toEqual({ at: DAY, at_hour: DAY * 24, asn: 1, detail: "first", sealed_contact: "contact1.one" });
+    });
+
+    it("leaves a link that arrives later moving the report as before", async () => {
+      await store.create(newDoc("d1"), DAY);
+      await reporting("a");
+      await store.report(
+        { doc: "d1", net: "a", category: "phishing", asn: 2, sealedLink: "sealed1.link" },
+        DAY + 1,
+        (DAY + 1) * 24,
+      );
+      const row = await testEnv.DB.prepare("SELECT at, asn FROM reports").first();
+      expect(row).toEqual({ at: DAY + 1, asn: 2 });
     });
 
     it("does not revive a cleared report", async () => {
       await store.create(newDoc("d1"), DAY);
       for (const net of ["a", "b", "c"]) await report(net);
       await store.appealAccepted("d1", DAY);
-      await reporting("a", "sealed1.one");
+      await reporting("a", "contact1.one");
       expect(await contactOf()).toBeNull();
       const row = await testEnv.DB.prepare("SELECT cleared FROM reports WHERE net = 'a'").first<{ cleared: number }>();
       expect(row?.cleared).toBe(1);
@@ -1161,7 +1222,7 @@ describe("reports", () => {
 
     it("is erased with its report", async () => {
       await store.create(newDoc("d1"), DAY);
-      await reporting("a", "sealed1.one");
+      await reporting("a", "contact1.one");
       await store.sweep(DAY + 181);
       expect((await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports").first<{ n: number }>())?.n).toBe(0);
     });
