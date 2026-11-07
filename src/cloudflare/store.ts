@@ -420,6 +420,18 @@ export class Cloud implements Store {
     return taken.meta.changes > 0;
   }
 
+  async heldByNewOwner(owner: string, newSince: number, today: number): Promise<number> {
+    const held = await this.#db
+      .prepare(
+        `SELECT COALESCE(SUM(bytes), 0) AS n FROM docs
+         WHERE owner = ?1 AND latest >= 0 AND dies_on >= ?3
+           AND NOT EXISTS (SELECT 1 FROM keys k WHERE k.root = ?1 AND k.first_day <= ?2)`,
+      )
+      .bind(owner, newSince, today)
+      .first<{ n: number }>();
+    return held?.n ?? 0;
+  }
+
   async allKeysSignedBy(roots: string[], day: number): Promise<boolean> {
     const asked = [...new Set(roots)];
     const found = await this.#db

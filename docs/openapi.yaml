@@ -243,7 +243,7 @@ paths:
                   - $ref: "#/components/schemas/KeyBlocked"
         "404": { $ref: "#/components/responses/Missing" }
         "409":
-          description: Another version arrived first, or this person keeps as many documents, or as many languages of this one, as they may.
+          description: Another version arrived first, or this person keeps as many documents, or as many languages of this one, as they may, or a key in its first 30 days already holds as many bytes as it may until something it shared expires.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Behind" }
@@ -804,7 +804,7 @@ components:
       type: object
       required: [refused]
       properties:
-        refused: { enum: [behind, shares_full, languages_full] }
+        refused: { enum: [behind, shares_full, languages_full, room_full] }
     MachinesFull:
       type: object
       required: [refused]

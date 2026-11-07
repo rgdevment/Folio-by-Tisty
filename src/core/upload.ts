@@ -189,6 +189,17 @@ const rootsOf = ({ manifest, signature }: ReadEnvelope): string[] => [(manifest.
 const keyIsNew = async (read: ReadEnvelope, now: number, { store, limits }: ReadTools): Promise<boolean> =>
   !(await store.allKeysSignedBy(rootsOf(read), dayOf(now) - limits.daysAKeyIsNew));
 
+// One key that moves from network to network holds only so much in its first days, until what it shared expires.
+const roomRefused = async (
+  owner: string,
+  bytes: number,
+  now: number,
+  { store, limits }: ReadTools,
+): Promise<Refused | null> =>
+  (await store.heldByNewOwner(owner, dayOf(now) - limits.daysAKeyIsNew, dayOf(now))) + bytes > limits.newKeyBytesAtMost
+    ? { refused: "room_full" }
+    : null;
+
 const takeUploadHour = async (net: string, now: number, { store, limits }: ReadTools): Promise<Refused | null> =>
   (await store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour))
     ? null
@@ -263,6 +274,8 @@ const storeVersion = async (
     if (hourSpent) return hourSpent;
     const full = await keys.admit(roots, accepted);
     if (full) return full;
+    const noRoom = newKey ? await roomRefused((manifest.owner as Owner).root, bytes.length, now, tools) : null;
+    if (noRoom) return noRoom;
     const refused = await share(uploading, sharing, read, net, tools);
     if (refused) return refused;
     held = await store.held(id);
@@ -282,6 +295,8 @@ const storeVersion = async (
     // Its owner's key too, or a blocked owner's documents would carry on through an edit link.
     const full = await keys.admit([held.owner, signature.root], accepted);
     if (full) return full;
+    const noRoom = newKey ? await roomRefused(held.owner, bytes.length, now, tools) : null;
+    if (noRoom) return noRoom;
   }
 
   const owner = manifest.owner as Owner;

@@ -776,6 +776,63 @@ describe("what stops a version", () => {
     });
   });
 
+  describe("what a new key holds", () => {
+    const roomOf = (bytes: number) => ({ ...tools, limits: { ...LIMITS, newKeyBytesAtMost: bytes } });
+    const sendTo = (to: UploadTools, id: string, bytes: Bytes, now = NOW, first?: FirstUpload) =>
+      uploadDoc({ id, now, ip: "203.0.113.9", bytes: async () => bytes, ...(first ? { first } : {}) }, to);
+    const twoOf = async (owner: Person) => {
+      const one = await started();
+      const two = await started();
+      return {
+        one,
+        two,
+        first: await sealedEnvelope({ id: one.id, version: 1, owner }),
+        second: await sealedEnvelope({ id: two.id, version: 1, owner }),
+      };
+    };
+
+    it("takes up to its room, and a first version past it leaves nothing", async () => {
+      const fresh = await newPerson();
+      const { one, two, first, second } = await twoOf(fresh);
+      const room = roomOf(first.length + second.length - 1);
+      expect(await sendTo(room, one.id, first, NOW, one)).toEqual({ stored: true, version: 1 });
+      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ refused: "room_full" });
+      expect(await row(two.id)).toBeNull();
+      expect(await sendTo(roomOf(first.length + second.length), two.id, second, NOW, two)).toEqual({
+        stored: true,
+        version: 1,
+      });
+    });
+
+    it("counts a new version with what its document already holds", async () => {
+      const fresh = await newPerson();
+      const one = await started();
+      const first = await sealedEnvelope({ id: one.id, version: 1, owner: fresh });
+      const next = await sealedEnvelope({ id: one.id, version: 2, owner: fresh });
+      const room = roomOf(first.length + next.length - 1);
+      expect(await sendTo(room, one.id, first, NOW, one)).toEqual({ stored: true, version: 1 });
+      expect(await sendTo(room, one.id, next, LATER)).toEqual({ refused: "room_full" });
+    });
+
+    it("frees what stopped being shared", async () => {
+      const fresh = await newPerson();
+      const { one, two, first, second } = await twoOf(fresh);
+      const room = roomOf(first.length + second.length - 1);
+      await sendTo(room, one.id, first, NOW, one);
+      await store.stop(one.id, dayOf(NOW));
+      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ stored: true, version: 1 });
+    });
+
+    it("is no longer counted once the key is old", async () => {
+      const fresh = await newPerson();
+      const { one, two, first, second } = await twoOf(fresh);
+      const room = roomOf(first.length + second.length - 1);
+      await sendTo(room, one.id, first, NOW, one);
+      await testEnv.DB.prepare("UPDATE keys SET first_day = first_day - ?").bind(LIMITS.daysAKeyIsNew).run();
+      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ stored: true, version: 1 });
+    });
+  });
+
   describe("a key the operator blocked", () => {
     const blocked = () => new CloudModeration(testEnv.DB);
     const rootOf = (person: Person): string => toBase64Url(person.rootBytes);
@@ -910,9 +967,10 @@ describe("what stops a version", () => {
       const counted = { ...UNDER, store: new Cloud({ ...testEnv, DB: watched }, LIMITS) };
       await up(id, await sealedEnvelope({ id, version: 2, owner: fresh, terms: "9" }), LATER, undefined, counted);
       const aboutKeys = said.filter((one) => /\b(FROM|INTO|UPDATE) keys\b/.test(one));
-      expect(aboutKeys).toHaveLength(2);
+      expect(aboutKeys).toHaveLength(3);
       expect(aboutKeys[0]).toContain("k.first_day <= ?2");
       expect(aboutKeys[1]).toBe("SELECT terms_version, blocked_at FROM keys WHERE root = ?");
+      expect(aboutKeys[2]).toContain("SUM(bytes)");
     });
 
     it("writes the record on a retry, when the first try lost it", async () => {
