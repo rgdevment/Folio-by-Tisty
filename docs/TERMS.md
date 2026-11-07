@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 6, in force since November 6, 2026.**
+**Version 7, in force since November 6, 2026.**
 
 ## The short version
 
@@ -153,12 +153,13 @@ you are to report: it keeps a digest of the network.
   opening is noted. In a browser, the code that decrypts comes from the same
   server; the [privacy policy](PRIVACY.md) says what that does not protect
   against.
-- **A report of child abuse is reviewed by a person,** without seeing images,
-  videos or other files: only the text is read, with images off. If it is false,
-  it is discarded. If not, or if that cannot be told without seeing them, it is
-  reported by hand to the PDI or the prosecutor, who get the link and the
-  encrypted copy. Whoever reports must not download, copy, forward or email that
-  material.
+- **A report of child abuse is reviewed by a person,** who opens the document
+  only to verify it, without malice or dishonest intent, and may not keep a copy
+  on their device. If it is false, it is discarded. If not, that person blocks the
+  document and reports it to the relevant authorities, the only ones who get the
+  key, along with the records Folio holds. The copy stays encrypted in Folio for
+  up to 180 days, or as long as an order asks. Whoever reports must not download,
+  copy, forward or email that material.
 - **Copyright is claimed by its holder** at <abuso@tisty.app>. A compulsory
   removal takes a court order, as Ley 17.336 says, and the operator may also act
   on a DMCA notice. The operator may stop taking uploads from a repeat

@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 6, vigente desde el 6 de noviembre de 2026.**
+**Versión 7, vigente desde el 6 de noviembre de 2026.**
 
 ## En corto
 
@@ -153,11 +153,13 @@ para denunciar: guarda un resumen de la red.
   Anota cada apertura. En un navegador, el código que descifra viene del mismo
   servidor; la [política de privacidad](PRIVACIDAD.md) dice de qué no protege
   eso.
-- **Una denuncia de abuso infantil la revisa una persona,** sin ver imágenes,
-  videos ni otros archivos: lee solo el texto, con las imágenes apagadas. Si es
-  falsa, la descarta. Si no, o si no se puede saber sin verlos, la denuncia a mano
-  a la PDI o a la Fiscalía y les entrega el link y la copia cifrada. Quien denuncia
-  no debe descargar, copiar, reenviar ni mandar por correo ese material.
+- **Una denuncia de abuso infantil la revisa una persona,** que abre el documento
+  solo para verificarla, sin malicia ni intenciones deshonestas, y no puede guardar
+  copia en su equipo. Si es falsa, la descarta. Si no, bloquea el documento y lo
+  denuncia a las autoridades pertinentes, las únicas que reciben la llave, junto
+  con los registros que Folio tenga. La copia queda cifrada en Folio hasta 180
+  días, o lo que pida una orden. Quien denuncia no debe descargar, copiar, reenviar
+  ni mandar por correo ese material.
 - **Los derechos de autor los reclama su titular** en <abuso@tisty.app>. Un
   retiro obligatorio requiere orden judicial, como dice la Ley 17.336, y el
   operador también puede atender un aviso DMCA. El operador puede dejar de
