@@ -96,6 +96,7 @@ beforeEach(() => {
     opened: vi.fn(),
     copy: vi.fn(),
     panic: vi.fn(),
+    purgeOwner: vi.fn(),
     verifyLink: vi.fn(),
     handedOver: vi.fn(),
     forgetContact: vi.fn(),
@@ -221,6 +222,13 @@ describe("the panel", () => {
     expect(page.getElementById("state")?.textContent).toBe("Servicio con aviso de gasto. Llaves nuevas hoy: 7.");
   });
 
+  it("offers to purge a key from a report and from a blocked document", () => {
+    pressing("reports", "Borrar todo de esta llave");
+    expect(doing.purgeOwner).toHaveBeenLastCalledWith(QUEUE.reports[0]?.doc);
+    pressing("blocked", "Borrar todo de esta llave");
+    expect(QUEUE.docs.map((one) => one.id)).toContain(doing.purgeOwner.mock.lastCall?.[0]);
+  });
+
   it("says when only old keys can upload", () => {
     drawQueue(page, { ...QUEUE, stage: "new_keys_off" }, doing as unknown as Doing);
     expect(page.getElementById("state")?.textContent).toContain("subidas solo de llaves antiguas");
@@ -245,7 +253,7 @@ describe("the panel", () => {
     const cards = blocked.querySelectorAll(".card");
     expect(cards[0]?.textContent).toContain("espera una versión de su dueño");
     const offered = [...(cards[0] as Element).querySelectorAll("button")].map((one) => one.textContent);
-    expect(offered).toEqual(["Link para verificar", "Botón de pánico"]);
+    expect(offered).toEqual(["Link para verificar", "Botón de pánico", "Borrar todo de esta llave"]);
     pressing("blocked", "Desbloquear");
     expect(doing.accept).toHaveBeenCalledWith("YzAbCdEf");
   });

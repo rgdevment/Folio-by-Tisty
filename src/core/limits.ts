@@ -2,7 +2,8 @@ export interface Limits {
   ttlChoices: number[];
   sharesAtMost: number;
   languagesAtMost: number;
-  keyDaysOldNearTheCeiling: number;
+  daysAKeyIsNew: number;
+  newKeysBytesADay: number;
   revokedMachinesAtMost: number;
   versionsKept: number;
   replacedKeptDays: number;
@@ -49,7 +50,8 @@ export const LEVEL_ONE: Limits = {
   ttlChoices: [1, 3, 7, 15],
   sharesAtMost: 2,
   languagesAtMost: 20,
-  keyDaysOldNearTheCeiling: 30,
+  daysAKeyIsNew: 30,
+  newKeysBytesADay: 5_000_000_000,
   revokedMachinesAtMost: 64,
   versionsKept: 3,
   replacedKeptDays: 7,

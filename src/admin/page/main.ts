@@ -74,6 +74,18 @@ const panicking = async (id: string, version: number, note: string): Promise<voi
   }
 };
 
+const purging = async (id: string, note: string): Promise<void> => {
+  said.textContent = "Trabajando…";
+  const answered = await sent(`${id}/purge_owner`, { note });
+  if (!answered?.ok) {
+    said.textContent = COULD_NOT;
+    return;
+  }
+  const { purged, kept } = (await answered.json()) as { purged: number; kept: number };
+  await load();
+  said.textContent = `Se borrarán ${purged} en la próxima limpieza. Se conservan ${kept}.`;
+};
+
 const load = async (): Promise<void> => {
   const response = await answered(() => fetch("/api/queue", { credentials: "same-origin", cache: "no-store" }));
   if (!response?.ok) {
@@ -97,6 +109,12 @@ const load = async (): Promise<void> => {
     panic: (id, version) => {
       const note = prompt(`¿Por qué bloquear y retener ${id}? Dejará de servirse y se retiene 180 días.`);
       if (note?.trim()) void panicking(id, version, note);
+    },
+    purgeOwner: (id) => {
+      const note = prompt(
+        `¿Por qué borrar todos los documentos de la llave dueña de ${id}? No se puede deshacer. Se conserva lo retenido, lo denunciado por abuso infantil y lo que cita otra persona.`,
+      );
+      if (note?.trim()) void purging(id, note);
     },
     verifyLink: (id, version) => void verifying(id, version),
     handedOver: (id) =>

@@ -13,6 +13,7 @@ export interface AdminApi {
     | "reportWasFalse"
     | "opened"
     | "panic"
+    | "purgeOwner"
     | "makeCase"
     | "handedOver"
     | "forgetContact"
@@ -22,7 +23,7 @@ export interface AdminApi {
   now: number;
 }
 
-const ACTION_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|case|handed_over)$/;
+const ACTION_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|purge_owner|case|handed_over)$/;
 const TOKEN_HASH = /^[A-Za-z0-9_-]{43}$/;
 const REPORT_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/(false|forget_contact)$/;
 const SAID_AT_MOST = 500;
@@ -73,6 +74,10 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
   }
   const note = await noteOf(request);
   if (!note) return json(400, { refused: "no_reason" });
+  if (action === "purge_owner") {
+    const purged = await moderation.purgeOwner(id, note, now);
+    return purged ? json(200, purged) : json(404, { refused: "missing" });
+  }
   if (action === "panic") {
     const records = await moderation.panic(id, note, now);
     return records ? json(200, { records }) : json(404, { refused: "missing" });

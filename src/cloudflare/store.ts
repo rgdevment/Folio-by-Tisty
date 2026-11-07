@@ -27,7 +27,7 @@ import type {
   Version,
 } from "../core/store";
 import { keptVersions } from "../core/versions";
-import { acceptAppeal, mayCorrect } from "./moderation";
+import { acceptAppeal, CLAIMED, mayCorrect } from "./moderation";
 
 // Two rows by their key at most: the machine that signed the last version and its owner's, the start of owner_mark.
 const revocationsOf = (version: string): string => `(
@@ -64,7 +64,6 @@ interface DocRow {
 }
 
 // A document being forgotten: nothing can move it on from here, and the sweep finishes it even after failing halfway.
-const CLAIMED = -1;
 
 // Beside the envelopes, so D1 and its backups never hold both the digests and their key (decision 128).
 const KEY_OBJECTS = "~";
@@ -97,6 +96,9 @@ const LANGUAGES_OF = (owner: string, anchor: string, today: string): string =>
   `SELECT COUNT(*) FROM docs l WHERE l.owner = ${owner} AND l.anchor = ${anchor}
      AND (l.latest > 0 OR (l.latest = 0 AND l.dies_on >= ${today}))
      AND l.blocked_at IS NULL AND (l.paused_at IS NULL OR l.dies_on >= ${today})`;
+
+// Not a network's digest, which is base64url, so the day's sum of new keys has its own row that the sweep clears too.
+const NEW_KEYS_NET = "~new-keys";
 
 const LIVES_ON = "CASE WHEN paused_at IS NULL THEN MAX(dies_on, ?1 + ttl_days) ELSE dies_on END";
 
@@ -215,12 +217,13 @@ export class Cloud implements Store {
     const kept = trimmed.length < all.length ? await this.#withEvidence(upload.id, today, all, trimmed) : trimmed;
     if (kept.length > this.#limits.versionsListedAtMost) return "list_full";
 
-    if (!(await this.#takeQuota(upload.net, 0, bytes, today))) return "quota";
+    const room = await this.#takeRoom(upload.net, bytes, today, upload.newKey);
+    if (room !== "stored") return room;
     const key = objectKey(upload.id, version);
     try {
       await this.#envelopes.put(key, upload.body);
     } catch (error) {
-      await this.#giveQuotaBack(upload.net, 0, bytes, today);
+      await this.#giveRoomBack(upload.net, bytes, today, upload.newKey);
       throw error;
     }
 
@@ -277,7 +280,7 @@ export class Cloud implements Store {
           ]),
     ]);
     if ((moved?.meta.changes ?? 0) === 0) {
-      await this.#giveQuotaBack(upload.net, 0, bytes, today);
+      await this.#giveRoomBack(upload.net, bytes, today, upload.newKey);
       return this.#lostTheRace(upload, key);
     }
 
@@ -459,6 +462,31 @@ export class Cloud implements Store {
       .run();
   }
 
+  async #takeRoom(
+    net: string,
+    bytes: number,
+    today: number,
+    newKey = false,
+  ): Promise<"stored" | "quota" | "new_keys_full"> {
+    if (!(await this.#takeQuota(net, 0, bytes, today))) return "quota";
+    if (!newKey) return "stored";
+    const taken = await this.#db
+      .prepare(
+        `INSERT INTO net_day (day, net, docs, bytes) SELECT ?1, ?2, 0, ?3 WHERE ?3 <= ?4
+         ON CONFLICT (day, net) DO UPDATE SET bytes = bytes + excluded.bytes WHERE bytes + excluded.bytes <= ?4`,
+      )
+      .bind(today, NEW_KEYS_NET, bytes, this.#limits.newKeysBytesADay)
+      .run();
+    if (taken.meta.changes > 0) return "stored";
+    await this.#giveQuotaBack(net, 0, bytes, today);
+    return "new_keys_full";
+  }
+
+  async #giveRoomBack(net: string, bytes: number, today: number, newKey = false): Promise<void> {
+    await this.#giveQuotaBack(net, 0, bytes, today);
+    if (newKey) await this.#giveQuotaBack(NEW_KEYS_NET, 0, bytes, today);
+  }
+
   async #giveQuotaBack(net: string, docs: number, bytes: number, today: number): Promise<void> {
     await this.#db
       .prepare("UPDATE net_day SET docs = docs - ?, bytes = bytes - ? WHERE day = ? AND net = ?")
@@ -524,7 +552,7 @@ export class Cloud implements Store {
       .prepare(
         `SELECT d.owner, d.latest, json_extract(d.versions, '$[#-1]') AS last_version, d.dies_on, d.paused_at, d.blocked_at, d.fix_by,
            ${REVOCATIONS_OF_THE_LAST_VERSION} AS revocations,
-           CASE WHEN d.paused_at IS NOT NULL AND d.dies_on < ?2 THEN 0
+           CASE WHEN d.latest = ${CLAIMED} OR (d.paused_at IS NOT NULL AND d.dies_on < ?2) THEN 0
              ELSE EXISTS (SELECT 1 FROM holds h WHERE h.held = d.id) OR CASE WHEN a.id IS NULL THEN d.dies_on >= ?2
                ELSE a.latest <> ${CLAIMED} AND a.blocked_at IS NULL AND a.paused_at IS NULL
                  AND (a.dies_on >= ?2 OR EXISTS (SELECT 1 FROM holds h WHERE h.held = a.id)) END END AS alive
@@ -595,12 +623,16 @@ export class Cloud implements Store {
     return (await this.#envelopes.head(filesKey(id, hash))) !== null;
   }
 
-  async keepFiles({ id, hash, body, net }: KeptFiles, today: number): Promise<"stored" | "quota"> {
-    if (!(await this.#takeQuota(net, 0, body.length, today))) return "quota";
+  async keepFiles(
+    { id, hash, body, net, newKey }: KeptFiles,
+    today: number,
+  ): Promise<"stored" | "quota" | "new_keys_full"> {
+    const room = await this.#takeRoom(net, body.length, today, newKey);
+    if (room !== "stored") return room;
     try {
       await this.#envelopes.put(filesKey(id, hash), body);
     } catch (error) {
-      await this.#giveQuotaBack(net, 0, body.length, today);
+      await this.#giveRoomBack(net, body.length, today, newKey);
       throw error;
     }
     return "stored";

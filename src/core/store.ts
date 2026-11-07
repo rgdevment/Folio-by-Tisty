@@ -36,6 +36,7 @@ export interface Upload {
   permit: string | null;
   ownerMark: string;
   files?: string;
+  newKey?: boolean;
 }
 
 export interface KeptFiles {
@@ -43,6 +44,7 @@ export interface KeptFiles {
   hash: string;
   body: Uint8Array;
   net: string;
+  newKey?: boolean;
 }
 
 export type Appealed = "accepted" | "review";
@@ -136,7 +138,16 @@ export type Created =
   | "no_anchor"
   | "quota"
   | "bad_ttl";
-export type Uploaded = "stored" | "same" | "behind" | "missing" | "blocked" | "paused" | "quota" | "list_full";
+export type Uploaded =
+  | "stored"
+  | "same"
+  | "behind"
+  | "missing"
+  | "blocked"
+  | "paused"
+  | "quota"
+  | "list_full"
+  | "new_keys_full";
 export type Admitted = "here" | "new" | "over" | "full";
 export type Stage = "open" | "warned" | "new_keys_off" | "no_uploads" | "blocked";
 
@@ -173,7 +184,7 @@ export interface Store {
   openedCase(id: string, hash: string, today: number, now: number): Promise<OpenedCase | null>;
   envelope(id: string, version: Version): Promise<ReadableStream | null>;
   hasFiles(id: string, hash: string): Promise<boolean>;
-  keepFiles(files: KeptFiles, today: number): Promise<"stored" | "quota">;
+  keepFiles(files: KeptFiles, today: number): Promise<"stored" | "quota" | "new_keys_full">;
   filesOf(id: string, hash: string): Promise<ReadableStream | null>;
   dayKey(today: number): Promise<string>;
   evidenceKey(today: number): Promise<string>;
