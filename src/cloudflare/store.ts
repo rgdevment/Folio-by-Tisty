@@ -80,7 +80,7 @@ const KEYS_AT_ONCE = 1000;
 const COUNTED_REPORT = "r.cleared = 0 AND r.over_cap = 0 AND r.net NOT IN (SELECT net FROM false_reporters)";
 // A network is often shared: finding one report false says nothing of what others on it reported before.
 const REPORT_AS_EVIDENCE =
-  "r.cleared = 0 AND r.over_cap = 0 AND r.level <> 'light' AND r.net NOT IN (SELECT f.net FROM false_reporters f WHERE COALESCE(f.since, f.at) < r.at)";
+  "r.cleared = 0 AND (r.over_cap = 0 OR r.level = 'grave') AND r.level <> 'light' AND r.net NOT IN (SELECT f.net FROM false_reporters f WHERE COALESCE(f.since, f.at) < r.at)";
 // The API now refuses a grave report without its link: this is for what was reported before it did (decision 153).
 const REPORT_THAT_BLOCKS = `${COUNTED_REPORT} AND (r.level = 'medium' OR (r.level = 'grave' AND r.sealed_link IS NOT NULL))`;
 const LIGHT_REPORT = `${COUNTED_REPORT} AND r.level = 'light'`;
@@ -111,6 +111,8 @@ const LIVES_ON = "CASE WHEN paused_at IS NULL THEN MAX(dies_on, ?1 + ttl_days) E
 
 // What can block now: an appeal that cleared its owner leaves earlier versions on record and out of the count.
 const COUNTS_NOW = `${REPORT_THAT_BLOCKS} AND r.version >= docs.counts_from`;
+const COUNTS_TODAY = `${COUNTS_NOW} AND (SELECT COUNT(DISTINCT y.doc) FROM reports y JOIN docs b ON b.id = y.doc
+  WHERE y.net = r.net AND b.blocked_at = ?1 AND b.blocked_by_operator = 0) < ?7`;
 // A version no longer listed, or a report with none, is not proof that someone else signed it.
 const SIGNED_BY_OWNER = `COALESCE(
   (SELECT json_extract(j.value, '$.signer') FROM json_each(docs.versions) j WHERE json_extract(j.value, '$.n') = r.version),
@@ -673,7 +675,9 @@ export class Cloud implements Store {
              CASE WHEN EXISTS (SELECT 1 FROM json_each(d.versions) v WHERE json_extract(v.value, '$.n') = ?10)
                THEN ?10 ELSE d.latest END,
              ?11,
-             (SELECT COUNT(*) FROM reports x WHERE x.net = ?2 AND x.doc <> ?1 AND x.cleared = 0 AND x.over_cap = 0) >= ?12
+             ?9 <> 'light' AND
+               (SELECT COUNT(*) FROM reports x
+                WHERE x.net = ?2 AND x.doc <> ?1 AND x.level <> 'light' AND x.cleared = 0 AND x.over_cap = 0) >= ?12
            FROM docs d WHERE d.id = ?1 AND ${STILL_LIVES("d", "?3")}
            ON CONFLICT (doc, net) DO UPDATE
              SET at = CASE WHEN reports.cleared = 1 THEN excluded.at
@@ -736,9 +740,8 @@ export class Cloud implements Store {
       .prepare(
         `UPDATE docs SET blocked_at = ?1, blocked_hour = ?6, dies_on = ?1 + ?2
          WHERE id = ?3 AND blocked_at IS NULL
-           AND (SELECT COUNT(*) FROM reports r WHERE r.doc = ?3 AND ${COUNTS_NOW}) >= ?4
-           AND (SELECT COUNT(DISTINCT r.asn) FROM reports r WHERE r.doc = ?3 AND ${COUNTS_NOW}) >= ?5
-           AND (SELECT COUNT(*) FROM docs b WHERE b.blocked_at = ?1 AND b.blocked_by_operator = 0) < ?7`,
+           AND (SELECT COUNT(*) FROM reports r WHERE r.doc = ?3 AND ${COUNTS_TODAY}) >= ?4
+           AND (SELECT COUNT(DISTINCT r.asn) FROM reports r WHERE r.doc = ?3 AND ${COUNTS_TODAY}) >= ?5`,
       )
       .bind(
         today,
@@ -747,7 +750,7 @@ export class Cloud implements Store {
         this.#limits.reportsToBlock,
         this.#limits.reportOperatorsToBlock,
         hour,
-        this.#limits.autoBlocksADay,
+        this.#limits.blocksANetHelpsADay,
       );
   }
 
@@ -848,11 +851,30 @@ export class Cloud implements Store {
   }
 
   // Adds up first: what expired is only known once every past day has counted (decision 128).
-  async sweep(today: number): Promise<Swept> {
+  async #blockWhatWaited(today: number, hour: number): Promise<void> {
+    const waiting = await this.#db
+      .prepare(
+        `SELECT docs.id FROM docs JOIN reports r ON r.doc = docs.id
+         WHERE docs.blocked_at IS NULL AND ${STILL_LIVES("docs", "?1")} AND ${COUNTS_NOW}
+         GROUP BY docs.id HAVING COUNT(*) >= ?2 LIMIT ?3`,
+      )
+      .bind(today, this.#limits.reportsToBlock, this.#limits.sweptAtOnce)
+      .all<{ id: string }>();
+    if (waiting.results.length === 0) return;
+    await this.#db.batch(waiting.results.map(({ id }) => this.#blockWhenItCounts(id, today, hour)));
+  }
+
+  async sweep(today: number, hour = today * HOURS_IN_A_DAY): Promise<Swept> {
     await this.#db.batch([this.#db.prepare(this.#createSeen(today)), this.#db.prepare(this.#createSeen(today + 1))]);
     const { summed, failed: failedDays } = await this.#sumPastDays(today);
     let forgotten = 0;
     let failed = failedDays;
+    try {
+      await this.#blockWhatWaited(today, hour);
+    } catch (error) {
+      failed += 1;
+      console.error("what waited to be blocked could not be", String(error));
+    }
     // A block stops the reads that keep documents alive, so an attack must not be able to erase them (decision 118).
     if (failedDays === 0 && (await this.stage()) !== "blocked") {
       try {
@@ -1044,16 +1066,16 @@ export class Cloud implements Store {
   async news(after: number, before: number, atMost: number): Promise<News> {
     const newKeysDay = Math.floor((before - 1) / HOURS_IN_A_DAY);
     const newReports = "FROM reports WHERE at_hour > ?1 AND at_hour < ?2 AND cleared = 0 AND level <> 'light'";
-    const [reports, totals, blocked, appealed, keys, autoBlocks] = await this.#db.batch([
+    const [reports, totals, blocked, appealed, keys] = await this.#db.batch([
       this.#db
         .prepare(
-          `SELECT doc, category, COUNT(*) AS nets FROM (
-             SELECT doc, category, level, net IN (SELECT net FROM false_reporters) AS false_net,
+          `SELECT doc, category, COUNT(*) AS nets, SUM(not_counting) AS uncounted FROM (
+             SELECT doc, category, level, (over_cap = 1 OR net IN (SELECT net FROM false_reporters)) AS not_counting,
                ROW_NUMBER() OVER (PARTITION BY net ORDER BY ${GRAVEST_FIRST}, at_hour) AS in_its_net
              ${newReports}
            )
            GROUP BY doc, category
-           ORDER BY MIN(in_its_net), ${GRAVEST_FIRST}, SUM(NOT false_net) DESC, doc LIMIT ?3`,
+           ORDER BY MIN(in_its_net), ${GRAVEST_FIRST}, SUM(NOT not_counting) DESC, doc LIMIT ?3`,
         )
         .bind(after, before, atMost),
       this.#db
@@ -1066,9 +1088,6 @@ export class Cloud implements Store {
         .prepare("SELECT id FROM docs WHERE appealed_hour > ?1 AND appealed_hour < ?2 ORDER BY id LIMIT ?3")
         .bind(after, before, atMost),
       this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS keys FROM net_day WHERE day = ?").bind(newKeysDay),
-      this.#db
-        .prepare("SELECT COUNT(*) AS n FROM docs WHERE blocked_at = ? AND blocked_by_operator = 0")
-        .bind(newKeysDay),
     ]);
     const ids = (rows: typeof blocked): string[] => ((rows?.results ?? []) as { id: string }[]).map(({ id }) => id);
     return {
@@ -1079,7 +1098,6 @@ export class Cloud implements Store {
       appealed: ids(appealed),
       newKeys: (keys?.results?.[0] as { keys: number } | undefined)?.keys ?? 0,
       newKeysDay,
-      autoBlocksFull: ((autoBlocks?.results?.[0] as { n: number } | undefined)?.n ?? 0) >= this.#limits.autoBlocksADay,
     };
   }
 

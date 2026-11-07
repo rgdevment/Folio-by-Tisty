@@ -137,9 +137,11 @@ para denunciar: guarda un resumen de la red.
   siempre trae el link para leerlo, cifrado para que solo el operador lo abra, y
   nunca la parte que permite editar. Bloquea con las mismas tres redes, o cuando
   el operador lo decida.
-- **Hay topes contra los abusos.** Una red cuenta en hasta 20 documentos cada
-  180 días, y hasta 10 documentos al día se bloquean solos. Lo que pase de ahí
-  sigue registrado y espera a que lo revise el operador.
+- **Hay topes contra los abusos.** Una red cuenta para bloquear en hasta 20
+  documentos cada 180 días, y ayuda a bloquear hasta 3 documentos al día. Lo que
+  pase de ahí sigue registrado y lo ve el operador. Lo que espera por el tope
+  diario se vuelve a intentar solo. Pasado el tope de 180 días, una denuncia
+  grave sigue conservando el documento, y una de engaño ya no.
 - **Una sola denuncia de engaño o grave conserva el documento:** si caduca o
   dejas de compartirlo, no se sirve, pero su copia queda hasta 180 días desde la
   denuncia, por si una autoridad la pide. Una orden puede pedir más. Denunciar

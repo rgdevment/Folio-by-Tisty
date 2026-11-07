@@ -57,7 +57,7 @@ const openCommand = (doc: string, sealed: string): string =>
   `node scripts/report-key.mjs open <llave> ${doc} ${sealed}`;
 
 const checkCommand = (doc: string, sealed: string): string =>
-  `node scripts/report-key.mjs check <llave> ${doc} ${sealed}`;
+  `node scripts/report-key.mjs check <llave> ${doc} ${sealed} "<link para verificar>"`;
 
 const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLElement => {
   const card = page.createElement("article");

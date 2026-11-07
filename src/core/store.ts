@@ -83,14 +83,13 @@ export interface Reported {
 }
 
 export interface News {
-  reports: { doc: string; category: string; nets: number }[];
+  reports: { doc: string; category: string; nets: number; uncounted: number }[];
   reportsTotal: number;
   reportLines: number;
   blocked: string[];
   appealed: string[];
   newKeys: number;
   newKeysDay: number;
-  autoBlocksFull: boolean;
 }
 
 // What a read needs of a document, in one row.

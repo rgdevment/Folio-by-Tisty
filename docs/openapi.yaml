@@ -558,7 +558,7 @@ paths:
         the same whether or not the document exists. Anything but a light report must bring `detail`, of at least 10 characters. A report on a document that no longer lives is not kept, and answers the same. Spam and offensive content are light: ten networks of two
         operators within 24 hours warn the author, who has three days to send a new version. Phishing, malware and scams block with three
         networks of two operators, and so do the grave ones, which must bring `sealedLink`: nobody could review
-        them without it. Copyright is not reported here: its holder asks, and it comes down. If telling the operator fails the answer is `failed`, the report stays, and
+        them without it. A network counts to block on up to 20 documents in 180 days and helps block up to 3 a day; past that its reports stay on record, and what waits is tried again each hour. Copyright is not reported here: its holder asks, and it comes down. If telling the operator fails the answer is `failed`, the report stays, and
         sending it again tells again.
       parameters:
         - $ref: "#/components/parameters/Proof"

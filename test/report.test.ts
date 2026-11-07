@@ -114,48 +114,58 @@ describe("checking a sealed link without opening the document", () => {
       );
     });
 
-  it("says the key opens it, and asks only for the envelope", async () => {
-    const result = await checking(await sealLink(SAMPLE_ID, SAMPLES.link_key, operatorKey));
+  it("says the key opens it, through the case link alone", async () => {
+    const result = await checking(await sealLink(SAMPLE_ID, SAMPLES.link_key, operatorKey), CASE);
     expect(result.code).toBe(0);
     expect(result.out).toContain("opens this document");
     expect(result.out).not.toContain(SAMPLES.link_key);
-    expect(asked).toEqual([{ url: `/api/v1/docs/${SAMPLE_ID}`, token: undefined }]);
+    expect(asked).toEqual([{ url: `/api/v1/cases/${SAMPLE_ID}`, token: "T".repeat(43) }]);
   });
 
   it("says a made-up key does not open it", async () => {
-    const result = await checking(await sealLink(SAMPLE_ID, "A".repeat(43), operatorKey));
+    const result = await checking(await sealLink(SAMPLE_ID, "A".repeat(43), operatorKey), CASE);
     expect(result.code).toBe(3);
     expect(result.out).toContain("does not open it");
   });
 
-  it("says what is sealed is no key, when it is no link to this document", async () => {
-    const result = await checking(await sealContact(SAMPLE_ID, "a@b.co", operatorKey));
-    expect(result.code).not.toBe(0);
+  it("says what is sealed is no key, when it is no link", async () => {
+    const result = await checking(await sealContact(SAMPLE_ID, "a@b.co", operatorKey), CASE);
+    expect(result.code).toBe(3);
     expect(asked).toEqual([]);
   });
 
-  it("explains how to check a blocked document", async () => {
-    answer = { status: 403, body: Buffer.from("{}") };
-    const result = await checking(await sealLink(SAMPLE_ID, SAMPLES.link_key, operatorKey));
+  it("will not check without a link to verify, so it never reads like a visitor", async () => {
+    const sealed = await sealLink(SAMPLE_ID, SAMPLES.link_key, operatorKey);
+    expect((await checking(sealed)).code).toBe(1);
+    const result = await checking(sealed, "not-a-link");
     expect(result.code).toBe(1);
     expect(result.err).toContain("make a link to verify");
-  });
-
-  it("brings a blocked document with a case link", async () => {
-    const result = await checking(await sealLink(SAMPLE_ID, SAMPLES.link_key, operatorKey), CASE);
-    expect(result.out).toContain("opens this document");
-    expect(asked).toEqual([{ url: `/api/v1/cases/${SAMPLE_ID}`, token: "T".repeat(43) }]);
-  });
-
-  it("refuses what is no case link", async () => {
-    const result = await checking(await sealLink(SAMPLE_ID, SAMPLES.link_key, operatorKey), "not-a-link");
-    expect(result.code).toBe(1);
     expect(asked).toEqual([]);
   });
 
-  it("refuses what is no envelope", async () => {
-    answer = { status: 200, body: Buffer.from("<html>") };
-    const result = await checking(await sealLink(SAMPLE_ID, SAMPLES.link_key, operatorKey));
+  it("says so when the link brings nothing", async () => {
+    answer = { status: 404, body: Buffer.from("{}") };
+    const result = await checking(await sealLink(SAMPLE_ID, SAMPLES.link_key, operatorKey), CASE);
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("could not be brought: 404");
+  });
+
+  it("stops reading once it has the manifest", async () => {
+    answer = { status: 200, body: Buffer.concat([ENVELOPE, Buffer.alloc(8_000_000)]) };
+    const result = await checking(await sealLink(SAMPLE_ID, SAMPLES.link_key, operatorKey), CASE);
+    expect(result.out).toContain("opens this document");
+  });
+
+  it.each([
+    ["what is not an envelope", Buffer.from("<html>")],
+    ["a manifest past its size", Buffer.concat([Buffer.from("TENV"), Buffer.from([0, 1, 0, 0]), Buffer.alloc(70_000)])],
+    [
+      "what ends before its manifest",
+      Buffer.concat([Buffer.from("TENV"), Buffer.from([0, 0, 0, 200]), Buffer.alloc(10)]),
+    ],
+  ])("refuses %s", async (_, body) => {
+    answer = { status: 200, body };
+    const result = await checking(await sealLink(SAMPLE_ID, SAMPLES.link_key, operatorKey), CASE);
     expect(result.code).toBe(1);
   });
 });

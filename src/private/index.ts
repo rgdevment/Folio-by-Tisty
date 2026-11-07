@@ -6,6 +6,7 @@ import { sendDigest } from "../core/digest";
 import { dayOf, LEVEL_ONE } from "../core/limits";
 import { DayKeys } from "../core/net";
 import { checkSpend } from "../core/spend";
+import { hourOf } from "../core/start";
 import { answer } from "./api";
 
 interface Env extends Bindings, SpendBindings, MailBindings {
@@ -86,7 +87,7 @@ export default {
       console.log(JSON.stringify({ orphans: await store.forgetOrphans(controller.scheduledTime) }));
       return;
     }
-    const swept = await store.sweep(dayOf(controller.scheduledTime));
+    const swept = await store.sweep(dayOf(controller.scheduledTime), hourOf(controller.scheduledTime));
     // Only numbers, never an id (decision 98). The heartbeat stops arriving when a sweep fails, and that is the alert.
     console.log(JSON.stringify(swept));
     if (swept.failed === 0 && env.HEARTBEAT_URL) await fetch(env.HEARTBEAT_URL);

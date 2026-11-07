@@ -265,7 +265,7 @@ export class CloudModeration {
         .bind(id),
       this.#db
         .prepare(
-          `SELECT category, level, detail, version, at, cleared FROM reports WHERE doc = ?
+          `SELECT category, level, detail, version, at, cleared, over_cap FROM reports WHERE doc = ?
            ORDER BY category = 'csam' DESC, level = 'grave' DESC, at LIMIT ?`,
         )
         .bind(id, REPORT_ROWS_AT_MOST),

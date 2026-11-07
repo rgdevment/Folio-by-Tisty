@@ -24,12 +24,12 @@ const textOf = (stage: Stage, was: Stage, news: News, keysSaid: number, panel?: 
     ...(keysSaid > 0 ? [`Llaves nuevas el ${dateOf(news.newKeysDay)}: ${keysSaid}`, ""] : []),
     ...listOf(
       `Denuncias nuevas (${news.reportsTotal}):`,
-      news.reports.map(({ doc, category, nets }) => `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}`),
+      news.reports.map(
+        ({ doc, category, nets, uncounted }) =>
+          `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}${uncounted > 0 ? `, ${uncounted} sin contar` : ""}`,
+      ),
       news.reportLines > news.reports.length,
     ),
-    ...(news.autoBlocksFull
-      ? ["Se alcanzó el tope diario de bloqueos automáticos: lo demás espera en el panel.", ""]
-      : []),
     ...listOf("Bloqueados:", news.blocked),
     ...listOf("Reclamos:", news.appealed),
     ...(panel ? [`Panel: ${panel}`] : []),

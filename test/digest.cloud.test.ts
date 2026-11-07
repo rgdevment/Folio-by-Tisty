@@ -42,23 +42,17 @@ beforeEach(async () => {
   await share(OTHER);
 });
 
-describe("the mail when the day's blocks ran out", () => {
-  it("says the rest waits in the panel", async () => {
-    await testEnv.DB.batch(
-      Array.from({ length: 10 }, (_, at) =>
-        testEnv.DB.prepare(
-          "INSERT INTO docs (id, owner, admin_hash, ttl_days, dies_on, active_day, blocked_at, blocked_hour) VALUES (?, 'x', 'a', 3, ?, ?, ?, ?)",
-        ).bind(`Filled${String(at).padStart(2, "0")}`, TODAY + 3, TODAY, TODAY, HOUR - 1),
-      ),
-    );
-    const { send } = await digest();
-    expect((send.mock.calls[0] as [string, string])[1]).toContain("tope diario");
-  });
-
-  it("says nothing of it otherwise", async () => {
+describe("the mail on networks that do not count", () => {
+  it("says how many, and lists first what clean networks say", async () => {
     await report(ID, "n1", "phishing");
+    await report(ID, "n2", "phishing");
+    await report(OTHER, "n3", "phishing");
+    await testEnv.DB.prepare("UPDATE reports SET over_cap = 1 WHERE net IN ('n1', 'n2')").run();
     const { send } = await digest();
-    expect((send.mock.calls[0] as [string, string])[1]).not.toContain("tope diario");
+    const text = (send.mock.calls[0] as [string, string])[1];
+    expect(text).toContain(`phishing: ${ID}, 2 redes, 2 sin contar`);
+    expect(text).toContain(`phishing: ${OTHER}, 1 red\n`);
+    expect(text.indexOf(OTHER)).toBeLessThan(text.indexOf(ID));
   });
 });
 

@@ -176,7 +176,7 @@ describe("checking a key", () => {
   it("copies a command that opens nothing, only where a link came", () => {
     pressing("reports", "Comprobar sin abrir");
     expect(doing.copy).toHaveBeenCalledWith(
-      expect.stringContaining("report-key.mjs check <llave> AbCdEfGh sealed1.opaque"),
+      'node scripts/report-key.mjs check <llave> AbCdEfGh sealed1.opaque "<link para verificar>"',
     );
     const buttons = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
     expect(buttons.filter((one) => one.textContent === "Comprobar sin abrir")).toHaveLength(1);

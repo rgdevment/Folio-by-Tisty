@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
+import worker from "../src/private/index";
 
 const testEnv = env as unknown as {
   DB: D1Database;
@@ -123,6 +124,7 @@ describe("the caps", () => {
 
   it("counts a network on its first documents, and keeps the rest on record", async () => {
     await cards(21, "n");
+    expect(await overCap("Capdoc00", "n")).toBe(0);
     expect(await overCap("Capdoc19", "n")).toBe(0);
     expect(await overCap("Capdoc20", "n")).toBe(1);
     const stayed = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports").first<{ n: number }>();
@@ -131,19 +133,45 @@ describe("the caps", () => {
     expect(reports.filter((one) => one.overCap).map((one) => one.doc)).toEqual(["Capdoc20"]);
   });
 
-  it("does not let what is past the cap block or hold", async () => {
+  it("does not let what is past the cap block, or hold unless it is grave", async () => {
     await cards(21, "n");
     await shared("OverLast");
+    await shared("OverGrav");
     await report("OverLast", "n", "phishing", DAY);
+    await report("OverGrav", "n", "csam", DAY, { sealedLink: LINK });
     await report("OverLast", "b", "phishing", DAY);
     const { blocked } = await report("OverLast", "c", "phishing", DAY);
     expect(blocked).toBe(false);
     await testEnv.DB.prepare("DELETE FROM reports WHERE net IN ('b', 'c')").run();
-    await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'OverLast'")
+    await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id IN ('OverLast', 'OverGrav')")
       .bind(DAY + 1)
       .run();
     await store.sweep(DAY + 10);
     expect(await row("OverLast")).toBeNull();
+    expect(await row("OverGrav")).not.toBeNull();
+  });
+
+  it("does not let an appeal lift itself over child abuse from a network past its cap", async () => {
+    await cards(21, "n");
+    await shared("OverAppl");
+    await upload("OverAppl", 2, "second-key");
+    await report("OverAppl", "n", "csam", DAY, { sealedLink: LINK, version: 2 });
+    await report("OverAppl", "b", "phishing", DAY, { version: 2 });
+    await testEnv.DB.prepare("UPDATE docs SET blocked_at = ?, blocked_hour = ? WHERE id = 'OverAppl'")
+      .bind(DAY, DAY * 24)
+      .run();
+    expect(await store.appeal("OverAppl", DAY, DAY * 24)).toBe("review");
+  });
+
+  it("does not spend the cap on light reports, nor mark one past it", async () => {
+    await cards(20, "n", "spam");
+    await shared("AfterSpm");
+    await report("AfterSpm", "n", "phishing", DAY);
+    expect(await overCap("AfterSpm", "n")).toBe(0);
+    await cards(21, "m");
+    await shared("SpamOver");
+    await report("SpamOver", "m", "spam", DAY);
+    expect(await overCap("SpamOver", "m")).toBe(0);
   });
 
   it("does not count cleared reports toward the cap, so a mistake does not close it", async () => {
@@ -154,38 +182,69 @@ describe("the caps", () => {
     expect(await overCap("Afterclr", "n")).toBe(0);
   });
 
-  it("stops blocking on its own past the day's documents, and the mail says so", async () => {
-    const reportedBy3 = async (id: string) => {
-      await shared(id);
-      let last = { blocked: false };
-      for (const net of ["a", "b", "c"]) last = await report(id, net, "phishing", DAY);
-      return last.blocked;
-    };
-    for (let at = 0; at < 10; at += 1) expect(await reportedBy3(`Blocks${String(at).padStart(2, "0")}`)).toBe(true);
-    expect((await store.news(0, DAY * 24 + 1, 50)).autoBlocksFull).toBe(true);
-    expect(await reportedBy3("Blocks10")).toBe(false);
-    const stillThere = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE doc = 'Blocks10'").first<{
+  const blockedBy = async (id: string, nets: string[], day = DAY) => {
+    await shared(id);
+    let last = { blocked: false };
+    for (const net of nets) last = await report(id, net, "phishing", day);
+    return last.blocked;
+  };
+
+  it("lets a network help block three documents a day, and no more", async () => {
+    for (const id of ["Blocked1", "Blocked2", "Blocked3"]) expect(await blockedBy(id, ["a", "b", "c"])).toBe(true);
+    expect(await blockedBy("Blocked4", ["a", "b", "c"])).toBe(false);
+    const stillThere = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE doc = 'Blocked4'").first<{
       n: number;
     }>();
     expect(stillThere?.n).toBe(3);
   });
 
-  it("starts the count again the next day, and an operator's block does not use it", async () => {
-    for (let at = 0; at < 10; at += 1) await shared(`Operator${at}`);
-    await testEnv.DB.prepare("UPDATE docs SET blocked_at = ?, blocked_by_operator = 1").bind(DAY).run();
-    expect((await store.news(0, DAY * 24 + 1, 50)).autoBlocksFull).toBe(false);
-    for (let at = 0; at < 10; at += 1) {
-      const id = `Blocks${String(at).padStart(2, "0")}`;
-      await shared(id);
-      for (const net of ["a", "b", "c"]) await report(id, net, "phishing", DAY);
-    }
-    await shared("Nextdayy");
-    await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'Nextdayy'")
-      .bind(DAY + 20)
+  it("keeps the blocks of other networks working when one group spent theirs", async () => {
+    for (const id of ["Blocked1", "Blocked2", "Blocked3"]) await blockedBy(id, ["a", "b", "c"]);
+    expect(await blockedBy("OthersOn", ["d", "e", "f"])).toBe(true);
+  });
+
+  it("does not count an operator's block against a network", async () => {
+    for (const id of ["Blocked1", "Blocked2", "Blocked3"]) await blockedBy(id, ["a", "b", "c"]);
+    await testEnv.DB.prepare("UPDATE docs SET blocked_by_operator = 1").run();
+    expect(await blockedBy("Blocked4", ["a", "b", "c"])).toBe(true);
+  });
+
+  it("tries again what waited, and blocks it once the day has room, at the hour it says", async () => {
+    for (const id of ["Blocked1", "Blocked2", "Blocked3"]) await blockedBy(id, ["a", "b", "c"]);
+    await blockedBy("Waitingd", ["a", "b", "c"]);
+    await store.sweep(DAY, DAY * 24 + 5);
+    expect((await row("Waitingd"))?.blocked_at).toBeNull();
+    await store.sweep(DAY + 1, (DAY + 1) * 24 + 5);
+    expect((await row("Waitingd"))?.blocked_at).toBe(DAY + 1);
+    const hour = await testEnv.DB.prepare("SELECT blocked_hour FROM docs WHERE id = 'Waitingd'").first<{
+      blocked_hour: number;
+    }>();
+    expect(hour?.blocked_hour).toBe((DAY + 1) * 24 + 5);
+  });
+
+  it("says the real hour of the round when the hourly sweep blocks it", async () => {
+    for (const id of ["Blocked1", "Blocked2", "Blocked3"]) await blockedBy(id, ["a", "b", "c"]);
+    await blockedBy("Waitingd", ["a", "b", "c"]);
+    const at = (DAY + 1) * 86_400_000 + 7 * 3_600_000;
+    await worker.scheduled({ cron: "0 * * * *", scheduledTime: at, noRetry: () => {} } as never, testEnv as never);
+    const row = await testEnv.DB.prepare("SELECT blocked_hour FROM docs WHERE id = 'Waitingd'").first<{
+      blocked_hour: number;
+    }>();
+    expect(row?.blocked_hour).toBe((DAY + 1) * 24 + 7);
+  });
+
+  it("does not block in the sweep what expired or lacks its reports", async () => {
+    for (const id of ["Blocked1", "Blocked2", "Blocked3"]) await blockedBy(id, ["a", "b", "c"]);
+    await blockedBy("Waitingd", ["a", "b", "c"]);
+    await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'Waitingd'")
+      .bind(DAY - 5)
       .run();
-    let last = { blocked: false };
-    for (const net of ["a", "b", "c"]) last = await report("Nextdayy", net, "phishing", DAY + 1);
-    expect(last.blocked).toBe(true);
+    await shared("Tworepos");
+    await report("Tworepos", "x", "phishing", DAY);
+    await report("Tworepos", "y", "phishing", DAY);
+    await store.sweep(DAY + 1, (DAY + 1) * 24);
+    expect((await row("Tworepos"))?.blocked_at).toBeNull();
+    expect((await row("Waitingd"))?.blocked_at).toBeNull();
   });
 });
 

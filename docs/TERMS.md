@@ -136,9 +136,11 @@ you are to report: it keeps a digest of the network.
   link to read it, encrypted so only the operator can open it, and never the
   part that allows editing. It blocks with the same three networks, or when the
   operator decides.
-- **There are caps against abuse.** A network counts on up to 20 documents every
-  180 days, and up to 10 documents a day are blocked on their own. What goes
-  past that stays on record and waits for the operator to review it.
+- **There are caps against abuse.** A network counts to block on up to 20
+  documents every 180 days, and helps block up to 3 documents a day. What goes
+  past that stays on record and the operator sees it. What waits for the daily
+  cap is tried again on its own. Past the 180-day cap, a grave report still
+  keeps the document, and one of deceit no longer does.
 - **A single report of deceit or a grave one keeps the document:** if it expires
   or you stop sharing it, it is not served, but its copy stays for up to 180
   days from the report, in case an authority asks for it. An order can ask for

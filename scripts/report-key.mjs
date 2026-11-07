@@ -7,6 +7,7 @@ const EPHEMERAL_BYTES = 32;
 const ORIGIN = process.env.FOLIO_ORIGIN ?? "https://tisty.cl";
 const MANIFEST_SIZE_AT = 4;
 const MANIFEST_AT = 8;
+const MANIFEST_BYTES_AT_MOST = 16384;
 const CASE_TOKEN = /#caso\.([A-Za-z0-9_-]{43})/;
 const LABELS = { "sealed1.": "folio.report-link.v1", "contact1.": "folio.report-contact.v1" };
 
@@ -62,22 +63,24 @@ const open = async (file, id, sealedLink) => {
   console.log(shown(await opened(file, id, sealedLink)));
 };
 
-const envelopeOf = async (id, caseLink) => {
-  const token = caseLink ? CASE_TOKEN.exec(caseLink)?.[1] : undefined;
-  if (caseLink && !token) throw new Error("that is not a case link");
-  const response = await fetch(`${ORIGIN}/api/v1/${token ? "cases" : "docs"}/${id}`, {
-    ...(token ? { headers: { "Folio-Case": token } } : {}),
-  });
-  if (response.status === 403 && !token) {
-    throw new Error("the document is blocked: make a link to verify in the panel, and add it as the last argument");
-  }
+const manifestOf = async (id, caseLink) => {
+  const token = CASE_TOKEN.exec(caseLink)?.[1];
+  if (!token) throw new Error("that is not a case link: make a link to verify in the panel");
+  const response = await fetch(`${ORIGIN}/api/v1/cases/${id}`, { headers: { "Folio-Case": token } });
   if (!response.ok) throw new Error(`the document could not be brought: ${response.status}`);
-  return Buffer.from(await response.arrayBuffer());
-};
-
-const manifestOf = (envelope) => {
-  const size = envelope.readUInt32BE(MANIFEST_SIZE_AT);
-  return JSON.parse(envelope.subarray(MANIFEST_AT, MANIFEST_AT + size).toString());
+  const reader = response.body.getReader();
+  let held = Buffer.alloc(0);
+  for (;;) {
+    const size = held.length >= MANIFEST_AT ? held.readUInt32BE(MANIFEST_SIZE_AT) : 0;
+    if (size > MANIFEST_BYTES_AT_MOST) throw new Error("this is no envelope");
+    if (held.length >= MANIFEST_AT && held.length >= MANIFEST_AT + size) {
+      await reader.cancel();
+      return JSON.parse(held.subarray(MANIFEST_AT, MANIFEST_AT + size).toString());
+    }
+    const { done, value } = await reader.read();
+    if (done) throw new Error("this is no envelope");
+    held = Buffer.concat([held, value]);
+  }
 };
 
 const keyOpens = (key, { head, commitment }) => {
@@ -97,7 +100,7 @@ const check = async (file, id, sealedLink, caseLink) => {
     process.exitCode = NOT_OPENED;
     return;
   }
-  const opens = keyOpens(key, manifestOf(await envelopeOf(id, caseLink)));
+  const opens = keyOpens(key, await manifestOf(id, caseLink));
   console.log(opens ? "The key opens this document. Nothing of it was read." : "It does not open it: the key is not this document's.");
   if (!opens) process.exitCode = NOT_OPENED;
 };
@@ -105,8 +108,8 @@ const check = async (file, id, sealedLink, caseLink) => {
 const [command, file, ...rest] = process.argv.slice(2);
 if (command === "new" && file) await create(file);
 else if (command === "open" && file && rest.length === 2) await open(file, rest[0], rest[1]);
-else if (command === "check" && file && (rest.length === 2 || rest.length === 3)) await check(file, ...rest);
+else if (command === "check" && file && rest.length === 3) await check(file, ...rest);
 else {
-  console.error("usage: report-key.mjs new <file> | open <file> <id> <sealed> | check <file> <id> <sealedLink> [caseLink]");
+  console.error("usage: report-key.mjs new <file> | open <file> <id> <sealed> | check <file> <id> <sealedLink> <caseLink>");
   process.exit(1);
 }
