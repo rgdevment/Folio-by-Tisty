@@ -22,13 +22,20 @@ export const pictureAddresses = (said: Picture[], bytes: Bytes[]): (string | nul
     return URL.createObjectURL(new Blob([held], { type: picture.kind }));
   });
 
-const hostOf = (where: string): string | null => {
+const urlOf = (where: string): URL | null => {
   try {
-    return new URL(where).host;
+    return new URL(where);
   } catch {
     return null;
   }
 };
+
+const hostOf = (where: string): string | null => urlOf(where)?.host ?? null;
+
+const XHTML = "http://www.w3.org/1999/xhtml";
+
+// A styled piece inside a link can hide words the reader never sees, so only bare words may name the address.
+const bareWords = (link: Element): string => (link.children.length === 0 ? (link.textContent ?? "") : "");
 
 const BARE_WWW = /^www\./;
 
@@ -48,8 +55,10 @@ const whereItGoes = (where: string, said: string): string | null => {
     const address = where.slice("mailto:".length).split("?", 1)[0] ?? "";
     return said.trim().toLowerCase() === address.toLowerCase() ? null : address;
   }
-  const host = hostOf(where);
-  return host === null || saysItsHost(said, host) ? null : host;
+  const url = urlOf(where);
+  if (url === null || url.host === "") return null;
+  if (url.username !== "" || url.password !== "") return url.host;
+  return saysItsHost(said, url.host) ? null : url.host;
 };
 
 export const finished = (words: DocumentFragment, addresses: (string | null)[]): DocumentFragment => {
@@ -67,12 +76,12 @@ export const finished = (words: DocumentFragment, addresses: (string | null)[]):
     if (LEAVES.test(where)) {
       link.setAttribute("target", "_blank");
       link.setAttribute("rel", "noopener noreferrer");
-      const goes = whereItGoes(where, link.textContent ?? "");
+      const goes = whereItGoes(where, bareWords(link));
       if (goes) {
         const shown = link.ownerDocument.createElement("span");
         shown.className = "link-where";
         shown.textContent = ` (${goes})`;
-        link.after(shown);
+        (link.namespaceURI === XHTML ? link : (link.closest("svg") ?? link)).after(shown);
       }
     } else if (FILE.test(where)) {
       // A press asks for it, and no address ever does: what follows the # is the link key.

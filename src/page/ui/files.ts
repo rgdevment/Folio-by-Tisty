@@ -85,7 +85,7 @@ const told = (link: HTMLElement, said: string): void => {
 
 const CONTROLS = /\p{C}/gu;
 const MAY_RUN_BY_NAME =
-  /\.(exe|msi|msp|bat|cmd|com|scr|pif|cpl|dll|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|hta|lnk|reg|jar|apk|appimage|deb|rpm|dmg|pkg|app|sh|iso|img|html?|xhtml|svg|docm|xlsm|pptm)[\s.]*$/i;
+  /\.(exe|msi|msp|msix|msixbundle|appx|appxbundle|application|bat|cmd|com|scr|pif|cpl|dll|msc|ps1|psm1|ps1xml|psc1|vb|vbs|vbe|js|jse|ws|wsf|wsh|hta|lnk|url|website|scf|inf|reg|chm|gadget|jar|apk|appimage|deb|rpm|dmg|pkg|app|command|sh|iso|img|vhdx?|html?|xhtml|mht|mhtml|svg|docm|dotm|xlsm|xltm|xlam|xll|pptm|potm|ppsm|ppam|sldm)[\s.]*$/i;
 const MAY_RUN_BY_START = [
   [0x4d, 0x5a],
   [0x7f, 0x45, 0x4c, 0x46],

@@ -168,6 +168,16 @@ describe("where a link goes", () => {
     ["look-alike letters", '<a href="https://xn--bnco-53d.cl/">b\u0430nco.cl</a>', " (xn--bnco-53d.cl)"],
     ["its address among other words", '<a href="https://evil.example/">mira evil.example ahora</a>', " (evil.example)"],
     ["a mail to someone else", '<a href="mailto:a@evil.example?subject=x">escríbenos</a>', " (a@evil.example)"],
+    [
+      "a name before an at sign in its own words",
+      '<a href="https://banco.cl@evil.example/">https://banco.cl@evil.example/</a>',
+      " (evil.example)",
+    ],
+    [
+      "words a reader may not see",
+      '<a href="https://evil.example/"><math><mtext style="font-size:0">https://evil.example/</mtext></math>banco.cl</a>',
+      " (evil.example)",
+    ],
   ])("shows it for %s", (_, html, shown) => {
     expect(whereOf(html)).toBe(shown);
   });
@@ -181,6 +191,16 @@ describe("where a link goes", () => {
     ["what stays in the document", '<a href="tisty:file/0">x</a>'],
   ])("does not repeat it with %s", (_, html) => {
     expect(whereOf(html)).toBeNull();
+  });
+
+  it("shows it beside a drawing, where a link inside it would hide it", () => {
+    const words = finished(
+      domPurifyCleaner(place).clean('<svg><a href="https://evil.example/"><text>banco.cl</text></a></svg>'),
+      [],
+    );
+    const shown = words.querySelector(".link-where");
+    expect(shown?.textContent).toBe(" (evil.example)");
+    expect(shown?.previousElementSibling?.localName).toBe("svg");
   });
 
   it("is written as words, never as markup", () => {
