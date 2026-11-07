@@ -101,6 +101,7 @@ beforeEach(() => {
     handedOver: vi.fn(),
     forgetContact: vi.fn(),
     reportsPage: vi.fn(),
+    networkWasFalse: vi.fn(),
   };
   drawQueue(page, QUEUE, doing as unknown as Doing);
 });
@@ -138,6 +139,15 @@ describe("the page when no answer comes, as when the session of Access ended", (
   });
 });
 
+describe("a network found false", () => {
+  it("offers to discard all its reports, only on its own", () => {
+    const offered = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
+    expect(offered.filter((one) => one.textContent === "Descartar todas las de esta red")).toHaveLength(1);
+    pressing("reports", "Descartar todas las de esta red");
+    expect(doing.networkWasFalse).toHaveBeenCalledWith("IjKlMnOp", "n2");
+  });
+});
+
 describe("pages of reports", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -163,6 +173,25 @@ describe("pages of reports", () => {
     pressing("reports", "Volver al inicio");
     expect(doing.reportsPage).toHaveBeenCalledWith(0);
     expect(page.getElementById("reports")?.textContent).not.toContain("Ver las siguientes");
+  });
+
+  it("goes back to the start when acting left the page empty", async () => {
+    const fetching = vi.fn(
+      async (path: string) =>
+        new Response(
+          JSON.stringify(
+            path === "/api/queue" ? { ...QUEUE, reportsTotal: 450 } : { ...QUEUE, reports: [], reportsFrom: 2 },
+          ),
+        ),
+    );
+    vi.resetModules();
+    vi.stubGlobal("document", page);
+    vi.stubGlobal("fetch", fetching);
+    await import("../src/admin/page/main");
+    await vi.waitFor(() => expect(page.getElementById("reports")?.textContent).toContain("Se ven de"));
+    pressing("reports", "Ver las siguientes");
+    await vi.waitFor(() => expect(fetching.mock.calls.at(-1)?.[0]).toBe("/api/queue"));
+    await vi.waitFor(() => expect(page.getElementById("reports")?.textContent).toContain("Se ven de la 1 a la 2"));
   });
 
   it("asks the server for that page, and stays on it after acting", async () => {

@@ -5,6 +5,7 @@ export interface Doing {
   reject: (id: string) => void;
   reportWasFalse: (id: string, net: string) => void;
   forgetContact: (id: string, net: string) => void;
+  networkWasFalse: (id: string, net: string) => void;
   opened: (id: string) => void;
   copy: (said: string) => void;
   panic: (id: string, version: number) => void;
@@ -68,6 +69,11 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
     button(page, "Era falsa", () => doing.reportWasFalse(report.doc, report.net)),
     button(page, "Botón de pánico", () => doing.panic(report.doc, report.version), true),
   ];
+  if (report.fromFalseNet) {
+    buttons.push(
+      button(page, "Descartar todas las de esta red", () => doing.networkWasFalse(report.doc, report.net), true),
+    );
+  }
   if (report.sealedLink) {
     const sealed = report.sealedLink;
     card.append(piece(page, "code", "sealed", sealed));

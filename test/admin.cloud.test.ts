@@ -357,6 +357,17 @@ describe("a block the operator placed", () => {
 });
 
 describe("what it can do", () => {
+  it("discards all of a network's reports only for the operator", async () => {
+    await share();
+    await reported("phishing", ["n1"]);
+    await store.create({ id: "OtherDoc", owner: "o2", adminHash: "a", ttlDays: 3, net: "n" }, TODAY);
+    await store.report({ doc: "OtherDoc", net: "n1", asn: 1, category: "phishing", version: 1 }, TODAY, HOUR);
+    expect((await asked(`/api/docs/${ID}/reports/n1/false_network`, { method: "POST" })).status).toBe(403);
+    expect((await acting(`/api/docs/${ID}/reports/n1/false_network`)).status).toBe(200);
+    expect((await moderation.queue(NOW)).reportsTotal).toBe(0);
+    expect((await acting(`/api/docs/${ID}/reports/n1/false_network`)).status).toBe(404);
+  });
+
   it("erases a reporter's email when asked, that one alone, and says so on record", async () => {
     await share();
     for (const net of ["n1", "n2"]) {

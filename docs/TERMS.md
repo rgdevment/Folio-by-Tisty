@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 8, in force since November 6, 2026.**
+**Version 9, in force since November 6, 2026.**
 
 ## The short version
 
@@ -139,10 +139,12 @@ you are to report: it keeps a digest of the network.
   days from the report, in case an authority asks for it. An order can ask for
   more.
 - **A false report is discarded.** If the link it brings does not open the
-  document, or the operator finds it false, the operator discards it, and
-  reports from that network stop counting on every document for up to 180 days.
-  Until then it counts like any other. If an appeal is accepted, the reports on
-  that version stop counting, but a new version can be reported.
+  document, or the operator finds it false, the operator discards it; until then
+  it counts like any other. From then on and for up to 180 days, reports from
+  that network do not count to block and keep nothing. What that network
+  reported before is still kept, since a network is often shared, unless the
+  operator discards that too. If an appeal is accepted, the reports on that
+  version stop counting, but a new version can be reported.
 - **You may appeal once per document** in your manage link. If every version
   reported was signed by someone you let edit, and there is no report of child
   abuse, the appeal is accepted on its own: the edit link stops working and it
