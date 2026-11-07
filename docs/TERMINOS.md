@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 11, vigente desde el 6 de noviembre de 2026.**
+**Versión 12, vigente desde el 7 de noviembre de 2026.**
 
 ## En corto
 
@@ -59,10 +59,10 @@ con lo que lees es tu responsabilidad.
 - **Dejar de compartir** corta los links al instante. La copia se borra en la
   siguiente limpieza, normalmente antes de una hora. Una denuncia puede impedir
   ese borrado, y no se te avisará.
-- **Hay topes** de tamaño, de imágenes y adjuntos, de documentos compartidos a
-  la vez y de subidas por hora, que el servicio puede cambiar. Hoy cada llave
-  puede tener dos documentos compartidos a la vez. Tisty te avisa antes de
-  compartir si algo no cabe.
+- **Hay topes** de tamaño, de imágenes y adjuntos, de idiomas, de documentos
+  compartidos a la vez y de subidas por hora, que el servicio puede cambiar. Hoy
+  cada llave puede tener dos documentos compartidos a la vez, y cada documento
+  hasta 20 idiomas. Tisty te avisa antes de compartir si algo no cabe.
 - **Si el servicio llega a su límite de gasto,** puede dejar de aceptar
   documentos o de responder por un tiempo. Mientras esté detenido, nada caduca.
 
@@ -85,8 +85,17 @@ con lo que lees es tu responsabilidad.
   lo que dará acceso a más. Todavía no está decidido cómo se gana, y estos
   términos lo dirán cuando lo esté. Las denuncias por sí solas nunca la quitan:
   solo cuenta lo que confirma el operador.
-- **Una llave nueva parte con los topes más bajos,** y cada red puede traer solo
-  unas pocas nuevas al día.
+- **Una llave es nueva durante sus primeros 30 días** y parte con los topes más
+  bajos. Cada red puede traer solo unas pocas nuevas al día. Entre todas, las
+  llaves nuevas suben hasta 5 GB al día, y desde una red que ya subió 50 MB ese
+  día no sube ninguna más. Cuenta la llave del dueño y la de quien firma la
+  versión: si una es nueva, la versión también.
+- **Cuando Folio guarda 80 GB,** solo acepta versiones de llaves que no son
+  nuevas, salvo la del dueño que espera un documento cuyo reclamo se aceptó
+  solo. Con 100 GB no acepta ninguna hasta que se libere espacio.
+- **Puedes retirar hasta 64 llaves,** por ejemplo la de un equipo perdido. Folio
+  guarda cada retiro para siempre, para que quien lea sepa que esa llave ya no
+  habla por ti.
 
 ## Qué no se permite
 
@@ -162,6 +171,9 @@ para denunciar: guarda un resumen de la red.
 - **El operador puede retirar** cualquier documento que incumpla estos términos,
   y bloquear el acceso a quien abuse del servicio. Lo que él bloquea solo lo
   levanta él, ninguna versión nueva lo hace, y la copia queda hasta 180 días.
+  También puede bloquear una llave: no sube nada más, ni documentos ni
+  versiones, y nadie sube versiones de sus documentos, tampoco con un link de
+  editar. Lo que ya compartió sigue hasta que caduque o él lo retire.
 - **El operador puede denunciar** a la PDI o a la Fiscalía lo que, al revisarlo,
   parezca delito, y avisar de phishing y malware a Google Safe Browsing y a
   Cloudflare. Lo hace una persona, a mano.

@@ -7,6 +7,7 @@ import type { Queue } from "../src/core/queue";
 const HARM = '<img src=x onerror="alert(1)">';
 const QUEUE: Queue = {
   stage: "warned",
+  blockedKeys: [{ root: "BLOCKEDROOT", blockedAt: 20400 }],
   newKeys: 7,
   reportsTotal: 2,
   reportsFrom: 0,
@@ -14,6 +15,7 @@ const QUEUE: Queue = {
   reports: [
     {
       doc: "AbCdEfGh",
+      ownerToBlock: "OWNERROOT",
       net: "n1",
       category: "csam",
       level: "grave",
@@ -28,6 +30,7 @@ const QUEUE: Queue = {
     },
     {
       doc: "IjKlMnOp",
+      ownerToBlock: null,
       net: "n2",
       category: "phishing",
       level: "medium",
@@ -44,6 +47,7 @@ const QUEUE: Queue = {
   docs: [
     {
       id: "AbCdEfGh",
+      ownerToBlock: "OWNERROOT",
       latest: 2,
       blockedAt: 20_000,
       appealedAt: 20_001,
@@ -58,6 +62,7 @@ const QUEUE: Queue = {
     },
     {
       id: "QrStUvWx",
+      ownerToBlock: null,
       latest: 1,
       blockedAt: 20_000,
       appealedAt: 20_001,
@@ -69,6 +74,7 @@ const QUEUE: Queue = {
     },
     {
       id: "YzAbCdEf",
+      ownerToBlock: "OWNERROOT",
       latest: 1,
       blockedAt: 20_000,
       appealedAt: null,
@@ -94,6 +100,8 @@ const pressing = (place: string, said: string, at = 0): void => {
 beforeEach(() => {
   page = new JSDOM(readFileSync("src/admin/page/index.html", "utf8")).window.document;
   doing = {
+    blockKey: vi.fn(),
+    unblockKey: vi.fn(),
     accept: vi.fn(),
     reject: vi.fn(),
     reportWasFalse: vi.fn(),
@@ -141,6 +149,37 @@ describe("the page when no answer comes, as when the session of Access ended", (
     await vi.waitFor(() => expect(page.getElementById("appeals")?.querySelector("button")).not.toBeNull());
     pressing("appeals", "Rechazar");
     await vi.waitFor(() => expect(SAID_OF()).toContain("No se pudo. Recarga"));
+  });
+});
+
+describe("blocking a key from the panel", () => {
+  const posted = async (press: () => void) => {
+    const fetching = vi.fn(async (_path: string, _init?: RequestInit) => new Response(JSON.stringify(QUEUE)));
+    vi.resetModules();
+    vi.stubGlobal("document", page);
+    vi.stubGlobal("fetch", fetching);
+    vi.stubGlobal("confirm", () => true);
+    vi.stubGlobal("prompt", () => "granja de spam");
+    await import("../src/admin/page/main");
+    await vi.waitFor(() => expect(page.getElementById("blocked-keys")?.querySelector("button")).not.toBeNull());
+    press();
+    await vi.waitFor(() => expect(fetching.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
+    return fetching.mock.calls.filter(([, init]) => init?.method === "POST");
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends the owner's key with its reason", async () => {
+    const sent = await posted(() => pressing("reports", "Bloquear llave del dueño"));
+    expect(sent[0]?.[0]).toBe("/api/keys/OWNERROOT/block");
+    expect(JSON.parse(String(sent[0]?.[1]?.body))).toEqual({ note: "granja de spam" });
+  });
+
+  it("lifts a blocked key", async () => {
+    const sent = await posted(() => pressing("blocked-keys", "Desbloquear llave"));
+    expect(sent[0]?.[0]).toBe("/api/keys/BLOCKEDROOT/unblock");
   });
 });
 
@@ -504,10 +543,45 @@ describe("the panel", () => {
     expect(doing.handedOver).toHaveBeenCalledWith("YzAbCdEf");
   });
 
+  it("offers to block the owner's key from a report and from a blocked document", () => {
+    pressing("reports", "Bloquear llave del dueño");
+    expect(doing.blockKey).toHaveBeenCalledWith("OWNERROOT");
+    pressing("appeals", "Bloquear llave del dueño");
+    expect(doing.blockKey).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not offer to block a key that is already blocked", () => {
+    const cards = (page.getElementById("reports") as Element).querySelectorAll(".card");
+    expect(cards[1]?.textContent).toContain("IjKlMnOp");
+    expect(cards[1]?.textContent).not.toContain("Bloquear llave del dueño");
+    const blocked = (page.getElementById("blocked") as Element).querySelectorAll(".card");
+    expect(blocked[0]?.textContent).toContain("QrStUvWx");
+    expect(blocked[1]?.textContent).toContain("Bloquear llave del dueño");
+  });
+
+  it("lists the blocked keys, each with a way to lift it", () => {
+    expect(page.getElementById("blocked-keys")?.textContent).toContain("BLOCKEDROOT");
+    pressing("blocked-keys", "Desbloquear llave");
+    expect(doing.unblockKey).toHaveBeenCalledWith("BLOCKEDROOT");
+  });
+
+  it("offers a form for a key that is on no card", () => {
+    expect(page.getElementById("key-form")).not.toBeNull();
+  });
+
   it("says when there is nothing", () => {
     drawQueue(
       page,
-      { stage: "open", newKeys: 0, reportsTotal: 0, reportsFrom: 0, reports: [], docs: [], warned: [] },
+      {
+        stage: "open",
+        newKeys: 0,
+        reportsTotal: 0,
+        reportsFrom: 0,
+        reports: [],
+        docs: [],
+        warned: [],
+        blockedKeys: [],
+      },
       doing as unknown as Doing,
     );
     expect(page.getElementById("reports")?.textContent).toBe("Ninguna.");

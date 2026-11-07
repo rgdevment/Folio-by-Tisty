@@ -20,6 +20,8 @@ export interface AdminApi {
     | "forgetContact"
     | "networkWasFalse"
     | "clearWarning"
+    | "blockKey"
+    | "unblockKey"
   >;
   access: AccessSettings;
   certs: Certs;
@@ -37,6 +39,7 @@ const ON_REPORT = {
   false_network: "networkWasFalse",
   forget_contact: "forgetContact",
 } as const;
+const KEY_PATH = /^\/api\/keys\/([A-Za-z0-9_-]{43})\/(block|unblock)$/;
 const SAID_AT_MOST = 500;
 const HEADERS = {
   "Cache-Control": "no-store",
@@ -73,6 +76,13 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
   if (reportDoc && net) {
     const acting = ON_REPORT[onReport as keyof typeof ON_REPORT];
     return answerOf(await moderation[acting](reportDoc, net, now));
+  }
+  const [, root, onKey] = KEY_PATH.exec(path) ?? [];
+  if (root && onKey === "unblock") return answerOf(await moderation.unblockKey(root, now));
+  if (root) {
+    const reason = await noteOf(request);
+    if (!reason) return json(400, { refused: "no_reason" });
+    return answerOf(await moderation.blockKey(root, reason, now));
   }
   const [, id, action] = ACTION_PATH.exec(path) ?? [];
   if (!id) return json(404, { refused: "missing" });

@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 11, in force since November 6, 2026.**
+**Version 12, in force since November 7, 2026.**
 
 ## The short version
 
@@ -58,10 +58,10 @@ but what you do with what you read is your responsibility.
 - **Stopping sharing** cuts the links at once. The copy is deleted at the next
   cleanup, normally within an hour. A report can prevent that deletion, and you
   will not be told.
-- **There are limits** on size, pictures and attachments, documents shared at
-  once and uploads per hour, which the service can change. Today each key may
-  have two documents shared at once. Tisty warns you before sharing if something
-  does not fit.
+- **There are limits** on size, pictures and attachments, languages, documents
+  shared at once and uploads per hour, which the service can change. Today each
+  key may have two documents shared at once, and each document up to 20
+  languages. Tisty warns you before sharing if something does not fit.
 - **If the service reaches its spending limit,** it may stop taking documents or
   answering for a while. While it is stopped, nothing expires.
 
@@ -84,8 +84,16 @@ but what you do with what you read is your responsibility.
   what will give access to more. How it is earned is not decided yet, and these
   terms will say when it is. Reports alone never take it away: only what the
   operator confirms counts.
-- **A new key starts from the lowest limits,** and each network can bring only a
-  few new ones a day.
+- **A key is new for its first 30 days** and starts from the lowest limits. Each
+  network can bring only a few new ones a day. Together, new keys upload up to
+  5 GB a day, and from a network that already uploaded 50 MB that day none
+  uploads more. Both the owner's key and the signer's count: if either is new,
+  so is the version.
+- **Once Folio holds 80 GB,** it only takes versions from keys that are not new,
+  except the owner's version that a document awaits after its appeal was
+  accepted on its own. At 100 GB it takes none until space frees up.
+- **You may take back up to 64 keys,** such as the one on a lost device. Folio
+  keeps each one for good, so readers know that key no longer speaks for you.
 
 ## What is not allowed
 
@@ -161,6 +169,10 @@ you are to report: it keeps a digest of the network.
 - **The operator may remove** any document that breaks these terms, and block
   access to whoever abuses the service. What the operator blocks only the
   operator lifts, no new version does, and the copy stays for up to 180 days.
+  The operator may also block a key: it uploads nothing more, neither documents
+  nor versions, and nobody uploads versions of its documents, not even with an
+  edit link. What it already shared stays until it expires or the operator
+  removes it.
 - **The operator may report** to the PDI or the prosecutor what, on review,
   looks like a crime, and tell Google Safe Browsing and Cloudflare about
   phishing and malware. One person does this, by hand.

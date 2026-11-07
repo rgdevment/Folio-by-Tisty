@@ -21,6 +21,7 @@ export type Refused =
         | "uploads_off"
         | "outdated"
         | "revoked"
+        | "key_blocked"
         | "bad_revocation";
     }
   | { refused: "envelope"; why: EnvelopeRefusal }

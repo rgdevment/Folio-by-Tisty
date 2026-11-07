@@ -1,5 +1,5 @@
 {
-  "serial": 17,
+  "serial": 18,
   "ttl_days": [
     1,
     3,
@@ -7,6 +7,7 @@
     15
   ],
   "shares_at_most": 2,
+  "languages_at_most": 20,
   "envelope_bytes_at_most": 24000000,
   "first_bytes_at_most": 2512000,
   "rest_bytes_at_most": 15572000,
@@ -28,9 +29,9 @@
   "oldest_contract_taken": null,
   "oldest_contract_served": null,
   "terms": {
-    "version": "11",
-    "es": "d88bc66091f4fb792e03c6b27a3137667528da4cdef6b1e2b547ae6818e3478f",
-    "en": "6c68f70df9ec634bf73b0feedf40c02d0e8260db2d9d324aca166104aa8a026d"
+    "version": "12",
+    "es": "ac5c2ed0a2d846385b607cdde87de33f36ee2933648121e1a6f758aba5186f24",
+    "en": "bba7529756d9db442f60e5f8b865421b94d905d709c00746ec615b087c4ec266"
   },
   "sharing_open": true
 }

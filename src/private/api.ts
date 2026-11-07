@@ -48,6 +48,7 @@ export const STATUS: Record<Refused["refused"], number> = {
   terms: 428,
   envelope: 422,
   revoked: 403,
+  key_blocked: 403,
   bad_revocation: 400,
 };
 

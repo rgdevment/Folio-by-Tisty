@@ -109,6 +109,7 @@ export const LEVEL_ONE: Limits = {
 export const publishedLimits = (limits: Limits) => ({
   ttl_days: limits.ttlChoices,
   shares_at_most: limits.sharesAtMost,
+  languages_at_most: limits.languagesAtMost,
   envelope_bytes_at_most: limits.envelopeBytesAtMost,
   first_bytes_at_most: limits.firstBytesAtMost,
   rest_bytes_at_most: limits.restBytesAtMost,

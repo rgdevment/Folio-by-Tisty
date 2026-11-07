@@ -7,6 +7,8 @@ export interface Doing {
   forgetContact: (id: string, net: string) => void;
   networkWasFalse: (id: string, net: string) => void;
   opened: (id: string) => void;
+  blockKey: (root: string) => void;
+  unblockKey: (root: string) => void;
   copy: (said: string) => void;
   panic: (id: string, version: number) => void;
   purgeOwner: (id: string) => void;
@@ -85,6 +87,8 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing): HTMLEle
       button(page, "Descartar todas las de esta red", () => doing.networkWasFalse(report.doc, report.net), true),
     );
   }
+  const { ownerToBlock } = report;
+  if (ownerToBlock) buttons.push(button(page, "Bloquear llave del dueño", () => doing.blockKey(ownerToBlock), true));
   if (report.sealedLink) {
     const sealed = report.sealedLink;
     card.append(piece(page, "code", "sealed", sealed));
@@ -124,12 +128,14 @@ const docCard = (page: Document, doc: QueuedDoc, doing: Doing, waiting: boolean)
   );
   if (doc.mayCorrect)
     card.append(piece(page, "p", "card-line", "Reclamo aceptado solo: espera una versión de su dueño."));
+  const { ownerToBlock } = doc;
   card.append(
     actions(
       page,
       button(page, "Link para verificar", () => doing.verifyLink(doc.id, doc.versionToOpen)),
       button(page, "Botón de pánico", () => doing.panic(doc.id, doc.versionToOpen), true),
       button(page, "Borrar todo de esta llave", () => doing.purgeOwner(doc.id), true),
+      ...(ownerToBlock ? [button(page, "Bloquear llave del dueño", () => doing.blockKey(ownerToBlock), true)] : []),
       ...(doc.mayHandOver ? [button(page, "Ya lo entregué", () => doing.handedOver(doc.id))] : []),
     ),
   );
@@ -154,6 +160,20 @@ const docCard = (page: Document, doc: QueuedDoc, doing: Doing, waiting: boolean)
 
 const filled = (place: Element, page: Document, cards: HTMLElement[], none: string): void => {
   place.replaceChildren(...(cards.length > 0 ? cards : [piece(page, "p", "card-line", none)]));
+};
+
+const keyCard = (page: Document, { root, blockedAt }: Queue["blockedKeys"][number], doing: Doing): HTMLElement => {
+  const card = page.createElement("article");
+  card.className = "card";
+  card.append(
+    piece(page, "code", "sealed", root),
+    piece(page, "p", "card-line", `Bloqueada el ${dayText(blockedAt)}`),
+    actions(
+      page,
+      button(page, "Desbloquear llave", () => doing.unblockKey(root)),
+    ),
+  );
+  return card;
 };
 
 const warningCard = (page: Document, warning: QueuedWarning, doing: Doing): HTMLElement => {
@@ -215,5 +235,11 @@ export const drawQueue = (page: Document, queue: Queue, doing: Doing): void => {
     page,
     queue.docs.filter((one) => !one.waitsForOperator).map((one) => docCard(page, one, doing, false)),
     "Ninguno.",
+  );
+  filled(
+    place("blocked-keys"),
+    page,
+    queue.blockedKeys.map((one) => keyCard(page, one, doing)),
+    "Ninguna.",
   );
 };

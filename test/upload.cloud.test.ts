@@ -1,6 +1,7 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
 import { administer } from "../src/core/admin";
 import type { Bytes } from "../src/core/bytes";
@@ -775,6 +776,50 @@ describe("what stops a version", () => {
     });
   });
 
+  describe("a key the operator blocked", () => {
+    const blocked = () => new CloudModeration(testEnv.DB);
+    const rootOf = (person: Person): string => toBase64Url(person.rootBytes);
+
+    it("uploads no new document, and keeps nothing of it", async () => {
+      const fresh = await newPerson();
+      const before = await started();
+      await send(before.id, await sealedEnvelope({ id: before.id, version: 1, owner: fresh }), NOW, before);
+      await blocked().blockKey(rootOf(fresh), "abuse", NOW);
+      const first = await started();
+      const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: fresh });
+      expect(await send(first.id, bytes, NOW, first)).toEqual({ refused: "key_blocked" });
+      expect(await row(first.id)).toBeNull();
+    });
+
+    it("uploads no new version, and what it shared can still be read", async () => {
+      const fresh = await newPerson();
+      const first = await started();
+      await send(first.id, await sealedEnvelope({ id: first.id, version: 1, owner: fresh }), NOW, first);
+      await blocked().blockKey(rootOf(fresh), "abuse", NOW);
+      const next = await sealedEnvelope({ id: first.id, version: 2, owner: fresh });
+      expect(await send(first.id, next, LATER)).toEqual({ refused: "key_blocked" });
+      expect(await readDoc({ id: first.id, ip: "203.0.113.9", now: LATER }, tools)).toMatchObject({ served: true });
+    });
+
+    it("uploads again once lifted", async () => {
+      const fresh = await newPerson();
+      const first = await started();
+      await send(first.id, await sealedEnvelope({ id: first.id, version: 1, owner: fresh }), NOW, first);
+      await blocked().blockKey(rootOf(fresh), "abuse", NOW);
+      await blocked().unblockKey(rootOf(fresh), NOW);
+      const next = await sealedEnvelope({ id: first.id, version: 2, owner: fresh });
+      expect(await send(first.id, next, LATER)).toEqual({ stored: true, version: 2 });
+    });
+
+    it("takes no version of its documents from an editor either", async () => {
+      const { pair, permit } = await newToken();
+      const id = await shared({ permit });
+      await blocked().blockKey(rootOf(mario), "abuse", NOW);
+      const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+      expect(await send(id, edited, LATER)).toEqual({ refused: "key_blocked" });
+    });
+  });
+
   describe("the terms in force", () => {
     const UNDER = { ...tools, termsVersion: "9" };
     const HOUR = Math.floor(NOW / 3_600_000);
@@ -867,7 +912,7 @@ describe("what stops a version", () => {
       const aboutKeys = said.filter((one) => /\b(FROM|INTO|UPDATE) keys\b/.test(one));
       expect(aboutKeys).toHaveLength(2);
       expect(aboutKeys[0]).toContain("k.first_day <= ?2");
-      expect(aboutKeys[1]).toBe("SELECT terms_version FROM keys WHERE root = ?");
+      expect(aboutKeys[1]).toBe("SELECT terms_version, blocked_at FROM keys WHERE root = ?");
     });
 
     it("writes the record on a retry, when the first try lost it", async () => {

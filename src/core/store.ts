@@ -161,7 +161,7 @@ export interface Swept {
 
 // What the rules need of wherever Folio runs, so the core never knows it is Cloudflare (decisions 16 and 108).
 export interface KeyAdmitted {
-  said: "known" | "new" | "full";
+  said: "known" | "new" | "full" | "blocked";
   terms: string | null;
 }
 

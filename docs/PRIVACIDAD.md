@@ -1,6 +1,6 @@
 # Privacidad de Folio by Tisty
 
-**Vigente desde el 6 de noviembre de 2026.**
+**Vigente desde el 7 de noviembre de 2026.**
 
 ## En corto
 
@@ -28,12 +28,12 @@ Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 | El manifiesto en claro: cuántas partes tiene, cuánto pesa cada una, de qué tipo son y su versión | Aplicar los topes sin leer el contenido | Lo mismo que el documento |
 | El link de administrar, guardado como resumen (hash), y la llave pública del token del link de editar, que nunca llega al servidor | Comprobar quién puede cambiar o borrar | Lo mismo que el documento |
 | Tu llave pública y su certificado, en lo que compartes | Que quien lee sepa que es tuyo | Lo mismo que el documento |
-| Tu llave pública sola, el día en que Folio la vio por primera vez, y qué versión de los términos aceptó y en qué hora lo supo el servidor, sin relación con ninguna red ni documento | Que los topes y la reputación sigan con ella, y que una llave nueva parta con los más bajos | Para siempre, aunque tus documentos ya no estén |
+| Tu llave pública sola, el día en que Folio la vio por primera vez, qué versión de los términos aceptó y en qué hora lo supo el servidor, y si el operador la bloqueó, sin relación con ninguna red ni documento | Que los topes y la reputación sigan con ella, y que una llave nueva parta con los más bajos | Para siempre, aunque tus documentos ya no estén |
 | Cuántas veces se leyó, contando una vez por día y por visitante | Mostrarte las lecturas en Tisty | Lo mismo que el documento |
 | Una línea por cada lectura servida: el id del link (sin su llave, así que no abre nada), el país y el centro de datos de Cloudflare, nunca tu IP | Saber cuánto se lee cada documento y desde dónde, y dimensionar el servicio | Hasta 7 días, en los registros de Workers de Cloudflare |
 | Un resumen de tu IP (un HMAC con una llave que cambia) | Topes por IP y bloqueos ante abuso | Lo que dura la cuota o el bloqueo, y hasta un día más |
 | Una copia diaria de la base de datos, cifrada con una llave guardada fuera de línea, sin los resúmenes de lectura del día ni los cupos, y sin los documentos | Recuperarse de una falla | 30 días, en GitHub |
-| Lo que el operador hizo con un documento y por qué, también abrirlo: su id, la acción y el motivo | Poder responder por ello después | 180 días, o mientras el documento esté retenido |
+| Lo que el operador hizo con un documento o una llave y por qué, también abrirlo: su id, la acción y el motivo | Poder responder por ello después | 180 días, o mientras el documento esté retenido |
 | Un link de caso, para verificar una denuncia o entregarlo a una autoridad: un resumen de su token, el documento y la versión que abre, cada apertura y, si es para una autoridad, los registros del documento, cifrados con una clave que Folio no guarda y sin la red ni el correo de quien denunció | Que quien verifica o investiga lea esa versión aunque el documento esté bloqueado | 30 días; las aperturas, como lo anterior |
 | Un resumen por correo al operador, hasta cuatro veces al día: el id de los links denunciados, bloqueados o reclamados, la categoría y cuántas redes denunciaron, nunca una llave, una IP o el contenido | Avisarle qué revisar | Hasta 180 días, o más si una orden lo pide, en su buzón de Migadu |
 | Lo que le escribes al operador por correo, con tu dirección | Responderte | Hasta 180 días desde el último mensaje, o más si una orden lo pide, en su buzón de Migadu |

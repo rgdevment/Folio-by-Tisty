@@ -3,11 +3,12 @@ import { env } from "cloudflare:workers";
 import { load } from "js-yaml";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import written from "../docs/openapi.yaml?raw";
+import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
 import { type Bytes, words } from "../src/core/bytes";
 import { dayOf, LEVEL_ONE, REPORT_CATEGORIES } from "../src/core/limits";
 import { SEALED_CONTACT_AT_MOST } from "../src/core/sealed-link";
-import { hourOf, macOf, proofHolds, tokenHash } from "../src/core/start";
+import { hourOf, macOf, proofHolds, toBase64Url, tokenHash } from "../src/core/start";
 import { STATUS } from "../src/private/api";
 import worker from "../src/private/index";
 import {
@@ -522,6 +523,18 @@ const UPLOADING: Scenario[] = [
   {
     method: "PUT",
     path: UPLOAD_PATH,
+    status: 403,
+    refused: "key_blocked",
+    upload: envelope(2),
+    ready: async () => {
+      await shareSigned();
+      await store.keepKeys([toBase64Url(owner.rootBytes)], TODAY);
+      await new CloudModeration(testEnv.DB).blockKey(toBase64Url(owner.rootBytes), "abuse", Date.now());
+    },
+  },
+  {
+    method: "PUT",
+    path: UPLOAD_PATH,
     status: 409,
     refused: "languages_full",
     upload: envelope(1),
@@ -690,7 +703,17 @@ beforeEach(async () => {
   LEVEL_ONE.oldestContractServed = null;
   LEVEL_ONE.revocationsAnHour = 30;
   LEVEL_ONE.uploadsAnHour = 60;
-  for (const table of ["docs", "net_day", "net_hour", "reports", "holds", "service_stage", "revocations", "editors"]) {
+  for (const table of [
+    "docs",
+    "keys",
+    "net_day",
+    "net_hour",
+    "reports",
+    "holds",
+    "service_stage",
+    "revocations",
+    "editors",
+  ]) {
     await testEnv.DB.prepare(`DELETE FROM ${table}`).run();
   }
   const tables = await testEnv.DB.prepare("SELECT name FROM sqlite_master WHERE name GLOB 'seen_[0-9]*'").all<{

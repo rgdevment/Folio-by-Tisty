@@ -137,6 +137,7 @@ const keyAdmission = (net: string, today: number, { store }: ReadTools): KeyAdmi
     admit: async (roots, accepted) => {
       for (const root of new Set(roots)) {
         const { said, terms } = await store.admitKey(root, net, today);
+        if (said === "blocked") return { refused: "key_blocked" };
         if (said === "full") return { refused: "quota", until: (today + 1) * DAY_MS };
         if (said === "new") fresh.push(root);
         if (root === accepted.root && (terms === null || BigInt(accepted.version) > BigInt(terms))) toWrite = accepted;
@@ -278,7 +279,8 @@ const storeVersion = async (
   if (!sharing) {
     const hourSpent = await takeUploadHour(net, now, tools);
     if (hourSpent) return hourSpent;
-    const full = await keys.admit([signature.root], accepted);
+    // Its owner's key too, or a blocked owner's documents would carry on through an edit link.
+    const full = await keys.admit([held.owner, signature.root], accepted);
     if (full) return full;
   }
 
