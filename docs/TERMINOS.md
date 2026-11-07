@@ -154,11 +154,11 @@ para denunciar: guarda un resumen de la red.
   Cloudflare. Lo hace una persona, a mano.
 - **Cuando denuncia a una autoridad,** el operador bloquea el documento y lo
   retiene 180 días, renovables mientras la autoridad lo pida. Le entrega un link
-  que abre solo la versión denunciada durante 30 días, con cada apertura anotada,
-  y un paquete cifrado con los registros que Folio tenga, sin la red ni el correo
-  de quien denunció. También puede usar un link así para verificar una denuncia sobre un
-  documento ya bloqueado. Después de entregar la llave, borra la que trajo la
-  denuncia, que sigue hasta 30 días en los respaldos cifrados.
+  que abre solo la versión denunciada durante 30 días, con cada apertura
+  anotada, y un paquete cifrado con los registros que Folio tenga, sin la red ni
+  el correo de quien denunció. También puede usar un link así para verificar una
+  denuncia sobre un documento ya bloqueado. Después de entregar la llave, borra
+  la que trajo la denuncia, que sigue hasta 30 días en los respaldos cifrados.
 - **El operador solo abre lo cifrado** en cuatro casos y siempre con el link
   para leerlo: cuando quien lo compartió lo entrega para demostrar que el
   bloqueo fue un error, para revisar una denuncia grave con el link que trajo,
