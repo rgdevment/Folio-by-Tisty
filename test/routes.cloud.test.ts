@@ -187,6 +187,21 @@ describe("a report", () => {
     expect(row?.asn).toBe(1);
   });
 
+  it("asks the brake before anything else, so a proof cannot be sent again for free", async () => {
+    await share();
+    const { set } = tools();
+    const asked = await reportDoc({ id: ID, ip: "203.0.113.7", asn: 1, now: NOW, said: { category: "spam" } }, set);
+    if (!("salt" in asked)) throw new Error("no proof was asked for");
+    const proof = await solve(asked.salt, asked.bits);
+    const braked = tools({ limiter: { allows: async () => false } }).set;
+    const answer = await reportDoc(
+      { id: ID, ip: "203.0.113.7", asn: 1, now: NOW, said: { category: "spam" }, proof },
+      braked,
+    );
+    expect(answer).toMatchObject({ refused: "slow" });
+    expect(await reports()).toHaveLength(0);
+  });
+
   it("does not block on one report of CSAM", async () => {
     await share();
     const { set } = tools();

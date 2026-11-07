@@ -141,7 +141,9 @@ export class Cloud implements Store {
          SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?10
          WHERE (?3 IS NOT NULL AND EXISTS (
            SELECT 1 FROM docs a WHERE a.id = ?3 AND a.owner = ?2 AND a.anchor IS NULL AND a.latest >= 0
-         )) OR (?3 IS NULL AND (
+         ) AND (
+           SELECT COUNT(*) FROM docs l WHERE l.owner = ?2 AND l.anchor = ?3 AND l.latest >= 0 AND l.dies_on >= ?8
+         ) < ?11 - 1) OR (?3 IS NULL AND (
            SELECT COUNT(*) FROM docs d
            WHERE d.owner = ?2 AND d.anchor IS NULL AND d.latest >= 0 AND d.blocked_at IS NULL
              AND NOT EXISTS (SELECT 1 FROM holds h WHERE h.held = d.id)
@@ -159,13 +161,17 @@ export class Cloud implements Store {
         today,
         this.#limits.sharesAtMost,
         doc.ownerMark ?? "",
+        this.#limits.languagesAtMost,
       )
       .run();
     if (inserted.meta.changes > 0) return "created";
     await this.#giveQuotaBack(doc.net, 1, 0, today);
     const raced = await this.#row(doc.id);
     if (raced) return this.#retried(raced, doc);
-    return doc.anchor !== undefined ? "no_anchor" : "shares_full";
+    if (doc.anchor === undefined) return "shares_full";
+    const anchor = await this.#row(doc.anchor);
+    const takesLanguages = anchor?.owner === doc.owner && anchor.anchor === null && anchor.latest >= 0;
+    return takesLanguages ? "shares_full" : "no_anchor";
   }
 
   // A lost answer comes back as the same document, and only that is not somebody else's id.
@@ -366,6 +372,23 @@ export class Cloud implements Store {
       .first<DocRow>();
   }
 
+  async anyRootRevokedAsMany(roots: string[], atMost: number): Promise<boolean> {
+    const full = await this.#db
+      .prepare(
+        `SELECT root FROM revocations WHERE root IN (SELECT value FROM json_each(?1))
+         GROUP BY root HAVING COUNT(*) >= ?2 LIMIT 1`,
+      )
+      .bind(JSON.stringify([...new Set(roots)]), atMost)
+      .first();
+    return full !== null;
+  }
+  async keySignedBy(root: string, day: number): Promise<boolean> {
+    const known = await this.#db
+      .prepare("SELECT 1 FROM keys WHERE root = ?1 AND first_day <= ?2")
+      .bind(root, day)
+      .first();
+    return known !== null;
+  }
   async #takeQuota(net: string, docs: number, bytes: number, today: number): Promise<boolean> {
     if (docs > this.#limits.netDocsADay || bytes > this.#limits.netBytesADay) return false;
     const taken = await this.#db

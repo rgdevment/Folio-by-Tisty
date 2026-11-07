@@ -14,6 +14,7 @@ export interface Doing {
 const STAGES: Record<string, string> = {
   open: "abierto",
   warned: "con aviso de gasto",
+  new_keys_off: "subidas solo de llaves antiguas",
   no_uploads: "subidas cortadas",
   blocked: "bloqueado por gasto",
 };

@@ -129,7 +129,7 @@ export interface Owned {
 export type Created = "created" | "same" | "taken" | "shares_full" | "no_anchor" | "quota" | "bad_ttl";
 export type Uploaded = "stored" | "same" | "behind" | "missing" | "blocked" | "paused" | "quota" | "list_full";
 export type Admitted = "here" | "new" | "over" | "full";
-export type Stage = "open" | "warned" | "no_uploads" | "blocked";
+export type Stage = "open" | "warned" | "new_keys_off" | "no_uploads" | "blocked";
 
 export interface Swept {
   summed: number;
@@ -157,6 +157,8 @@ export interface Store {
   revoke(revocations: Revocation[]): Promise<void>;
   isRevoked(root: string, machine: string, now: number): Promise<boolean>;
   haveSigned(roots: string[]): Promise<boolean>;
+  anyRootRevokedAsMany(roots: string[], atMost: number): Promise<boolean>;
+  keySignedBy(root: string, day: number): Promise<boolean>;
   admit(reading: Reading, today: number): Promise<Admitted>;
   note(reading: Reading, today: number): Promise<void>;
   shown(id: string, today: number): Promise<Shown | null>;

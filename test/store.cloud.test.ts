@@ -423,6 +423,35 @@ describe("expiring", () => {
     expect(await row("held")).toBeNull();
   });
 
+  it("takes languages up to the top, and only those still alive count", async () => {
+    await store.create(newDoc("anchor", { ttlDays: 15 }), DAY);
+    const language = (id: string) => newDoc(id, { anchor: "anchor", ttlDays: 1 });
+    for (let n = 1; n < LEVEL_ONE.languagesAtMost; n += 1) {
+      expect(await store.create(language(`lang${n}`), DAY)).toBe("created");
+    }
+    expect(await store.create(language("toomany"), DAY)).toBe("shares_full");
+    expect(await store.create(language("toomany"), DAY + 2)).toBe("created");
+  });
+
+  it("calls a missing anchor missing, even for its top", async () => {
+    expect(await store.create(newDoc("orphan", { anchor: "nothing" }), DAY)).toBe("no_anchor");
+  });
+
+  it("counts the machines a root took back", async () => {
+    const taken = (machine: string) => ({ root: "o1", machine, at: "2026-11-01T00:00:00Z", signed: "s" });
+    await store.revoke([taken("m1"), taken("m2")]);
+    expect(await store.anyRootRevokedAsMany(["o1", "other"], 2)).toBe(true);
+    expect(await store.anyRootRevokedAsMany(["o1", "other"], 3)).toBe(false);
+    expect(await store.anyRootRevokedAsMany(["other"], 1)).toBe(false);
+  });
+
+  it("knows a key by the day it first signed", async () => {
+    await store.keepKeys(["o1"], DAY);
+    expect(await store.keySignedBy("o1", DAY)).toBe(true);
+    expect(await store.keySignedBy("o1", DAY - 1)).toBe(false);
+    expect(await store.keySignedBy("nobody", DAY)).toBe(false);
+  });
+
   it("takes a language with its anchor, and never on its own", async () => {
     await store.create(newDoc("anchor", { ttlDays: 3 }), DAY);
     await store.create(newDoc("en", { anchor: "anchor", ttlDays: 1 }), DAY);

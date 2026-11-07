@@ -244,6 +244,12 @@ describe("the files a version names", () => {
     return { id, bytes, hash };
   };
 
+  it("are refused near the ceiling from a key that has not waited", async () => {
+    const { id, bytes } = await named();
+    await store.setStage("new_keys_off");
+    expect(await sendFiles(id, bytes)).toEqual({ refused: "uploads_off" });
+  });
+
   it("takes them only after a version names them, and serves only those", async () => {
     const { id, bytes, hash } = await named();
     expect(await sendFiles(id, bytes)).toEqual({ refused: "behind" });
@@ -906,6 +912,28 @@ describe("what stops a version", () => {
     });
   });
 
+  it("near the ceiling, from a key that has not waited, but not from one that has", async () => {
+    const id = await shared();
+    await store.setStage("new_keys_off");
+    const version2 = await sealedEnvelope({ id, version: 2, owner: mario });
+    expect(await send(id, version2, LATER)).toEqual({ refused: "uploads_off" });
+    const waited = LATER + LIMITS.keyDaysOldNearTheCeiling * DAY_MS;
+    expect(await send(id, version2, waited)).toEqual({ stored: true, version: 2 });
+  });
+
+  it("a refused first version counts against the hour, and writes nothing after it", async () => {
+    const oneAnHour = { ...tools, limits: { ...LIMITS, uploadsAnHour: 1 } };
+    const sendOnce = async () => {
+      const first = { ...(await started()), anchor: "AbCdEfGh" };
+      const bytes = async () => sealedEnvelope({ id: first.id, version: 1, owner: mario });
+      return uploadDoc({ id: first.id, now: NOW, ip: "203.0.113.9", bytes, first }, oneAnHour);
+    };
+    expect(await sendOnce()).toEqual({ refused: "bad_upload" });
+    const before = await testEnv.DB.prepare("SELECT docs FROM net_day").first();
+    expect(await sendOnce()).toMatchObject({ refused: "quota" });
+    expect(await testEnv.DB.prepare("SELECT docs FROM net_day").first()).toEqual(before);
+  });
+
   it.each(["no_uploads", "blocked"] as Stage[])("the spending stage %s", async (stage) => {
     const id = await shared();
     await store.setStage(stage);
@@ -1101,6 +1129,17 @@ describe("a machine its root took back", () => {
     expect(await ask()).toEqual({ done: true });
     expect(await ask()).toMatchObject({ refused: "quota" });
     expect(await ask({ ...quick, limiter: { allows: async () => false } })).toMatchObject({ refused: "slow" });
+  });
+
+  it("stops at the machines a root may take back, and what it took back stays", async () => {
+    await shared();
+    const few = { ...tools, limits: { ...LIMITS, revokedMachinesAtMost: 2 } };
+    const ask = async (howMany: number) =>
+      takeRevocations({ said: await otherMachines(mario, howMany), ip: "203.0.113.9", now: NOW }, few);
+    expect(await ask(2)).toEqual({ done: true });
+    expect(await ask(1)).toEqual({ refused: "bad_revocation" });
+    const { n } = (await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM revocations").first<{ n: number }>()) ?? {};
+    expect(n).toBe(2);
   });
 });
 

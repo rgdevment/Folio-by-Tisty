@@ -6,7 +6,7 @@ import { netDigest } from "./net";
 import type { ReadTools } from "./read";
 import { askForProof, type Refused, tooFast } from "./refused";
 import { hourEnds, hourOf, proofIsFresh, startHolds, toBase64Url, tokenHash } from "./start";
-import type { AcceptedTerms, Created, Held, Uploaded } from "./store";
+import type { AcceptedTerms, Created, Held, Stage, Uploaded } from "./store";
 import { listFreesAt, uploadAllowedAt } from "./versions";
 
 export interface FirstUpload {
@@ -169,12 +169,26 @@ const stopped = (held: Held, byOwner = false): Refused | null => {
 const notNext = (held: Held, version: number, byOwner: boolean): Refused | null =>
   stopped(held, byOwner) ?? (version === held.latest + 1 ? null : { refused: "behind" });
 
-const netIfOpen = async ({ ip, now }: Uploading, { store, limiter, dayKey }: ReadTools): Promise<string | Refused> => {
+interface OpenTo {
+  net: string;
+  stage: Stage;
+}
+
+const openTo = async ({ ip, now }: Uploading, { store, limiter, dayKey }: ReadTools): Promise<OpenTo | Refused> => {
   const net = await netDigest(await dayKey(dayOf(now)), ip);
   if (!(await limiter.allows(net))) return tooFast(now);
   const stage = await store.stage();
-  return stage === "no_uploads" || stage === "blocked" ? { refused: "uploads_off" } : net;
+  return stage === "no_uploads" || stage === "blocked" ? { refused: "uploads_off" } : { net, stage };
 };
+
+// A key costs nothing to make, so near the ceiling only one that has waited may still fill what is left.
+const newKeyNearTheCeiling = async (
+  stage: Stage,
+  root: string,
+  now: number,
+  { store, limits }: ReadTools,
+): Promise<boolean> =>
+  stage === "new_keys_off" && !(await store.keySignedBy(root, dayOf(now) - limits.keyDaysOldNearTheCeiling));
 
 const answerOf = (uploaded: Uploaded, version: number, now: number): UploadAnswer => {
   switch (uploaded) {
@@ -196,7 +210,7 @@ const answerOf = (uploaded: Uploaded, version: number, now: number): UploadAnswe
 
 const storeVersion = async (
   uploading: Uploading,
-  net: string,
+  { net, stage }: OpenTo,
   keys: KeyAdmission,
   tools: UploadTools,
 ): Promise<UploadAnswer> => {
@@ -232,8 +246,12 @@ const storeVersion = async (
   }
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
   if (version === null) return { refused: "terms", version: tools.termsVersion };
+  if (await newKeyNearTheCeiling(stage, signature.root, now, tools)) return { refused: "uploads_off" };
+  const hourLeft = () => store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour);
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
+    // Before anything is written, or a refused first version could be sent again for free.
+    if (!(await hourLeft())) return { refused: "quota", until: hourEnds(now) };
     const full = await keys.admit(roots, accepted);
     if (full) return full;
     const refused = await share(uploading, sharing, read, net, tools);
@@ -252,9 +270,7 @@ const storeVersion = async (
   if (!sharing) {
     const full = await keys.admit([signature.root], accepted);
     if (full) return full;
-  }
-  if (!(await store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour))) {
-    return { refused: "quota", until: hourEnds(now) };
+    if (!(await hourLeft())) return { refused: "quota", until: hourEnds(now) };
   }
 
   const owner = manifest.owner as Owner;
@@ -285,11 +301,11 @@ const storeVersion = async (
 const uploadVersion = async (uploading: Uploading, tools: UploadTools): Promise<UploadAnswer> => {
   const { files, now } = uploading;
   if (files !== undefined && !FILES_HASH.test(files)) return { refused: "bad_upload" };
-  const net = await netIfOpen(uploading, tools);
-  if (typeof net !== "string") return net;
-  const keys = keyAdmission(net, dayOf(now), tools);
+  const open = await openTo(uploading, tools);
+  if ("refused" in open) return open;
+  const keys = keyAdmission(open.net, dayOf(now), tools);
   try {
-    return await storeVersion(uploading, net, keys, tools);
+    return await storeVersion(uploading, open, keys, tools);
   } finally {
     await keys.giveBack();
   }
@@ -305,8 +321,9 @@ export const uploadDoc = async (uploading: Uploading, tools: UploadTools): Promi
 export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promise<FilesUploadAnswer> => {
   const { id, now } = uploading;
   const { store, limits } = tools;
-  const net = await netIfOpen(uploading, tools);
-  if (typeof net !== "string") return net;
+  const open = await openTo(uploading, tools);
+  if ("refused" in open) return open;
+  const { net, stage } = open;
   const held = await store.held(id);
   if (!held) return { refused: "missing" };
   const stoppedHere = stopped(held);
@@ -322,6 +339,7 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
   if (floor !== null && isBelowVersion(manifest.contract, floor)) return { refused: "outdated" };
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
   if (!mayUpload(read, held)) return { refused: "not_yours" };
+  if (await newKeyNearTheCeiling(stage, signature.root, now, tools)) return { refused: "uploads_off" };
 
   const hash = toBase64Url(await sha256(manifestBytes, index));
   if (held.versions.at(-1)?.files !== hash) return { refused: "behind" };

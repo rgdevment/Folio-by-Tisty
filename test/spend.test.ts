@@ -84,6 +84,11 @@ describe("the stage", () => {
     expect(stageOf({ ...quiet, storedGb: 100 }, cycle30(30))).toBe("no_uploads");
   });
 
+  it("stops new keys first, as the storage nears its ceiling", () => {
+    expect(stageOf({ ...quiet, storedGb: 79 }, cycle30(30))).toBe("open");
+    expect(stageOf({ ...quiet, storedGb: 80 }, cycle30(30))).toBe("new_keys_off");
+  });
+
   it("opens again at the next midnight when the attack stops, even in the first days", () => {
     const attacked = costing(8.5);
     expect(stageOf(attacked, cycle30(1))).toBe("blocked");

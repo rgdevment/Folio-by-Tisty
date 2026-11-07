@@ -570,6 +570,7 @@ const SCENARIOS: Scenario[] = [
   { method: "POST", path: REPORT_PATH, status: 400, refused: "bad_report", body: "{}" },
   { method: "POST", path: REPORT_PATH, status: 413, refused: "too_big", body: "x".repeat(20_000) },
   { method: "POST", path: REPORT_PATH, status: 429, refused: "proof", body: REPORT },
+  { method: "POST", path: REPORT_PATH, status: 429, refused: "slow", body: REPORT, braked: true },
   {
     method: "POST",
     path: REPORT_PATH,

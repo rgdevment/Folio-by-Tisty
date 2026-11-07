@@ -92,7 +92,7 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Done" }
         "400":
-          description: One of them is not a revocation, does not hold, or comes from a root that signed nothing here.
+          description: One of them is not a revocation, does not hold, comes from a root that signed nothing here, or from one that already took back as many machines as it may.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BadRevocation" }
@@ -237,7 +237,7 @@ paths:
                   - $ref: "#/components/schemas/Revoked"
         "404": { $ref: "#/components/responses/Missing" }
         "409":
-          description: Another version arrived first, or this person keeps as many documents as they may.
+          description: Another version arrived first, or this person keeps as many documents or as many languages of one as they may.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Behind" }
@@ -578,7 +578,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/TooBig" }
         "429":
-          description: A proof of work is asked for, or the network used up its reports of the hour.
+          description: A proof of work is asked for, the network used up its reports of the hour, or it asked too fast.
           headers:
             Retry-After: { $ref: "#/components/headers/RetryAfter" }
           content:
@@ -587,6 +587,7 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/Proof"
                   - $ref: "#/components/schemas/Quota"
+                  - $ref: "#/components/schemas/Slow"
         "500": { $ref: "#/components/responses/Failed" }
   /docs/{id}/admin:
     parameters:
