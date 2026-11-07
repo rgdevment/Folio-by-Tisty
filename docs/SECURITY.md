@@ -33,7 +33,7 @@ be met with legal threats.
   person's root key. One signature covers the manifest and the hash of every
   part, so it answers for everything inside, and the server refuses an upload
   without it. It says who signed, not which program made it. Keys taken back are
-  told to every reader.
+  told to every reader, up to 64 for each person.
 - **The page is never trusted.** The reading page cleans the drawn page with a
   closed list of tags and styles, runs no script from it, and lives behind a
   Content Security Policy that allows nothing from elsewhere.
@@ -43,8 +43,10 @@ be met with legal threats.
 - **Abuse costs.** Reporting and sharing something new ask for a proof of work,
   and so does a new reader past the day's free ones. Starting a share and reading
   have a speed limit per network, and uploading has a quota per network and a
-  wait per person. A network brings only a few new keys a day, and a new key
-  starts from the lowest limits.
+  wait per person. Reporting has its own speed limit per network. A network
+  brings only a few new keys a day, and a new key starts from the lowest limits.
+  Keys under 30 days old share a daily storage limit, and as storage nears its
+  ceiling only older keys can upload. A document takes up to 20 languages.
 - **The operator's panel stands apart.** It is another Worker, at panel.tisty.cl,
   with no access to where documents are stored or to their keys, so it cannot open
   anything. It sits behind Cloudflare Access, checks its token again, and refuses

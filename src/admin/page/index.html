@@ -11,6 +11,11 @@
     <main id="panel" class="panel">
       <h1>Panel de Folio</h1>
       <p id="said" class="said" role="status">Cargando…</p>
+      <section id="case-link" hidden>
+        <p id="case-link-said"></p>
+        <code id="case-link-code" class="sealed"></code>
+        <button type="button" id="case-link-copy">Copiar el link</button>
+      </section>
       <section aria-labelledby="state-title">
         <h2 id="state-title">Estado</h2>
         <p id="state"></p>
@@ -22,6 +27,10 @@
       <section aria-labelledby="reports-title">
         <h2 id="reports-title">Denuncias</h2>
         <div id="reports"></div>
+      </section>
+      <section aria-labelledby="warned-title">
+        <h2 id="warned-title">Avisos por denuncias leves</h2>
+        <div id="warned"></div>
       </section>
       <section aria-labelledby="blocked-title">
         <h2 id="blocked-title">Bloqueados</h2>

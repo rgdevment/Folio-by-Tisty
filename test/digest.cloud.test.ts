@@ -23,7 +23,7 @@ const HOUR = hourOf(NOW);
 const ID = "k7Qm2xPa";
 const OTHER = "wordsOnl";
 
-const share = (id: string) => store.create({ id, owner: "o1", adminHash: "a", ttlDays: 3, net: "n" }, TODAY - 5);
+const share = (id: string) => store.create({ id, owner: "o1", adminHash: "a", ttlDays: 15, net: "n" }, TODAY - 5);
 const report = (doc: string, net: string, category: string, hour = HOUR - 1) =>
   store.report({ doc, net, asn: 1, category }, TODAY, hour);
 
@@ -40,6 +40,20 @@ beforeEach(async () => {
   }
   await share(ID);
   await share(OTHER);
+});
+
+describe("the mail on networks that do not count", () => {
+  it("says how many, and lists first what clean networks say", async () => {
+    await report(ID, "n1", "phishing");
+    await report(ID, "n2", "phishing");
+    await report(OTHER, "n3", "phishing");
+    await testEnv.DB.prepare("UPDATE reports SET over_cap = 1 WHERE net IN ('n1', 'n2')").run();
+    const { send } = await digest();
+    const text = (send.mock.calls[0] as [string, string])[1];
+    expect(text).toContain(`phishing: ${ID}, 2 redes, 2 sin contar`);
+    expect(text).toContain(`phishing: ${OTHER}, 1 red\n`);
+    expect(text.indexOf(OTHER)).toBeLessThan(text.indexOf(ID));
+  });
 });
 
 describe("the mail", () => {
@@ -142,10 +156,21 @@ describe("the mail", () => {
     expect(left?.n).toBe(0);
   });
 
-  it("tells of the spending stage only when it changed", async () => {
+  it("tells when new keys near their top of the day, and not before", async () => {
+    await testEnv.DB.prepare("INSERT INTO net_day (day, net, docs, bytes) VALUES (?, '~new-keys', 0, ?)")
+      .bind(TODAY, LEVEL_ONE.newKeysBytesADay * 0.9 - 1)
+      .run();
+    expect((await digest()).sent).toBe(false);
+    await testEnv.DB.prepare("UPDATE net_day SET bytes = bytes + 1").run();
+    const { send } = await digest();
+    expect(send.mock.calls[0]?.[1]).toContain("casi agotado");
+    await testEnv.DB.prepare("DELETE FROM net_day").run();
+  });
+
+  it("tells of the stage of the service only when it changed", async () => {
     await store.setStage("blocked");
     const { send } = await digest();
-    expect(send.mock.calls[0]?.[1]).toContain("Gasto: blocked (antes: open)");
+    expect(send.mock.calls[0]?.[1]).toContain("Servicio: blocked (antes: open)");
     expect((await digest()).sent).toBe(false);
     expect(await store.stage()).toBe("blocked");
   });
@@ -179,7 +204,7 @@ describe("the mail", () => {
 describe("the round", () => {
   const scheduled = (more: object) =>
     worker.scheduled(
-      { cron: "0 0,12 * * *", scheduledTime: NOW, noRetry: () => {} } as never,
+      { cron: "0 0,6,12,18 * * *", scheduledTime: NOW, noRetry: () => {} } as never,
       { ...testEnv, ...more } as never,
     );
 

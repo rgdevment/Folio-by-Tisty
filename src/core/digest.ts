@@ -11,21 +11,25 @@ export interface DigestTools {
 
 const SEEN_AT_MOST = 50;
 
-const listOf = (title: string, lines: string[]): string[] => {
+const listOf = (title: string, lines: string[], more = lines.length >= SEEN_AT_MOST): string[] => {
   if (lines.length === 0) return [];
-  const more = lines.length >= SEEN_AT_MOST ? ["(hay más)"] : [];
-  return [title, ...lines, ...more, ""];
+  return [title, ...lines, ...(more ? ["(hay más)"] : []), ""];
 };
 
 const dateOf = (day: number): string => new Date(day * DAY_MS).toISOString().slice(0, 10);
 
 const textOf = (stage: Stage, was: Stage, news: News, keysSaid: number, panel?: string) =>
   [
-    ...(stage === was ? [] : [`Gasto: ${stage} (antes: ${was})`, ""]),
+    ...(stage === was ? [] : [`Servicio: ${stage} (antes: ${was})`, ""]),
     ...(keysSaid > 0 ? [`Llaves nuevas el ${dateOf(news.newKeysDay)}: ${keysSaid}`, ""] : []),
+    ...(news.newKeysNearTheirTop ? [`Tope de subidas nuevas casi agotado el ${dateOf(news.newKeysDay)}.`, ""] : []),
     ...listOf(
-      "Denuncias nuevas:",
-      news.reports.map(({ doc, category, nets }) => `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}`),
+      `Denuncias nuevas (${news.reportsTotal}):`,
+      news.reports.map(
+        ({ doc, category, nets, uncounted }) =>
+          `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}${uncounted > 0 ? `, ${uncounted} sin contar` : ""}`,
+      ),
+      news.reportLines > news.reports.length,
     ),
     ...listOf("Bloqueados:", news.blocked),
     ...listOf("Reclamos:", news.appealed),
@@ -44,7 +48,8 @@ export const sendDigest = async (
   const stage = await store.stage();
   const news = await store.news(told, hour, SEEN_AT_MOST);
   const keysSaid = news.newKeys >= newKeysToNotice ? news.newKeys : 0;
-  const empty = news.reports.length + news.blocked.length + news.appealed.length + keysSaid === 0;
+  const empty =
+    news.reports.length + news.blocked.length + news.appealed.length + keysSaid === 0 && !news.newKeysNearTheirTop;
   if (empty && stage === alerted) return false;
 
   const grave = news.reports.some(({ category }) => category === "csam");

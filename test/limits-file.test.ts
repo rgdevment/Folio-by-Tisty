@@ -370,6 +370,12 @@ describe("the limits Folio publishes", () => {
     expect(terms.version).toMatch(/^[1-9][0-9]*$/);
   });
 
+  it("say on their first lines the version they name", () => {
+    const { version } = published.terms as { version: string };
+    expect(readFileSync("docs/TERMINOS.md", "utf8")).toContain(`**Versión ${version}, vigente desde`);
+    expect(readFileSync("docs/TERMS.md", "utf8")).toContain(`**Version ${version}, in force since`);
+  });
+
   it("fit in what a reader of a signed file takes", () => {
     expect(file.length).toBeLessThanOrEqual(16 * 1024);
   });

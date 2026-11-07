@@ -1,6 +1,11 @@
 export interface Limits {
   ttlChoices: number[];
   sharesAtMost: number;
+  languagesAtMost: number;
+  daysAKeyIsNew: number;
+  newKeysBytesADay: number;
+  newKeysNetBytesADay: number;
+  revokedMachinesAtMost: number;
   versionsKept: number;
   replacedKeptDays: number;
   versionsListedAtMost: number;
@@ -28,12 +33,17 @@ export interface Limits {
   newKeysToNotice: number;
   reportsAnHour: number;
   reportDetailAtMost: number;
+  reportDetailAtLeast: number;
   sealedLinkAtMost: number;
   pausedDays: number;
   evidenceDays: number;
   reportsToBlock: number;
+  blocksANetHelpsADay: number;
+  docsANetCountsIn: number;
   reportOperatorsToBlock: number;
   lightReportsToWarn: number;
+  lightOperatorsToWarn: number;
+  lightWarnHours: number;
   lightFixDays: number;
   sweptAtOnce: number;
   historyDays: number;
@@ -45,6 +55,11 @@ export interface Limits {
 export const LEVEL_ONE: Limits = {
   ttlChoices: [1, 3, 7, 15],
   sharesAtMost: 2,
+  languagesAtMost: 20,
+  daysAKeyIsNew: 30,
+  newKeysBytesADay: 5_000_000_000,
+  newKeysNetBytesADay: 50_000_000,
+  revokedMachinesAtMost: 64,
   versionsKept: 3,
   replacedKeptDays: 7,
   versionsListedAtMost: 300,
@@ -72,12 +87,17 @@ export const LEVEL_ONE: Limits = {
   newKeysToNotice: 100,
   reportsAnHour: 10,
   reportDetailAtMost: 2000,
+  reportDetailAtLeast: 10,
   sealedLinkAtMost: 1024,
   pausedDays: 30,
   evidenceDays: 180,
   reportsToBlock: 3,
+  blocksANetHelpsADay: 3,
+  docsANetCountsIn: 20,
   reportOperatorsToBlock: 2,
-  lightReportsToWarn: 3,
+  lightReportsToWarn: 10,
+  lightOperatorsToWarn: 2,
+  lightWarnHours: 24,
   lightFixDays: 3,
   sweptAtOnce: 500,
   historyDays: 90,
@@ -89,6 +109,7 @@ export const LEVEL_ONE: Limits = {
 export const publishedLimits = (limits: Limits) => ({
   ttl_days: limits.ttlChoices,
   shares_at_most: limits.sharesAtMost,
+  languages_at_most: limits.languagesAtMost,
   envelope_bytes_at_most: limits.envelopeBytesAtMost,
   first_bytes_at_most: limits.firstBytesAtMost,
   rest_bytes_at_most: limits.restBytesAtMost,

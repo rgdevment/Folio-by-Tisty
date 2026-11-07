@@ -1,6 +1,6 @@
 # Folio by Tisty privacy policy
 
-**Draft of November 6, 2026.** Folio is not open yet.
+**In force since November 7, 2026.**
 
 ## The short version
 
@@ -25,7 +25,7 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 
 | What | Why | For how long |
 |---|---|---|
-| The encrypted document and its attached files, with its last 3 versions and those replaced in the last 7 days | To serve it to whoever has the link, and so a report can reach what someone replaced | Until the time without activity you choose, 15 days at most, or until you stop sharing it. With a serious report or an order, it is no longer served and stays for up to 180 days, or for as long as the order asks |
+| The encrypted document and its attached files, with its last 3 versions and those replaced in the last 7 days | To serve it to whoever has the link, and so a report can reach what someone replaced | Until the time without activity you choose, 15 days at most, or until you stop sharing it. With a serious report or an order, it is no longer served and stays for up to 180 days, or for as long as an order or an authority asks |
 | The manifest in the clear: how many parts, what each weighs, their kind and the version | To hold the limits without reading the content | As long as the document |
 | The manage link, kept as a digest (hash), and the public key of the edit link's token, which never reaches the server | To check who may change or delete it | As long as the document |
 | Your public key and its certificate, in what you share | So readers know it is yours | As long as the document |
@@ -34,11 +34,12 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 | A line for each read served: the link's id (without its key, so it opens nothing), the country and the Cloudflare data center, never your IP | To know how much each document is read and where from, and size the service | Up to 7 days, in Cloudflare's Workers Logs |
 | A digest of your IP (an HMAC with a key that changes) | Per-IP limits and blocks against abuse | As long as the quota or the block lasts, and up to a day more |
 | A daily copy of the database, encrypted with a key kept offline, without the day's read digests or quotas, and without the documents | To recover from a failure | 30 days, on GitHub |
-| What the operator did to a document or a key and why, opening it included: its id, the action and the reason | To answer for it later | 180 days |
-| A summary by mail to the operator, up to twice a day: the id of the links reported, blocked or appealed, the category and how many networks reported, never a key, an IP or the content | To tell them what to review | Up to 180 days, or more if an order asks, in their Migadu mailbox |
+| What the operator did to a document or a key and why, opening it included: its id, the action and the reason | To answer for it later | 180 days, or while the document is held |
+| A case link, to verify a report or to hand to an authority: a digest of its token, the document and version it opens, each opening and, when it is for an authority, the document's records, encrypted with a key Folio does not keep and without the network or the email of whoever reported | So whoever verifies or investigates can read that version even once the document is blocked | 30 days; the openings, as above |
+| A summary by mail to the operator, up to four times a day: the id of the links reported, blocked or appealed, the category and how many networks reported, never a key, an IP or the content | To tell them what to review | Up to 180 days, or more if an order asks, in their Migadu mailbox |
 | What you write to the operator by mail, with your address | To answer you | Up to 180 days from the last message, or more if an order asks, in their Migadu mailbox |
-| Keys you took back, as your root signed them: the key's public part and your root's | So readers learn that a stolen or retired key no longer speaks for you | For good, since a reader must always be able to tell |
-| Reports: category, detail and the version reported, in the clear; the link if given, sealed so only the operator can open it; and a digest of the reporter's network (an HMAC with a key that changes every 180 days), so each network reports only once | To moderate and pass them where they belong | 180 days, or longer if an order asks for it. If an appeal against a report is accepted, that network's digest stays 180 days from then, so it stops counting |
+| Keys you took back, up to 64, as your root signed them: the key's public part and your root's | So readers learn that a stolen or retired key no longer speaks for you | For good, since a reader must always be able to tell |
+| Reports: category, detail and the version reported, in the clear; the link and an email if given, sealed so only the operator can open them; and a digest of the reporter's network (an HMAC with a key that changes every 180 days), so each network reports only once | To moderate and pass them where they belong | 180 days, or longer if an order or an authority asks for it. If the operator finds it false, that network's digest stays 180 days from then, so it stops counting |
 
 **About signing:** your public key lets anyone tell that two documents come from
 the same person, though not who you are.
@@ -95,6 +96,9 @@ most direct ways are:
   server at the next cleanup, normally within an hour; during a spending block or
   a failure it can take longer. A serious report or an order can require keeping
   it.
+- **The email you left in a report:** write to <abuso@tisty.app> with the
+  document's id and the operator erases it. It stays in the encrypted backups for
+  up to 30 days.
 - **Anything else:** write to <rgdevment@tisty.app>. The digest of your IP does
   not reveal who you are, so in general there is no data that can be tied to
   you.

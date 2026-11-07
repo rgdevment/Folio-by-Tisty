@@ -121,6 +121,7 @@ beforeEach(async () => {
   for (const table of [
     "docs",
     "keys",
+    "cases",
     "reports",
     "false_reporters",
     "moderation",
@@ -212,6 +213,14 @@ describe("what it shows", () => {
     const queue = (await response.json()) as Awaited<ReturnType<CloudModeration["queue"]>>;
     expect(queue.reports.map((one) => one.category)).toEqual(["csam", "phishing"]);
     expect(queue.reports[0]?.sealedLink).toBe("sealed1.opaque");
+    expect(queue.reports[0]?.sealedContact).toBeNull();
+    await store.report(
+      { doc: ID, net: "n4", asn: 9, category: "csam", version: 1, sealedContact: "contact1.mail" },
+      TODAY,
+      HOUR,
+    );
+    const again = await new CloudModeration(testEnv.DB).queue(NOW);
+    expect(again.reports.map((one) => one.sealedContact)).toContain("contact1.mail");
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
@@ -243,6 +252,17 @@ describe("what it shows", () => {
     expect(reports).toHaveLength(200);
     expect(reports[0]?.doc).toBe("ZzNewDoc");
     expect(reportsTotal).toBe(201);
+  });
+
+  it.each([
+    ["2", 2],
+    ["0", 0],
+    ["-1", 0],
+    ["1.5", 0],
+    ["many", 0],
+  ])("reads the page of reports from %s", async (said, from) => {
+    const response = await asked(`/api/queue?from=${said}`);
+    expect(((await response.json()) as { reportsFrom: number }).reportsFrom).toBe(from);
   });
 
   it("puts what waits for the operator apart, and says who signed each version", async () => {
@@ -343,7 +363,7 @@ describe("what it can do", () => {
     expect((await acting(`/api/keys/${root}/block`, "abuse")).status).toBe(200);
     const held = await store.admitKey(root, "n", TODAY);
     expect(held.said).toBe("blocked");
-    const queue = await new CloudModeration(testEnv.DB).queue(TODAY * 86_400_000);
+    const queue = await moderation.queue(NOW);
     expect(queue.blockedKeys.map((one) => one.root)).toEqual([root]);
 
     expect((await acting(`/api/keys/${root}/block`, "again")).status).toBe(404);
@@ -364,19 +384,276 @@ describe("what it can do", () => {
   it("names the owner of what was reported, so its key can be blocked", async () => {
     await share();
     await reported();
-    const queue = await new CloudModeration(testEnv.DB).queue(TODAY * 86_400_000);
+    const queue = await moderation.queue(NOW);
     expect(queue.reports[0]?.owner).toBeTruthy();
     expect(queue.docs[0]?.owner).toBe(queue.reports[0]?.owner);
   });
 
-  it("accepts an appeal: lifts the block, and those networks stop counting", async () => {
+  it("lists a warning by light reports, and removes it with its reports", async () => {
+    await share();
+    await testEnv.DB.prepare("UPDATE docs SET fix_by = ? WHERE id = ?")
+      .bind(TODAY + 3, ID)
+      .run();
+    await reported("spam", ["n1", "n2"]);
+    const before = await moderation.queue(NOW);
+    expect(before.warned).toEqual([{ id: ID, fixBy: TODAY + 3, nets: 2 }]);
+    expect((await asked(`/api/docs/${ID}/clear_warning`, { method: "POST" })).status).toBe(403);
+    expect((await acting(`/api/docs/${ID}/clear_warning`)).status).toBe(200);
+    expect((await moderation.queue(NOW)).warned).toEqual([]);
+    const left = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE cleared = 0").first<{ n: number }>();
+    expect(left?.n).toBe(0);
+    expect(await logged()).toEqual([{ action: "clear_warning", note: null }]);
+    expect((await acting(`/api/docs/${ID}/clear_warning`)).status).toBe(404);
+  });
+
+  it("keeps other reports when a warning is removed, and lists no blocked document as warned", async () => {
+    await share();
+    await testEnv.DB.prepare("UPDATE docs SET fix_by = ? WHERE id = ?")
+      .bind(TODAY + 3, ID)
+      .run();
+    await reported("phishing", ["n1"]);
+    await acting(`/api/docs/${ID}/clear_warning`);
+    const left = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE cleared = 0").first<{ n: number }>();
+    expect(left?.n).toBe(1);
+    await testEnv.DB.prepare("UPDATE docs SET fix_by = ?, blocked_at = ? WHERE id = ?")
+      .bind(TODAY + 3, TODAY, ID)
+      .run();
+    expect((await moderation.queue(NOW)).warned).toEqual([]);
+  });
+
+  it("discards all of a network's reports only for the operator", async () => {
+    await share();
+    await reported("phishing", ["n1"]);
+    await store.create({ id: "OtherDoc", owner: "o2", adminHash: "a", ttlDays: 3, net: "n" }, TODAY);
+    await store.report({ doc: "OtherDoc", net: "n1", asn: 1, category: "phishing", version: 1 }, TODAY, HOUR);
+    expect((await asked(`/api/docs/${ID}/reports/n1/false_network`, { method: "POST" })).status).toBe(403);
+    expect((await acting(`/api/docs/${ID}/reports/n1/false_network`)).status).toBe(200);
+    expect((await moderation.queue(NOW)).reportsTotal).toBe(0);
+    expect((await acting(`/api/docs/${ID}/reports/n1/false_network`)).status).toBe(404);
+  });
+
+  describe("purging a key", () => {
+    const another = async (id: string, over: Record<string, unknown> = {}) => {
+      const doc = { id, owner: "o1", adminHash: "a", ttlDays: 3, net: "n", ...over };
+      await store.create(doc, TODAY);
+      await testEnv.DB.prepare("UPDATE docs SET latest = 1, versions = '[]' WHERE id = ?").bind(id).run();
+    };
+    const latestOf = async (id: string) =>
+      (await testEnv.DB.prepare("SELECT latest FROM docs WHERE id = ?").bind(id).first<{ latest: number }>())?.latest;
+    const purge = async (id = ID) => {
+      const answer = await acting(`/api/docs/${id}/purge_owner`, "spam farm");
+      return { status: answer.status, said: await answer.json() };
+    };
+
+    it("claims all its documents for the sweep, stops serving them, and logs each", async () => {
+      await share();
+      await another("Bbbbbbbb");
+      await another("Cccccccc", { owner: "o2" });
+      expect(await purge()).toEqual({ status: 200, said: { purged: 2, kept: 0 } });
+      expect(await latestOf(ID)).toBe(-1);
+      expect(await latestOf("Bbbbbbbb")).toBe(-1);
+      expect(await latestOf("Cccccccc")).toBe(1);
+      expect((await store.shown(ID, TODAY))?.alive).toBe(false);
+      const log = await testEnv.DB.prepare("SELECT doc, action, note FROM moderation ORDER BY doc").all();
+      expect(log.results).toEqual([
+        { doc: ID, action: "purge_owner", note: "spam farm" },
+        { doc: "Bbbbbbbb", action: "purge_owner", note: "spam farm" },
+      ]);
+    });
+
+    it("takes its reports out of the queue and ends its verify links", async () => {
+      await share();
+      await reported();
+      await moderation.makeCase(ID, { version: 1, tokenHash: "H".repeat(43) }, NOW);
+      await purge();
+      expect((await moderation.queue(NOW)).reportsTotal).toBe(0);
+      expect(await testEnv.DB.prepare("SELECT 1 FROM cases").first()).toBeNull();
+    });
+
+    it("keeps what an order holds, with its language", async () => {
+      await share();
+      await another("Language", { anchor: ID });
+      await another("Bbbbbbbb");
+      await testEnv.DB.prepare("UPDATE docs SET legal_until = ? WHERE id = ?").bind(TODAY, ID).run();
+      expect(await purge("Bbbbbbbb")).toEqual({ status: 200, said: { purged: 1, kept: 2 } });
+      expect(await latestOf(ID)).toBe(1);
+      expect(await latestOf("Language")).toBe(1);
+      await testEnv.DB.prepare("UPDATE docs SET legal_until = ? WHERE id = ?")
+        .bind(TODAY - 1, ID)
+        .run();
+      expect(await purge()).toEqual({ status: 200, said: { purged: 2, kept: 0 } });
+    });
+
+    it("says what it would do, and does nothing yet", async () => {
+      await share();
+      await another("Bbbbbbbb");
+      await testEnv.DB.prepare("UPDATE docs SET legal_until = ? WHERE id = ?").bind(TODAY, "Bbbbbbbb").run();
+      const preview = await asked(`/api/docs/${ID}/purge_owner`);
+      expect(await preview.json()).toEqual({ purged: 1, kept: 1 });
+      expect(await latestOf(ID)).toBe(1);
+      expect((await asked("/api/docs/Nnnnnnnn/purge_owner")).status).toBe(404);
+    });
+
+    it.each(["threat", "doxxing", "intimate"])("keeps a report of %s, unless it was cleared", async (category) => {
+      await share();
+      await store.report({ doc: ID, net: "n1", asn: 1, category, version: 1, sealedLink: "s" }, TODAY, HOUR);
+      expect((await purge()).said).toEqual({ purged: 0, kept: 1 });
+      await testEnv.DB.prepare("UPDATE reports SET cleared = 1").run();
+      expect((await purge()).said).toEqual({ purged: 1, kept: 0 });
+    });
+
+    it("does not keep what only a medium or light report names", async () => {
+      await share();
+      await store.report({ doc: ID, net: "n1", asn: 1, category: "phishing", version: 1 }, TODAY, HOUR);
+      expect((await purge()).said).toEqual({ purged: 1, kept: 0 });
+    });
+
+    it("keeps a report of child abuse and its anchor, unless the report was cleared", async () => {
+      await share();
+      await another("Language", { anchor: ID });
+      await store.report({ doc: "Language", net: "n1", asn: 1, category: "csam", version: 1 }, TODAY, HOUR);
+      expect(await purge()).toEqual({ status: 200, said: { purged: 0, kept: 2 } });
+      expect(await latestOf(ID)).toBe(1);
+      await testEnv.DB.prepare("UPDATE reports SET cleared = 1").run();
+      expect(await purge()).toEqual({ status: 200, said: { purged: 2, kept: 0 } });
+    });
+
+    it("counts a report of child abuse from a network found false, so a false mark cannot open the way", async () => {
+      await share();
+      await store.report({ doc: ID, net: "n1", asn: 1, category: "csam", version: 1 }, TODAY, HOUR);
+      await testEnv.DB.prepare("INSERT INTO false_reporters (net, at) VALUES ('n1', ?)").bind(TODAY).run();
+      expect((await purge()).said).toEqual({ purged: 0, kept: 1 });
+    });
+
+    it("keeps what a case for the authority holds, until that case ends", async () => {
+      await share();
+      await testEnv.DB.prepare(
+        "INSERT INTO cases (token_hash, doc, version, until, sealed_records) VALUES ('h', ?, 1, ?, 's')",
+      )
+        .bind(ID, TODAY)
+        .run();
+      expect((await purge()).said).toEqual({ purged: 0, kept: 1 });
+      await testEnv.DB.prepare("UPDATE cases SET until = ?")
+        .bind(TODAY - 1)
+        .run();
+      expect((await purge()).said).toEqual({ purged: 1, kept: 0 });
+    });
+
+    it("keeps what another person cites, and not what the same key does", async () => {
+      await share();
+      await another("Bbbbbbbb");
+      await another("Cccccccc", { owner: "o2" });
+      const holding = "INSERT INTO holds (held, holder) VALUES (?, ?)";
+      await testEnv.DB.prepare(holding).bind(ID, "Cccccccc").run();
+      await testEnv.DB.prepare(holding).bind("Bbbbbbbb", ID).run();
+      expect((await purge()).said).toEqual({ purged: 1, kept: 1 });
+      expect(await latestOf(ID)).toBe(1);
+      expect(await latestOf("Bbbbbbbb")).toBe(-1);
+    });
+
+    it("empties in the next sweep", async () => {
+      await share();
+      await purge();
+      expect(await testEnv.ENVELOPES.list().then((all) => all.objects.some((one) => one.key.startsWith(ID)))).toBe(
+        true,
+      );
+      await store.sweep(TODAY);
+      expect(await row()).toBeNull();
+      expect(await testEnv.ENVELOPES.list().then((all) => all.objects.some((one) => one.key.startsWith(ID)))).toBe(
+        false,
+      );
+    });
+
+    it("asks for a reason, knows no missing document, and is only the operator's", async () => {
+      await share();
+      expect((await acting(`/api/docs/${ID}/purge_owner`)).status).toBe(400);
+      expect((await purge("Nnnnnnnn")).status).toBe(404);
+      expect((await asked(`/api/docs/${ID}/purge_owner`, { method: "POST" })).status).toBe(403);
+      expect(await latestOf(ID)).toBe(1);
+    });
+  });
+
+  it("erases a reporter's email when asked, that one alone, and says so on record", async () => {
+    await share();
+    for (const net of ["n1", "n2"]) {
+      await store.report(
+        { doc: ID, net, asn: 1, category: "phishing", version: 1, sealedContact: "contact1.mail" },
+        TODAY,
+        HOUR,
+      );
+    }
+    expect((await acting(`/api/docs/${ID}/reports/n1/forget_contact`)).status).toBe(200);
+    const left = await testEnv.DB.prepare("SELECT net, sealed_contact FROM reports ORDER BY net").all();
+    expect(left.results).toEqual([
+      { net: "n1", sealed_contact: null },
+      { net: "n2", sealed_contact: "contact1.mail" },
+    ]);
+    expect((await acting(`/api/docs/${ID}/reports/n1/forget_contact`)).status).toBe(404);
+    expect(await logged()).toEqual([{ action: "forget_contact", note: null }]);
+    expect((await asked(`/api/docs/${ID}/reports/n2/forget_contact`, { method: "POST" })).status).toBe(403);
+  });
+
+  describe("a case", () => {
+    const HASH = "H".repeat(43);
+    const sendingCase = (id: string, body: unknown) =>
+      asked(`/api/docs/${id}/case`, {
+        method: "POST",
+        headers: { "Folio-Operator": "1" },
+        body: JSON.stringify(body),
+      });
+
+    it("panics with its reason, and answers the records", async () => {
+      await share();
+      const response = await acting(`/api/docs/${ID}/panic`, "looks real");
+      expect(response.status).toBe(200);
+      expect(((await response.json()) as { records: { id: string } }).records.id).toBe(ID);
+      expect((await row())?.blocked_at).toBe(TODAY);
+    });
+
+    it("will not panic without a reason, or over what does not exist", async () => {
+      await share();
+      expect((await acting(`/api/docs/${ID}/panic`)).status).toBe(400);
+      expect((await row())?.blocked_at).toBeNull();
+      expect((await acting("/api/docs/Nothing1/panic", "looks real")).status).toBe(404);
+    });
+
+    it("takes a case and says when the version is not there", async () => {
+      await share();
+      expect((await sendingCase(ID, { version: 1, tokenHash: HASH, sealedRecords: "case1.abc" })).status).toBe(200);
+      expect((await sendingCase(ID, { version: 9, tokenHash: "J".repeat(43) })).status).toBe(404);
+    });
+
+    it.each([
+      ["no version", { tokenHash: HASH }],
+      ["version zero", { version: 0, tokenHash: HASH }],
+      ["a broken version", { version: 1.5, tokenHash: HASH }],
+      ["no hash", { version: 1 }],
+      ["a short hash", { version: 1, tokenHash: "short" }],
+      ["records in the clear", { version: 1, tokenHash: HASH, sealedRecords: '{"reports":[]}' }],
+    ])("refuses a case with %s", async (_, body) => {
+      await share();
+      expect((await sendingCase(ID, body)).status).toBe(400);
+    });
+
+    it("hands over only for the operator, and answers what it did", async () => {
+      await share();
+      await reported("csam", ["n1"], "sealed1.x");
+      await acting(`/api/docs/${ID}/panic`, "looks real");
+      await sendingCase(ID, { version: 1, tokenHash: HASH, sealedRecords: "case1.abc" });
+      expect((await asked(`/api/docs/${ID}/handed_over`, { method: "POST" })).status).toBe(403);
+      expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(200);
+      expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(404);
+    });
+  });
+
+  it("accepts an appeal: lifts the block, and punishes no network for reporting", async () => {
     await share();
     await reported();
     await store.appeal(ID, TODAY, HOUR);
     expect((await acting(`/api/docs/${ID}/accept`)).status).toBe(200);
     expect((await row())?.blocked_at).toBeNull();
     const counted = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM false_reporters").first<{ n: number }>();
-    expect(counted?.n).toBe(3);
+    expect(counted?.n).toBe(0);
     expect(await logged()).toEqual([{ action: "accept", note: null }]);
   });
 

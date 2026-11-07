@@ -36,6 +36,12 @@ name = "SYNCS"
 namespace_id = "1002"
 simple = { limit = 2, period = 60 }
 
+# Its own, so what a shared network reads never stops someone from reporting.
+[[ratelimits]]
+name = "REPORTS"
+namespace_id = "1003"
+simple = { limit = 10, period = 60 }
+
 # BILLING_DAY is the plan's renewal day, or 28 if it falls later (decision 118).
 # SHARING_OPEN goes to "true" before sharing_open in docs/limits.json, which only asks clients and reaches them late.
 [vars]
@@ -50,7 +56,7 @@ CF_DATABASE_ID = "767d0dce-dff0-41b0-9857-b3ddcf2d36ad"
 CF_BUCKET_NAME = "folio-private-envelopes"
 
 [triggers]
-crons = ["*/15 * * * *", "0 * * * *", "0 0,12 * * *", "0 4 * * SUN"]
+crons = ["*/15 * * * *", "0 * * * *", "0 0,6,12,18 * * *", "0 4 * * SUN"]
 
 # What the code logs is kept, and the request itself never is (decision 98).
 [observability]

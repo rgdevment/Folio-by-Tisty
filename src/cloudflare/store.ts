@@ -1,6 +1,8 @@
 import type { Revocation } from "@tisty/contracts";
+import { caseNameOf } from "../core/case-records";
 import { DAY_MS, LEVEL_ONE, type Limits, levelOfReport } from "../core/limits";
 import { momentOf } from "../core/moment";
+import { GRAVEST_FIRST } from "../core/queue";
 import { toBase64Url } from "../core/start";
 import type {
   AcceptedTerms,
@@ -12,6 +14,7 @@ import type {
   KeyAdmitted,
   NewDoc,
   News,
+  OpenedCase,
   Owned,
   Reading,
   Report,
@@ -25,15 +28,22 @@ import type {
   Version,
 } from "../core/store";
 import { keptVersions } from "../core/versions";
-import { acceptAppeal, mayCorrect } from "./moderation";
+import { acceptAppeal, CLAIMED, mayCorrect } from "./moderation";
 
 // Two rows by their key at most: the machine that signed the last version and its owner's, the start of owner_mark.
-const REVOCATIONS_OF_THE_LAST_VERSION = `(
+const revocationsOf = (version: string): string => `(
   SELECT json_group_array(json_object('root', r.root, 'machine', r.machine, 'at', r.at, 'signed', r.signed))
   FROM revocations r
-  WHERE (r.root = json_extract(d.versions, '$[#-1].signer') AND r.machine = json_extract(d.versions, '$[#-1].machine'))
+  WHERE (r.root = json_extract(${version}, '$.signer') AND r.machine = json_extract(${version}, '$.machine'))
     OR (r.root = d.owner AND r.machine = substr(d.owner_mark, 1, instr(d.owner_mark, '.') - 1))
 )`;
+const REVOCATIONS_OF_THE_LAST_VERSION = revocationsOf("json_extract(d.versions, '$[#-1]')");
+
+const revocationsIn = (said: string): Revocation[] =>
+  (JSON.parse(said) as (Omit<Revocation, "at"> & { at: number })[]).map((one) => ({
+    ...one,
+    at: momentOf(one.at * 1000),
+  }));
 
 export interface Bindings {
   DB: D1Database;
@@ -55,7 +65,6 @@ interface DocRow {
 }
 
 // A document being forgotten: nothing can move it on from here, and the sweep finishes it even after failing halfway.
-const CLAIMED = -1;
 
 // Beside the envelopes, so D1 and its backups never hold both the digests and their key (decision 128).
 const KEY_OBJECTS = "~";
@@ -67,24 +76,46 @@ const KEY_BYTES = 32;
 const KEYS_AT_ONCE = 1000;
 
 // A report that weighs: not cleared by an appeal, and not from who reported falsely before (decision 41).
-const COUNTED_REPORT = "r.cleared = 0 AND r.net NOT IN (SELECT net FROM false_reporters)";
-const REPORT_AS_EVIDENCE = `${COUNTED_REPORT} AND r.level <> 'light'`;
-// Without the link nobody could review a grave one, so it stays on record and blocks nothing (decision 153).
+const COUNTED_REPORT = "r.cleared = 0 AND r.over_cap = 0 AND r.net NOT IN (SELECT net FROM false_reporters)";
+// A network is often shared: finding one report false says nothing of what others on it reported before.
+const REPORT_AS_EVIDENCE =
+  "r.cleared = 0 AND (r.over_cap = 0 OR r.level = 'grave') AND r.level <> 'light' AND r.net NOT IN (SELECT f.net FROM false_reporters f WHERE COALESCE(f.since, f.at) < r.at)";
+// The API now refuses a grave report without its link: this is for what was reported before it did (decision 153).
 const REPORT_THAT_BLOCKS = `${COUNTED_REPORT} AND (r.level = 'medium' OR (r.level = 'grave' AND r.sealed_link IS NOT NULL))`;
 const LIGHT_REPORT = `${COUNTED_REPORT} AND r.level = 'light'`;
 
 const WEIGHT_OF = (level: string): string => `CASE ${level} WHEN 'grave' THEN 2 WHEN 'medium' THEN 1 ELSE 0 END`;
 const REPORT_RISES = `${WEIGHT_OF("excluded.level")} > ${WEIGHT_OF("reports.level")}`;
-const REPORT_REPLACES = `(reports.cleared = 1 OR ${REPORT_RISES})`;
+// Cleared stays cleared for what it was about, so the same networks cannot undo an accepted appeal; a newer version is news.
+const AFTER_WHAT_WAS_ANSWERED =
+  "excluded.version >= (SELECT d.counts_from FROM docs d WHERE d.id = excluded.doc) AND reports.version < (SELECT d.counts_from FROM docs d WHERE d.id = excluded.doc)";
+const REPORT_REPLACES = `(CASE WHEN reports.cleared = 1 THEN reports.level = 'light' OR excluded.version > reports.version ELSE ${REPORT_RISES} OR (${AFTER_WHAT_WAS_ANSWERED}) END)`;
+// A document stopped today waits for the sweep, and what is reported until then still reaches it.
+const STILL_LIVES = (doc: string, today: string): string =>
+  `(${doc}.dies_on >= ${today} - 1 OR EXISTS (SELECT 1 FROM holds h WHERE h.held = ${doc}.id)
+    OR EXISTS (SELECT 1 FROM docs a WHERE a.id = ${doc}.anchor AND a.dies_on >= ${today} - 1))`;
+const REPORT_MOVES = `(${REPORT_REPLACES} OR (reports.cleared = 0 AND reports.sealed_link IS NULL AND excluded.sealed_link IS NOT NULL))`;
 
 // What keeps a document past its days, not served and not deleted (decision 42). Reports leave once their days pass.
 const HELD_AS_EVIDENCE = (doc: string, today: string): string =>
   `(COALESCE(${doc}.legal_until, 0) >= ${today} OR EXISTS (SELECT 1 FROM reports r WHERE r.doc = ${doc}.id AND ${REPORT_AS_EVIDENCE}))`;
 
+// A language lives by its anchor, so its own days only say it left when it never got a version, or was stopped.
+const LANGUAGES_OF = (owner: string, anchor: string, today: string): string =>
+  `SELECT COUNT(*) FROM docs l WHERE l.owner = ${owner} AND l.anchor = ${anchor}
+     AND (l.latest > 0 OR (l.latest = 0 AND l.dies_on >= ${today}))
+     AND l.blocked_at IS NULL AND (l.paused_at IS NULL OR l.dies_on >= ${today})`;
+
+// Not a network's digest, which is base64url, so the day's sum of new keys has its own row that the sweep clears too.
+const NEW_KEYS_NET = "~new-keys";
+const NEW_KEYS_NOTICED_AT = 0.9;
+
 const LIVES_ON = "CASE WHEN paused_at IS NULL THEN MAX(dies_on, ?1 + ttl_days) ELSE dies_on END";
 
 // What can block now: an appeal that cleared its owner leaves earlier versions on record and out of the count.
 const COUNTS_NOW = `${REPORT_THAT_BLOCKS} AND r.version >= docs.counts_from`;
+const COUNTS_TODAY = `${COUNTS_NOW} AND (SELECT COUNT(DISTINCT y.doc) FROM reports y JOIN docs b ON b.id = y.doc
+  WHERE y.net = r.net AND b.blocked_at = ?1 AND b.blocked_by_operator = 0) < ?7`;
 // A version no longer listed, or a report with none, is not proof that someone else signed it.
 const SIGNED_BY_OWNER = `COALESCE(
   (SELECT json_extract(j.value, '$.signer') FROM json_each(docs.versions) j WHERE json_extract(j.value, '$.n') = r.version),
@@ -125,13 +156,14 @@ export class Cloud implements Store {
     const held = await this.#row(doc.id);
     if (held) return this.#retried(held, doc);
     if (!(await this.#takeQuota(doc.net, 1, 0, today))) return "quota";
+    const otherLanguages = this.#limits.languagesAtMost - 1;
     const inserted = await this.#db
       .prepare(
         `INSERT OR IGNORE INTO docs (id, owner, anchor, permit, admin_hash, ttl_days, dies_on, active_day, owner_mark)
          SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?10
          WHERE (?3 IS NOT NULL AND EXISTS (
            SELECT 1 FROM docs a WHERE a.id = ?3 AND a.owner = ?2 AND a.anchor IS NULL AND a.latest >= 0
-         )) OR (?3 IS NULL AND (
+         ) AND (${LANGUAGES_OF("?2", "?3", "?8")}) < ?11) OR (?3 IS NULL AND (
            SELECT COUNT(*) FROM docs d
            WHERE d.owner = ?2 AND d.anchor IS NULL AND d.latest >= 0 AND d.blocked_at IS NULL
              AND NOT EXISTS (SELECT 1 FROM holds h WHERE h.held = d.id)
@@ -149,13 +181,19 @@ export class Cloud implements Store {
         today,
         this.#limits.sharesAtMost,
         doc.ownerMark ?? "",
+        otherLanguages,
       )
       .run();
     if (inserted.meta.changes > 0) return "created";
     await this.#giveQuotaBack(doc.net, 1, 0, today);
     const raced = await this.#row(doc.id);
     if (raced) return this.#retried(raced, doc);
-    return doc.anchor !== undefined ? "no_anchor" : "shares_full";
+    if (doc.anchor === undefined) return "shares_full";
+    const languages = await this.#db
+      .prepare(`SELECT (${LANGUAGES_OF("?1", "?2", "?3")}) AS n`)
+      .bind(doc.owner, doc.anchor, today)
+      .first<{ n: number }>();
+    return (languages?.n ?? 0) >= otherLanguages ? "languages_full" : "no_anchor";
   }
 
   // A lost answer comes back as the same document, and only that is not somebody else's id.
@@ -191,12 +229,13 @@ export class Cloud implements Store {
     const kept = trimmed.length < all.length ? await this.#withEvidence(upload.id, today, all, trimmed) : trimmed;
     if (kept.length > this.#limits.versionsListedAtMost) return "list_full";
 
-    if (!(await this.#takeQuota(upload.net, 0, bytes, today))) return "quota";
+    const room = await this.#takeRoom(upload.net, bytes, today, upload.newKey);
+    if (room !== "stored") return room;
     const key = objectKey(upload.id, version);
     try {
       await this.#envelopes.put(key, upload.body);
     } catch (error) {
-      await this.#giveQuotaBack(upload.net, 0, bytes, today);
+      await this.#giveRoomBack(upload.net, bytes, today, upload.newKey);
       throw error;
     }
 
@@ -253,7 +292,7 @@ export class Cloud implements Store {
           ]),
     ]);
     if ((moved?.meta.changes ?? 0) === 0) {
-      await this.#giveQuotaBack(upload.net, 0, bytes, today);
+      await this.#giveRoomBack(upload.net, bytes, today, upload.newKey);
       return this.#lostTheRace(upload, key);
     }
 
@@ -287,18 +326,30 @@ export class Cloud implements Store {
   }
 
   // The earliest one found counts, so a later note cannot move a theft forward (contract, revocation).
-  async revoke(revocations: Revocation[]): Promise<void> {
-    await this.#db.batch(
-      revocations.map(({ root, machine, at, signed }) =>
-        this.#db
-          .prepare(
-            `INSERT INTO revocations (root, machine, at, signed) VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT (root, machine) DO UPDATE SET at = excluded.at, signed = excluded.signed
-             WHERE excluded.at < revocations.at`,
-          )
-          .bind(root, machine, Date.parse(at) / 1000, signed),
-      ),
+  async revoke(revocations: Revocation[]): Promise<boolean> {
+    const taking = revocations.map(({ root, machine, at, signed }) =>
+      this.#db
+        .prepare(
+          `INSERT INTO revocations (root, machine, at, signed)
+           SELECT ?1, ?2, ?3, ?4
+           WHERE EXISTS (SELECT 1 FROM revocations WHERE root = ?1 AND machine = ?2)
+             OR (SELECT COUNT(*) FROM revocations WHERE root = ?1) < ?5
+           ON CONFLICT (root, machine) DO UPDATE SET at = excluded.at, signed = excluded.signed
+           WHERE excluded.at < revocations.at`,
+        )
+        .bind(root, machine, Date.parse(at) / 1000, signed, this.#limits.revokedMachinesAtMost),
     );
+    const asked = JSON.stringify(revocations.map(({ root, machine }) => [root, machine]));
+    const counting = this.#db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM json_each(?1) j WHERE EXISTS (
+           SELECT 1 FROM revocations r
+           WHERE r.root = json_extract(j.value, '$[0]') AND r.machine = json_extract(j.value, '$[1]')
+         )`,
+      )
+      .bind(asked);
+    const results = await this.#db.batch<{ n: number }>([...taking, counting]);
+    return results.at(-1)?.results[0]?.n === revocations.length;
   }
 
   async isRevoked(root: string, machine: string, now: number): Promise<boolean> {
@@ -369,6 +420,18 @@ export class Cloud implements Store {
     return taken.meta.changes > 0;
   }
 
+  async allKeysSignedBy(roots: string[], day: number): Promise<boolean> {
+    const asked = [...new Set(roots)];
+    const found = await this.#db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM json_each(?1) j
+         WHERE EXISTS (SELECT 1 FROM keys k WHERE k.root = j.value AND k.first_day <= ?2)`,
+      )
+      .bind(JSON.stringify(asked), day)
+      .first<{ n: number }>();
+    return found?.n === asked.length;
+  }
+
   async admitKey(root: string, net: string, today: number): Promise<KeyAdmitted> {
     const known = await this.#db
       .prepare("SELECT terms_version, blocked_at FROM keys WHERE root = ?")
@@ -409,6 +472,33 @@ export class Cloud implements Store {
       .prepare("UPDATE net_day SET keys = keys - ? WHERE day = ? AND net = ?")
       .bind(count, today, net)
       .run();
+  }
+
+  // A first version refused leaves nothing behind, or each try would hold a share until its days pass.
+  async forgetUnsent(id: string, net: string, today: number): Promise<void> {
+    const forgotten = await this.#db.prepare("DELETE FROM docs WHERE id = ? AND latest = 0").bind(id).run();
+    if (forgotten.meta.changes > 0) await this.#giveQuotaBack(net, 1, 0, today);
+  }
+
+  async #takeRoom(net: string, bytes: number, today: number, newKey = false): Promise<Uploaded> {
+    if (!(await this.#takeQuota(net, 0, bytes, today))) return "quota";
+    if (!newKey) return "stored";
+    const taken = await this.#db
+      .prepare(
+        `INSERT INTO net_day (day, net, docs, bytes)
+         SELECT ?1, ?2, 0, ?3 WHERE ?3 <= ?4 AND (SELECT bytes FROM net_day WHERE day = ?1 AND net = ?5) <= ?6
+         ON CONFLICT (day, net) DO UPDATE SET bytes = bytes + excluded.bytes WHERE bytes + excluded.bytes <= ?4`,
+      )
+      .bind(today, NEW_KEYS_NET, bytes, this.#limits.newKeysBytesADay, net, this.#limits.newKeysNetBytesADay)
+      .run();
+    if (taken.meta.changes > 0) return "stored";
+    await this.#giveQuotaBack(net, 0, bytes, today);
+    return "new_keys_full";
+  }
+
+  async #giveRoomBack(net: string, bytes: number, today: number, newKey = false): Promise<void> {
+    await this.#giveQuotaBack(net, 0, bytes, today);
+    if (newKey) await this.#giveQuotaBack(NEW_KEYS_NET, 0, bytes, today);
   }
 
   async #giveQuotaBack(net: string, docs: number, bytes: number, today: number): Promise<void> {
@@ -476,7 +566,7 @@ export class Cloud implements Store {
       .prepare(
         `SELECT d.owner, d.latest, json_extract(d.versions, '$[#-1]') AS last_version, d.dies_on, d.paused_at, d.blocked_at, d.fix_by,
            ${REVOCATIONS_OF_THE_LAST_VERSION} AS revocations,
-           CASE WHEN d.paused_at IS NOT NULL AND d.dies_on < ?2 THEN 0
+           CASE WHEN d.latest = ${CLAIMED} OR (d.paused_at IS NOT NULL AND d.dies_on < ?2) THEN 0
              ELSE EXISTS (SELECT 1 FROM holds h WHERE h.held = d.id) OR CASE WHEN a.id IS NULL THEN d.dies_on >= ?2
                ELSE a.latest <> ${CLAIMED} AND a.blocked_at IS NULL AND a.paused_at IS NULL
                  AND (a.dies_on >= ?2 OR EXISTS (SELECT 1 FROM holds h WHERE h.held = a.id)) END END AS alive
@@ -503,10 +593,39 @@ export class Cloud implements Store {
       pausedAt: row.paused_at,
       blockedAt: row.blocked_at,
       fixBy: row.fix_by,
-      revocations: (JSON.parse(row.revocations) as (Omit<Revocation, "at"> & { at: number })[]).map((one) => ({
-        ...one,
-        at: momentOf(one.at * 1000),
-      })),
+      revocations: revocationsIn(row.revocations),
+    };
+  }
+
+  async openedCase(id: string, hash: string, today: number, now: number): Promise<OpenedCase | null> {
+    const [found] = await this.#db.batch<{
+      version: string;
+      dies_on: number;
+      revocations: string;
+      sealed_records: string | null;
+    }>([
+      this.#db
+        .prepare(
+          `SELECT v.value AS version, d.dies_on, c.sealed_records, ${revocationsOf("v.value")} AS revocations
+           FROM cases c JOIN docs d ON d.id = c.doc
+             JOIN json_each(d.versions) v ON json_extract(v.value, '$.n') = c.version
+           WHERE c.token_hash = ?1 AND c.doc = ?2 AND c.until >= ?3`,
+        )
+        .bind(hash, id, today),
+      this.#db
+        .prepare(
+          `INSERT OR IGNORE INTO openings (doc, at, reason)
+           SELECT ?2, ?4, ?5 FROM cases WHERE token_hash = ?1 AND doc = ?2 AND until >= ?3`,
+        )
+        .bind(hash, id, today, now, `case ${caseNameOf(hash)}`),
+    ]);
+    const row = found?.results[0];
+    if (!row) return null;
+    return {
+      version: JSON.parse(row.version) as Version,
+      diesOn: row.dies_on,
+      revocations: revocationsIn(row.revocations),
+      sealedRecords: row.sealed_records,
     };
   }
 
@@ -582,22 +701,32 @@ export class Cloud implements Store {
     const [, moved] = await this.#db.batch([
       this.#db
         .prepare(
-          `INSERT INTO reports (doc, net, at, category, detail, sealed_link, asn, at_hour, level, version)
+          `INSERT INTO reports (doc, net, at, category, detail, sealed_link, asn, at_hour, level, version, sealed_contact, over_cap)
            SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9,
              CASE WHEN EXISTS (SELECT 1 FROM json_each(d.versions) v WHERE json_extract(v.value, '$.n') = ?10)
-               THEN ?10 ELSE d.latest END
-           FROM docs d WHERE d.id = ?1
+               THEN ?10 ELSE d.latest END,
+             ?11,
+             ?9 <> 'light' AND
+               (SELECT COUNT(*) FROM reports x
+                WHERE x.net = ?2 AND x.doc <> ?1 AND x.level <> 'light' AND x.cleared = 0 AND x.over_cap = 0) >= ?12
+           FROM docs d WHERE d.id = ?1 AND ${STILL_LIVES("d", "?3")}
            ON CONFLICT (doc, net) DO UPDATE
-             SET at = excluded.at, at_hour = excluded.at_hour, asn = excluded.asn,
+             SET at = CASE WHEN reports.cleared = 1 THEN excluded.at
+                   WHEN EXISTS (SELECT 1 FROM false_reporters f WHERE f.net = excluded.net) THEN reports.at
+                   WHEN ${REPORT_MOVES} THEN excluded.at ELSE reports.at END,
+                 at_hour = CASE WHEN ${REPORT_MOVES} THEN excluded.at_hour ELSE reports.at_hour END,
+                 asn = CASE WHEN ${REPORT_MOVES} THEN excluded.asn ELSE reports.asn END,
                  category = CASE WHEN ${REPORT_REPLACES} THEN excluded.category ELSE reports.category END,
                  level = CASE WHEN ${REPORT_REPLACES} THEN excluded.level ELSE reports.level END,
                  version = CASE WHEN ${REPORT_REPLACES} THEN excluded.version ELSE reports.version END,
                  detail = CASE WHEN reports.cleared = 1 THEN excluded.detail
-                   ELSE COALESCE(excluded.detail, reports.detail) END,
+                   WHEN ${REPORT_MOVES} THEN COALESCE(excluded.detail, reports.detail) ELSE reports.detail END,
                  sealed_link = CASE WHEN reports.cleared = 1 THEN excluded.sealed_link
                    ELSE COALESCE(reports.sealed_link, excluded.sealed_link) END,
+                 sealed_contact = CASE WHEN ${REPORT_REPLACES} THEN excluded.sealed_contact
+                   ELSE COALESCE(reports.sealed_contact, excluded.sealed_contact) END,
                  cleared = 0
-             WHERE ${REPORT_REPLACES} OR (reports.sealed_link IS NULL AND excluded.sealed_link IS NOT NULL)`,
+             WHERE ${REPORT_MOVES} OR (reports.cleared = 0 AND reports.sealed_contact IS NULL AND excluded.sealed_contact IS NOT NULL)`,
         )
         .bind(
           report.doc,
@@ -610,26 +739,30 @@ export class Cloud implements Store {
           hour,
           level,
           report.version ?? null,
+          report.sealedContact ?? null,
+          this.#limits.docsANetCountsIn,
         ),
-      level === "light" ? this.#warnAuthor(report.doc, today) : this.#blockWhenItCounts(report.doc, today, hour),
+      level === "light" ? this.#warnAuthor(report.doc, today, hour) : this.#blockWhenItCounts(report.doc, today, hour),
     ]);
     return { blocked: level !== "light" && (moved?.meta.changes ?? 0) > 0 };
   }
 
-  #warnAuthor(doc: string, today: number): D1PreparedStatement {
+  #warnAuthor(doc: string, today: number, hour: number): D1PreparedStatement {
+    const inTheWindow = `${LIGHT_REPORT} AND r.at_hour > ?6`;
     return this.#db
       .prepare(
         `UPDATE docs SET fix_by = ?1 + ?2
          WHERE id = ?3 AND fix_by IS NULL AND blocked_at IS NULL
-           AND (SELECT COUNT(*) FROM reports r WHERE r.doc = ?3 AND ${LIGHT_REPORT}) >= ?4
-           AND (SELECT COUNT(DISTINCT r.asn) FROM reports r WHERE r.doc = ?3 AND ${LIGHT_REPORT}) >= ?5`,
+           AND (SELECT COUNT(*) FROM reports r WHERE r.doc = ?3 AND ${inTheWindow}) >= ?4
+           AND (SELECT COUNT(DISTINCT r.asn) FROM reports r WHERE r.doc = ?3 AND ${inTheWindow}) >= ?5`,
       )
       .bind(
         today,
         this.#limits.lightFixDays,
         doc,
         this.#limits.lightReportsToWarn,
-        this.#limits.reportOperatorsToBlock,
+        this.#limits.lightOperatorsToWarn,
+        hour - this.#limits.lightWarnHours,
       );
   }
 
@@ -638,8 +771,8 @@ export class Cloud implements Store {
       .prepare(
         `UPDATE docs SET blocked_at = ?1, blocked_hour = ?6, dies_on = ?1 + ?2
          WHERE id = ?3 AND blocked_at IS NULL
-           AND (SELECT COUNT(*) FROM reports r WHERE r.doc = ?3 AND ${COUNTS_NOW}) >= ?4
-           AND (SELECT COUNT(DISTINCT r.asn) FROM reports r WHERE r.doc = ?3 AND ${COUNTS_NOW}) >= ?5`,
+           AND (SELECT COUNT(*) FROM reports r WHERE r.doc = ?3 AND ${COUNTS_TODAY}) >= ?4
+           AND (SELECT COUNT(DISTINCT r.asn) FROM reports r WHERE r.doc = ?3 AND ${COUNTS_TODAY}) >= ?5`,
       )
       .bind(
         today,
@@ -648,6 +781,7 @@ export class Cloud implements Store {
         this.#limits.reportsToBlock,
         this.#limits.reportOperatorsToBlock,
         hour,
+        this.#limits.blocksANetHelpsADay,
       );
   }
 
@@ -697,7 +831,7 @@ export class Cloud implements Store {
       .prepare(
         `UPDATE docs SET appealed_at = ?2, permit = NULL, counts_from = latest + 1
          WHERE id = ?1 AND blocked_at IS NOT NULL AND appealed_at IS NULL AND blocked_by_operator = 0
-           AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND r.category = 'csam' AND ${COUNTED_REPORT})
+           AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND r.category = 'csam' AND ${REPORT_AS_EVIDENCE})
            AND EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND ${COUNTS_NOW})
            AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND ${COUNTS_NOW} AND ${SIGNED_BY_OWNER})`,
       )
@@ -748,11 +882,30 @@ export class Cloud implements Store {
   }
 
   // Adds up first: what expired is only known once every past day has counted (decision 128).
-  async sweep(today: number): Promise<Swept> {
+  async #blockWhatWaited(today: number, hour: number): Promise<void> {
+    const waiting = await this.#db
+      .prepare(
+        `SELECT docs.id FROM docs JOIN reports r ON r.doc = docs.id
+         WHERE docs.blocked_at IS NULL AND ${STILL_LIVES("docs", "?1")} AND ${COUNTS_NOW}
+         GROUP BY docs.id HAVING COUNT(*) >= ?2 LIMIT ?3`,
+      )
+      .bind(today, this.#limits.reportsToBlock, this.#limits.sweptAtOnce)
+      .all<{ id: string }>();
+    if (waiting.results.length === 0) return;
+    await this.#db.batch(waiting.results.map(({ id }) => this.#blockWhenItCounts(id, today, hour)));
+  }
+
+  async sweep(today: number, hour = today * HOURS_IN_A_DAY): Promise<Swept> {
     await this.#db.batch([this.#db.prepare(this.#createSeen(today)), this.#db.prepare(this.#createSeen(today + 1))]);
     const { summed, failed: failedDays } = await this.#sumPastDays(today);
     let forgotten = 0;
     let failed = failedDays;
+    try {
+      await this.#blockWhatWaited(today, hour);
+    } catch (error) {
+      failed += 1;
+      console.error("what waited to be blocked could not be", String(error));
+    }
     // A block stops the reads that keep documents alive, so an attack must not be able to erase them (decision 118).
     if (failedDays === 0 && (await this.stage()) !== "blocked") {
       try {
@@ -768,6 +921,7 @@ export class Cloud implements Store {
         this.#db.prepare("DELETE FROM net_day WHERE day < ?").bind(today - 1),
         this.#db.prepare("DELETE FROM net_hour WHERE hour < ?").bind(today * HOURS_IN_A_DAY),
         this.#db.prepare("DELETE FROM false_reporters WHERE at < ?").bind(today - this.#limits.evidenceDays),
+        this.#db.prepare("DELETE FROM cases WHERE until < ?").bind(today),
         this.#db
           .prepare(
             `DELETE FROM reports WHERE at < ?1
@@ -942,29 +1096,47 @@ export class Cloud implements Store {
 
   async news(after: number, before: number, atMost: number): Promise<News> {
     const newKeysDay = Math.floor((before - 1) / HOURS_IN_A_DAY);
-    const [reports, blocked, appealed, keys] = await this.#db.batch([
+    const newReports = "FROM reports WHERE at_hour > ?1 AND at_hour < ?2 AND cleared = 0 AND level <> 'light'";
+    const [reports, totals, blocked, appealed, keys] = await this.#db.batch([
       this.#db
         .prepare(
-          `SELECT doc, category, COUNT(*) AS nets FROM reports
-           WHERE at_hour > ?1 AND at_hour < ?2 AND cleared = 0 AND level <> 'light'
-           GROUP BY doc, category ORDER BY category = 'csam' DESC, nets DESC, doc LIMIT ?3`,
+          `SELECT doc, category, COUNT(*) AS nets, SUM(not_counting) AS uncounted FROM (
+             SELECT doc, category, level, (over_cap = 1 OR net IN (SELECT net FROM false_reporters)) AS not_counting,
+               ROW_NUMBER() OVER (PARTITION BY net ORDER BY ${GRAVEST_FIRST}, at_hour) AS in_its_net
+             ${newReports}
+           )
+           GROUP BY doc, category
+           ORDER BY MIN(in_its_net), ${GRAVEST_FIRST}, SUM(NOT not_counting) DESC, doc LIMIT ?3`,
         )
         .bind(after, before, atMost),
+      this.#db
+        .prepare(`SELECT COUNT(*) AS n, COUNT(DISTINCT doc || '|' || category) AS listed ${newReports}`)
+        .bind(after, before),
       this.#db
         .prepare("SELECT id FROM docs WHERE blocked_hour > ?1 AND blocked_hour < ?2 ORDER BY id LIMIT ?3")
         .bind(after, before, atMost),
       this.#db
         .prepare("SELECT id FROM docs WHERE appealed_hour > ?1 AND appealed_hour < ?2 ORDER BY id LIMIT ?3")
         .bind(after, before, atMost),
-      this.#db.prepare("SELECT COALESCE(SUM(keys), 0) AS keys FROM net_day WHERE day = ?").bind(newKeysDay),
+      this.#db
+        .prepare(
+          `SELECT COALESCE(SUM(keys), 0) AS keys, COALESCE(SUM(CASE WHEN net = ?2 THEN bytes END), 0) AS new_keys_bytes
+           FROM net_day WHERE day = ?1`,
+        )
+        .bind(newKeysDay, NEW_KEYS_NET),
     ]);
     const ids = (rows: typeof blocked): string[] => ((rows?.results ?? []) as { id: string }[]).map(({ id }) => id);
     return {
       reports: (reports?.results ?? []) as News["reports"],
+      reportsTotal: (totals?.results?.[0] as { n: number } | undefined)?.n ?? 0,
+      reportLines: (totals?.results?.[0] as { listed: number } | undefined)?.listed ?? 0,
       blocked: ids(blocked),
       appealed: ids(appealed),
       newKeys: (keys?.results?.[0] as { keys: number } | undefined)?.keys ?? 0,
       newKeysDay,
+      newKeysNearTheirTop:
+        ((keys?.results?.[0] as { new_keys_bytes: number } | undefined)?.new_keys_bytes ?? 0) >=
+        this.#limits.newKeysBytesADay * NEW_KEYS_NOTICED_AT,
     };
   }
 

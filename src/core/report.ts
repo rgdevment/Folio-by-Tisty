@@ -1,11 +1,12 @@
 import { dayOf, type Limits, levelOfReport } from "./limits";
 import { netDigest } from "./net";
-import type { ReadTools } from "./read";
-import { askForProof, type Refused } from "./refused";
-import { holdsALink, isSealedLink } from "./sealed-link";
+import type { Limiter, ReadTools } from "./read";
+import { askForProof, type Refused, tooFast } from "./refused";
+import { holdsALink, isSealedContact, isSealedLink } from "./sealed-link";
 import { hourEnds, hourOf, proofIsFresh } from "./start";
 
 export interface ReportTools extends ReadTools {
+  reportLimiter: Limiter;
   evidenceKey: (today: number) => Promise<string>;
 }
 
@@ -13,6 +14,7 @@ export interface Said {
   category: string;
   detail?: string;
   sealedLink?: string;
+  sealedContact?: string;
   version?: number;
 }
 
@@ -37,20 +39,38 @@ const linkIsTaken = (link: unknown, category: string, limits: Limits): boolean =
 const detailIsTaken = (detail: unknown, limits: Limits): boolean =>
   isTextUpTo(detail, limits.reportDetailAtMost) && !holdsALink(String(detail ?? ""));
 
+// Whoever reviews it has to know what to look for, and a light report reaches nobody.
+const detailIsEnough = (detail: unknown, category: string, limits: Limits): boolean =>
+  levelOfReport(category) === "light" ||
+  (typeof detail === "string" && detail.trim().length >= limits.reportDetailAtLeast);
+
+const contactIsTaken = (contact: unknown, category: string): boolean =>
+  contact === undefined ||
+  (levelOfReport(category) !== "light" && typeof contact === "string" && isSealedContact(contact));
+
 const versionIsTaken = (version: unknown): boolean =>
   version === undefined || (Number.isSafeInteger(version) && (version as number) > 0);
 
 export const saidOf = (body: unknown, limits: Limits): Said | null => {
   if (typeof body !== "object" || body === null) return null;
-  const { category, detail, sealedLink, version } = body as Record<string, unknown>;
+  const { category, detail, sealedLink, sealedContact, version } = body as Record<string, unknown>;
   if (typeof category !== "string" || levelOfReport(category) === null) return null;
-  if (!detailIsTaken(detail, limits) || !linkIsTaken(sealedLink, category, limits) || !versionIsTaken(version)) {
+  if (
+    !detailIsTaken(detail, limits) ||
+    !detailIsEnough(detail, category, limits) ||
+    !linkIsTaken(sealedLink, category, limits) ||
+    !contactIsTaken(sealedContact, category) ||
+    !versionIsTaken(version)
+  ) {
     return null;
   }
+  // Nobody could review a grave one without its link, so it would only be an accusation on record.
+  if (levelOfReport(category) === "grave" && sealedLink === undefined) return null;
   return {
     category,
     ...(detail === undefined ? {} : { detail: detail as string }),
     ...(sealedLink === undefined ? {} : { sealedLink: sealedLink as string }),
+    ...(sealedContact === undefined ? {} : { sealedContact: sealedContact as string }),
     ...(version === undefined ? {} : { version: version as number }),
   };
 };
@@ -58,10 +78,11 @@ export const saidOf = (body: unknown, limits: Limits): Said | null => {
 // Nothing is written before the proof, so a flood of reports costs no rows (decision 41).
 export const reportDoc = async (
   { id, ip, asn, now, said, proof }: Reporting,
-  { store, limits, secret, dayKey, evidenceKey }: ReportTools,
+  { store, reportLimiter, limits, secret, dayKey, evidenceKey }: ReportTools,
 ): Promise<{ received: true } | Refused> => {
   const today = dayOf(now);
   const net = await netDigest(await dayKey(today), ip);
+  if (!(await reportLimiter.allows(net))) return tooFast(now);
   const scope = `report|${id}|${net}`;
   const proved = proof !== undefined && (await proofIsFresh(secret, scope, proof, limits.proofBits, now));
   if (!proved) return askForProof(secret, scope, limits.proofBits, now);

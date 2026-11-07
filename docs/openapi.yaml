@@ -96,6 +96,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BadRevocation" }
+        "409":
+          description: A root already took back as many machines as it may, so a new one was not kept. What fit in the same request was, so sending it again is safe, and a machine it already took back can still move its date earlier.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MachinesFull" }
         "413":
           description: Past what a request may weigh.
           content:
@@ -238,7 +243,7 @@ paths:
                   - $ref: "#/components/schemas/KeyBlocked"
         "404": { $ref: "#/components/responses/Missing" }
         "409":
-          description: Another version arrived first, or this person keeps as many documents as they may.
+          description: Another version arrived first, or this person keeps as many documents, or as many languages of this one, as they may.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Behind" }
@@ -279,8 +284,9 @@ paths:
         "500": { $ref: "#/components/responses/Failed" }
         "503":
           description: |
-            Uploads are off for now, by the spending cut, or this is a new document and the service has not opened
-            yet. What is already shared takes new versions while it has not. Reading goes on.
+            Uploads are off for now, by the spending cut, or the owner's or the signer's key is too new while the
+            storage is near its ceiling or new keys used up what they may store today, or this is a new document and
+            the service has not opened yet. What is already shared takes new versions while it has not. Reading goes on.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UploadsOff" }
@@ -367,6 +373,74 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UploadsOff" }
+  /cases/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Reading]
+      operationId: readCase
+      summary: Gives the version a case link opens, even on a blocked document.
+      description: |
+        For whoever verifies a report or investigates it. `Folio-Case` carries the token the operator handed
+        over, which lasts 30 days. It opens no more than a reader's link does: the key is still needed. Each
+        answer on this path and those below it is noted as an opening, and no reader is counted.
+      parameters:
+        - $ref: "#/components/parameters/CaseToken"
+      responses:
+        "200":
+          description: The envelope of that version, with the same headers as reading a document.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Missing" }
+        "429": { $ref: "#/components/responses/Slow" }
+        "500": { $ref: "#/components/responses/Failed" }
+  /cases/{id}/records:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Reading]
+      operationId: readCaseRecords
+      summary: Gives the document's records, sealed, when the case link was made for an authority.
+      description: The key is in the case link, and the server never had it.
+      parameters:
+        - $ref: "#/components/parameters/CaseToken"
+      responses:
+        "200":
+          description: The sealed records.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sealed]
+                properties:
+                  sealed: { type: string }
+        "404": { $ref: "#/components/responses/Missing" }
+        "429": { $ref: "#/components/responses/Slow" }
+        "500": { $ref: "#/components/responses/Failed" }
+  /cases/{id}/files/{hash}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+      - name: hash
+        in: path
+        required: true
+        description: The `files_hash` of the version the case opens.
+        schema: { type: string, pattern: "^[A-Za-z0-9_-]{43}$" }
+    get:
+      tags: [Reading]
+      operationId: readCaseFiles
+      summary: Gives the sealed files envelope of the version a case link opens.
+      parameters:
+        - $ref: "#/components/parameters/CaseToken"
+      responses:
+        "200":
+          description: The envelope as it was uploaded.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Missing" }
+        "429": { $ref: "#/components/responses/Slow" }
+        "500": { $ref: "#/components/responses/Failed" }
   /docs/{id}/files/{hash}:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -480,12 +554,12 @@ paths:
       summary: Reports a document.
       description: |
         One report per document and network counts, and it stays tied to the version the reader saw. A network
-        can raise its report to a higher level or add the link, and nothing else changes it. It answers
-        the same whether or not the document exists. Spam and offensive content are light: three networks of two
-        operators warn the author, who has three days to send a new version. Phishing, malware and scams block with three
-        networks of two operators. So do the grave ones, but only with `sealedLink`: without it they stay on
-        record and block nothing, since nobody could review them. Copyright is not reported here: its holder
-        asks, and it comes down. If telling the operator fails the answer is `failed`, the report stays, and
+        can raise its report to a higher level or add the link, and nothing else changes it. Once cleared, only a
+        report on a newer version counts again, so the same networks cannot undo an accepted appeal. It answers
+        the same whether or not the document exists. Anything but a light report must bring `detail`, of at least 10 characters. A report on a document that no longer lives is not kept, and answers the same. Spam and offensive content are light: ten networks of two
+        operators within 24 hours warn the author, who has three days to send a new version. Phishing, malware and scams block with three
+        networks of two operators, and so do the grave ones, which must bring `sealedLink`: nobody could review
+        them without it. A network counts to block on up to 20 documents in 180 days and helps block up to 3 a day; past that its reports stay on record, and what waits is tried again each hour. Copyright is not reported here: its holder asks, and it comes down. If telling the operator fails the answer is `failed`, the report stays, and
         sending it again tells again.
       parameters:
         - $ref: "#/components/parameters/Proof"
@@ -511,7 +585,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/TooBig" }
         "429":
-          description: A proof of work is asked for, or the network used up its reports of the hour.
+          description: A proof of work is asked for, the network used up its reports of the hour, or it asked too fast.
           headers:
             Retry-After: { $ref: "#/components/headers/RetryAfter" }
           content:
@@ -520,6 +594,7 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/Proof"
                   - $ref: "#/components/schemas/Quota"
+                  - $ref: "#/components/schemas/Slow"
         "500": { $ref: "#/components/responses/Failed" }
   /docs/{id}/admin:
     parameters:
@@ -614,6 +689,12 @@ components:
       in: path
       required: true
       schema: { type: string, pattern: "^[A-Za-z0-9]{8}$" }
+    CaseToken:
+      name: Folio-Case
+      in: header
+      required: true
+      description: The token of a case link.
+      schema: { type: string, pattern: "^[A-Za-z0-9_-]{43}$" }
     Proof:
       name: Folio-Proof
       in: header
@@ -723,7 +804,12 @@ components:
       type: object
       required: [refused]
       properties:
-        refused: { enum: [behind, shares_full] }
+        refused: { enum: [behind, shares_full, languages_full] }
+    MachinesFull:
+      type: object
+      required: [refused]
+      properties:
+        refused: { const: machines_full }
     BadEnvelope:
       type: object
       required: [refused, why]
@@ -782,6 +868,11 @@ components:
           maxLength: 1024
           pattern: "^sealed1\\.[A-Za-z0-9_-]{150,}$"
           description: The link to read it, id#key and never the edit token, sealed with the operator's public key. The server cannot open it, and a light report does not bring it.
+        sealedContact:
+          type: string
+          maxLength: 512
+          pattern: "^contact1\\.[A-Za-z0-9_-]{80,}$"
+          description: An email the reporter chose to leave, sealed with the operator's public key. A light report does not bring it.
     Status:
       type: object
       required: [status]

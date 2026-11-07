@@ -36,6 +36,7 @@ export interface Upload {
   permit: string | null;
   ownerMark: string;
   files?: string;
+  newKey?: boolean;
 }
 
 export interface KeptFiles {
@@ -74,6 +75,7 @@ export interface Report {
   asn: number;
   detail?: string;
   sealedLink?: string;
+  sealedContact?: string;
   version?: number;
 }
 
@@ -82,14 +84,24 @@ export interface Reported {
 }
 
 export interface News {
-  reports: { doc: string; category: string; nets: number }[];
+  reports: { doc: string; category: string; nets: number; uncounted: number }[];
+  reportsTotal: number;
+  reportLines: number;
   blocked: string[];
   appealed: string[];
   newKeys: number;
   newKeysDay: number;
+  newKeysNearTheirTop: boolean;
 }
 
 // What a read needs of a document, in one row.
+export interface OpenedCase {
+  version: Version;
+  diesOn: number;
+  revocations: Revocation[];
+  sealedRecords: string | null;
+}
+
 export interface Shown {
   owner: string;
   version: Version | null;
@@ -119,10 +131,27 @@ export interface Owned {
   status: DocStatus;
 }
 
-export type Created = "created" | "same" | "taken" | "shares_full" | "no_anchor" | "quota" | "bad_ttl";
-export type Uploaded = "stored" | "same" | "behind" | "missing" | "blocked" | "paused" | "quota" | "list_full";
+export type Created =
+  | "created"
+  | "same"
+  | "taken"
+  | "shares_full"
+  | "languages_full"
+  | "no_anchor"
+  | "quota"
+  | "bad_ttl";
+export type Uploaded =
+  | "stored"
+  | "same"
+  | "behind"
+  | "missing"
+  | "blocked"
+  | "paused"
+  | "quota"
+  | "list_full"
+  | "new_keys_full";
 export type Admitted = "here" | "new" | "over" | "full";
-export type Stage = "open" | "warned" | "no_uploads" | "blocked";
+export type Stage = "open" | "warned" | "new_keys_off" | "no_uploads" | "blocked";
 
 export interface Swept {
   summed: number;
@@ -145,14 +174,17 @@ export interface AcceptedTerms {
 export interface Store {
   create(doc: NewDoc, today: number): Promise<Created>;
   upload(upload: Upload, today: number, held?: Held): Promise<Uploaded>;
+  forgetUnsent(id: string, net: string, today: number): Promise<void>;
   held(id: string): Promise<Held | null>;
   setPermit(id: string, permit: string | null): Promise<void>;
-  revoke(revocations: Revocation[]): Promise<void>;
+  revoke(revocations: Revocation[]): Promise<boolean>;
   isRevoked(root: string, machine: string, now: number): Promise<boolean>;
   haveSigned(roots: string[]): Promise<boolean>;
+  allKeysSignedBy(roots: string[], day: number): Promise<boolean>;
   admit(reading: Reading, today: number): Promise<Admitted>;
   note(reading: Reading, today: number): Promise<void>;
   shown(id: string, today: number): Promise<Shown | null>;
+  openedCase(id: string, hash: string, today: number, now: number): Promise<OpenedCase | null>;
   envelope(id: string, version: Version): Promise<ReadableStream | null>;
   hasFiles(id: string, hash: string): Promise<boolean>;
   keepFiles(files: KeptFiles, today: number): Promise<"stored" | "quota">;

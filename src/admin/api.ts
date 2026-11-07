@@ -1,19 +1,44 @@
-import type { Acted, CloudModeration } from "../cloudflare/moderation";
+import type { Acted, CloudModeration, NewCase } from "../cloudflare/moderation";
+import { isSealedRecords } from "../core/case-records";
 import type { AccessSettings, Certs } from "./access";
 import { isOperator } from "./access";
 
 export interface AdminApi {
   moderation: Pick<
     CloudModeration,
-    "queue" | "accept" | "reject" | "block" | "reportWasFalse" | "opened" | "blockKey" | "unblockKey"
+    | "queue"
+    | "accept"
+    | "reject"
+    | "block"
+    | "reportWasFalse"
+    | "opened"
+    | "panic"
+    | "purgeOwner"
+    | "purgePreview"
+    | "makeCase"
+    | "handedOver"
+    | "forgetContact"
+    | "networkWasFalse"
+    | "clearWarning"
+    | "blockKey"
+    | "unblockKey"
   >;
   access: AccessSettings;
   certs: Certs;
   now: number;
 }
 
-const ACTION_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened)$/;
-const FALSE_REPORT_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/false$/;
+const ACTION_PATH =
+  /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|purge_owner|case|handed_over|clear_warning)$/;
+const PURGE_PREVIEW_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/purge_owner$/;
+const TOKEN_HASH = /^[A-Za-z0-9_-]{43}$/;
+const REPORT_PATH =
+  /^\/api\/docs\/([A-Za-z0-9]{8})\/reports\/([A-Za-z0-9_-]{1,64})\/(false|false_network|forget_contact)$/;
+const ON_REPORT = {
+  false: "reportWasFalse",
+  false_network: "networkWasFalse",
+  forget_contact: "forgetContact",
+} as const;
 const KEY_PATH = /^\/api\/keys\/([A-Za-z0-9_-]{43})\/(block|unblock)$/;
 const SAID_AT_MOST = 500;
 const HEADERS = {
@@ -37,9 +62,21 @@ const noteOf = async (request: Request): Promise<string | null> => {
   return note.length > 0 && note.length <= SAID_AT_MOST ? note : null;
 };
 
+const newCaseOf = async (request: Request): Promise<NewCase | null> => {
+  const said = (await request.json().catch(() => null)) as Partial<NewCase> | null;
+  const { version, tokenHash, sealedRecords } = said ?? {};
+  if (!Number.isInteger(version) || (version as number) < 1) return null;
+  if (typeof tokenHash !== "string" || !TOKEN_HASH.test(tokenHash)) return null;
+  if (sealedRecords !== undefined && !isSealedRecords(sealedRecords)) return null;
+  return { version: version as number, tokenHash, ...(sealedRecords === undefined ? {} : { sealedRecords }) };
+};
+
 const act = async (request: Request, path: string, { moderation, now }: AdminApi): Promise<Response> => {
-  const [, reportDoc, net] = FALSE_REPORT_PATH.exec(path) ?? [];
-  if (reportDoc && net) return answerOf(await moderation.reportWasFalse(reportDoc, net, now));
+  const [, reportDoc, net, onReport] = REPORT_PATH.exec(path) ?? [];
+  if (reportDoc && net) {
+    const acting = ON_REPORT[onReport as keyof typeof ON_REPORT];
+    return answerOf(await moderation[acting](reportDoc, net, now));
+  }
   const [, root, onKey] = KEY_PATH.exec(path) ?? [];
   if (root && onKey === "unblock") return answerOf(await moderation.unblockKey(root, now));
   if (root) {
@@ -51,9 +88,28 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
   if (!id) return json(404, { refused: "missing" });
   if (action === "accept") return answerOf(await moderation.accept(id, now));
   if (action === "reject") return answerOf(await moderation.reject(id, now));
+  if (action === "handed_over") return answerOf(await moderation.handedOver(id, now));
+  if (action === "clear_warning") return answerOf(await moderation.clearWarning(id, now));
+  if (action === "case") {
+    const made = await newCaseOf(request);
+    return made ? answerOf(await moderation.makeCase(id, made, now)) : json(400, { refused: "bad_case" });
+  }
   const note = await noteOf(request);
   if (!note) return json(400, { refused: "no_reason" });
+  if (action === "purge_owner") {
+    const purged = await moderation.purgeOwner(id, note, now);
+    return purged ? json(200, purged) : json(404, { refused: "missing" });
+  }
+  if (action === "panic") {
+    const records = await moderation.panic(id, note, now);
+    return records ? json(200, { records }) : json(404, { refused: "missing" });
+  }
   return answerOf(action === "block" ? await moderation.block(id, note, now) : await moderation.opened(id, note, now));
+};
+
+const reportsFromOf = (request: Request): number => {
+  const from = Number(new URL(request.url).searchParams.get("from"));
+  return Number.isSafeInteger(from) && from > 0 ? from : 0;
 };
 
 export const answer = async (request: Request, api: AdminApi): Promise<Response> => {
@@ -61,7 +117,14 @@ export const answer = async (request: Request, api: AdminApi): Promise<Response>
   if (!operator) return json(403, { refused: "not_the_operator" });
 
   const { pathname } = new URL(request.url);
-  if (request.method === "GET" && pathname === "/api/queue") return json(200, await api.moderation.queue(api.now));
+  if (request.method === "GET" && pathname === "/api/queue") {
+    return json(200, await api.moderation.queue(api.now, reportsFromOf(request)));
+  }
+  const [, toPurge] = PURGE_PREVIEW_PATH.exec(pathname) ?? [];
+  if (request.method === "GET" && toPurge) {
+    const preview = await api.moderation.purgePreview(toPurge, api.now);
+    return preview ? json(200, preview) : json(404, { refused: "missing" });
+  }
   if (request.method !== "POST") return json(404, { refused: "missing" });
   // A form or a link from elsewhere cannot send this header, and the preflight it needs is never answered.
   if (request.headers.get("Folio-Operator") !== "1") return json(403, { refused: "not_the_operator" });
