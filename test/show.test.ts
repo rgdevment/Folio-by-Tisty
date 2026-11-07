@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import VECTORS from "@tisty/contracts/vectors.json";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sealRecords } from "../src/core/case-records";
 import { proofHolds, solveProof } from "../src/core/start";
-import { showLink } from "../src/page/ui/show";
+import { showCase, showLink } from "../src/page/ui/show";
 
 // biome-ignore lint/suspicious/noExplicitAny: these are the contract's own samples, in the shape it writes them.
 const SAMPLES = VECTORS as any;
@@ -77,6 +78,101 @@ describe("what a reader is told", () => {
   it("lets what it did not expect reach the page's entry, which still closes", async () => {
     const broken = { bytes: hex(SAMPLES.main.envelope), arrivedAt: Number.NaN, diesOn: 1 };
     await expect(showLink(ID, SAMPLES.link_key, Promise.resolve(broken), NOT_FOUND)).rejects.toThrow();
+  });
+});
+
+describe("a case link", () => {
+  const TOKEN = "T".repeat(43);
+  const RECORDS_KEY = "A".repeat(43);
+  const served = () =>
+    new Response(hex(SAMPLES.main.envelope), {
+      headers: { "Folio-Arrived": "1800000000000", "Folio-Dies-On": "21000", "Folio-Version": "1" },
+    });
+  const button = () => place.document.getElementById("report") as HTMLButtonElement | null;
+
+  beforeEach(() => {
+    vi.stubGlobal("addEventListener", vi.fn());
+    vi.stubGlobal("requestAnimationFrame", vi.fn());
+    vi.stubGlobal("DOMParser", place.DOMParser);
+    vi.stubGlobal("MutationObserver", place.MutationObserver);
+    vi.stubGlobal("AbortController", place.AbortController);
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe(): void {}
+      },
+    );
+  });
+
+  it("asks with its token, for the case and not the document", async () => {
+    const fetched = vi.fn(async () => new Response('{"refused":"missing"}', { status: 404 }));
+    vi.stubGlobal("fetch", fetched);
+    await showCase(ID, { token: TOKEN });
+    const [path, asked] = fetched.mock.calls[0] as unknown as [string, RequestInit];
+    expect(path).toBe(`/api/v1/cases/${ID}`);
+    expect(asked.headers).toEqual({ "Folio-Case": TOKEN });
+    expect(said()).toContain("caducó");
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("does not ask for the key of what it could not bring", async () => {
+    const asking = vi.fn();
+    vi.stubGlobal("prompt", asking);
+    vi.stubGlobal("fetch", async () => new Response('{"refused":"slow"}', { status: 429 }));
+    await showCase(ID, { token: TOKEN });
+    expect(asking).not.toHaveBeenCalled();
+    expect(said()).toContain("demasiadas visitas");
+  });
+
+  it("opens with the key pasted alone or inside a link, and offers neither editing nor reporting", async () => {
+    vi.stubGlobal("fetch", async () => served());
+    vi.stubGlobal("prompt", () => `https://tisty.cl/${ID}#${SAMPLES.link_key}`);
+    await showCase(ID, { token: TOKEN });
+    expect(closed()).not.toBe("closed");
+    expect(place.document.getElementById("edit-in-tisty")).toBeNull();
+    expect(button()).toBeNull();
+  });
+
+  it("says the link does not open when no key was given", async () => {
+    vi.stubGlobal("fetch", async () => served());
+    vi.stubGlobal("prompt", () => null);
+    await showCase(ID, { token: TOKEN });
+    expect(said()).toContain("link completo");
+  });
+
+  it("offers the records when the link brings their key, and saves them open", async () => {
+    const sealed = await sealRecords('{"reports":[]}', new Uint8Array(32));
+    const fetched = vi.fn(async (path: string) =>
+      path.endsWith("/records") ? new Response(JSON.stringify({ sealed })) : served(),
+    );
+    vi.stubGlobal("fetch", fetched);
+    vi.stubGlobal("prompt", () => SAMPLES.link_key);
+    const kept: Blob[] = [];
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, { createObjectURL: (blob: Blob) => (kept.push(blob), "blob:x"), revokeObjectURL: () => {} }),
+    );
+    await showCase(ID, { token: TOKEN, recordsKey: RECORDS_KEY });
+    expect(button()?.textContent).toBe("Descargar registros");
+    expect(button()?.disabled).toBe(false);
+    const opensTheForm = vi.fn();
+    Object.assign(place.document.getElementById("report-dialog") as object, { showModal: opensTheForm });
+    const before = kept.length;
+    button()?.click();
+    await vi.waitFor(() => expect(kept.length).toBeGreaterThan(before));
+    expect(await (kept.at(-1) as Blob).text()).toBe('{"reports":[]}');
+    expect(opensTheForm).not.toHaveBeenCalled();
+  });
+
+  it("says so when the records cannot be brought", async () => {
+    vi.stubGlobal("fetch", async (path: string) =>
+      path.endsWith("/records") ? new Response('{"refused":"missing"}', { status: 404 }) : served(),
+    );
+    vi.stubGlobal("prompt", () => SAMPLES.link_key);
+    await showCase(ID, { token: TOKEN, recordsKey: RECORDS_KEY });
+    button()?.click();
+    await vi.waitFor(() => expect(button()?.textContent).toContain("No se pudieron"));
   });
 });
 

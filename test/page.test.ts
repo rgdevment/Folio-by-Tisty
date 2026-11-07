@@ -92,7 +92,7 @@ describe("opening a link", () => {
 
   it("says something even when the code that reads it could not load", () => {
     expect(main).toContain('from "./closed"');
-    expect(main).toMatch(/showAsked\([^)]*\)[^;]*\.catch/);
+    expect(main).toMatch(/opening\([^)]*\)[^;]*\.catch/);
   });
 });
 

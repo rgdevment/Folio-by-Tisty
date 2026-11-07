@@ -81,7 +81,16 @@ const pressing = (place: string, said: string, at = 0): void => {
 
 beforeEach(() => {
   page = new JSDOM(readFileSync("src/admin/page/index.html", "utf8")).window.document;
-  doing = { accept: vi.fn(), reject: vi.fn(), reportWasFalse: vi.fn(), opened: vi.fn(), copy: vi.fn() };
+  doing = {
+    accept: vi.fn(),
+    reject: vi.fn(),
+    reportWasFalse: vi.fn(),
+    opened: vi.fn(),
+    copy: vi.fn(),
+    panic: vi.fn(),
+    verifyLink: vi.fn(),
+    handedOver: vi.fn(),
+  };
   drawQueue(page, QUEUE, doing as unknown as Doing);
 });
 
@@ -141,7 +150,8 @@ describe("the panel", () => {
     const blocked = page.getElementById("blocked") as Element;
     const cards = blocked.querySelectorAll(".card");
     expect(cards[0]?.textContent).toContain("espera una versión de su dueño");
-    expect(cards[0]?.querySelector("button")).toBeNull();
+    const offered = [...(cards[0] as Element).querySelectorAll("button")].map((one) => one.textContent);
+    expect(offered).toEqual(["Link para verificar", "Botón de pánico"]);
     pressing("blocked", "Desbloquear");
     expect(doing.accept).toHaveBeenCalledWith("YzAbCdEf");
   });
@@ -170,6 +180,24 @@ describe("the panel", () => {
     expect(page.getElementById("reports")?.textContent).not.toContain("Se ven las");
     drawQueue(page, { ...QUEUE, reportsTotal: 900 }, doing as unknown as Doing);
     expect(page.getElementById("reports")?.textContent).toContain("Se ven las 2 más graves y recientes de 900.");
+  });
+
+  it("offers a report's own version to verify and to panic, and its link only to hand over", () => {
+    pressing("reports", "Link para verificar");
+    expect(doing.verifyLink).toHaveBeenCalledWith("AbCdEfGh", 2);
+    pressing("reports", "Botón de pánico", 1);
+    expect(doing.panic).toHaveBeenCalledWith("IjKlMnOp", 1);
+    pressing("reports", "Ya lo entregué");
+    expect(doing.handedOver).toHaveBeenCalledWith("AbCdEfGh");
+    const buttons = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
+    expect(buttons.filter((one) => one.textContent === "Ya lo entregué")).toHaveLength(1);
+  });
+
+  it("offers the latest version of a blocked document", () => {
+    pressing("blocked", "Botón de pánico");
+    expect(doing.panic).toHaveBeenCalledWith("QrStUvWx", 1);
+    pressing("appeals", "Link para verificar");
+    expect(doing.verifyLink).toHaveBeenCalledWith("AbCdEfGh", 2);
   });
 
   it("says when there is nothing", () => {

@@ -11,6 +11,7 @@ export interface FileAsking {
   id: string;
   linkKey: string;
   held: Document;
+  caseToken?: string;
 }
 
 type Plays = NonNullable<ReturnType<typeof playableAs>>;
@@ -38,14 +39,17 @@ const saysItIsAPage = ({ kind, name }: Attachment): boolean => PAGE_KIND.test(ki
 export const playerFor = (file: Attachment, bytes: Bytes): Plays | null =>
   saysItIsAPage(file) ? null : playableAs(bytes);
 
-const asked = async (id: string, hash: string, proof?: string): Promise<Bytes | NotArrived> => {
-  const response = await asking(`/api/v1/docs/${id}/files/${hash}`, proof);
+const asked = async (id: string, hash: string, proof?: string, caseToken?: string): Promise<Bytes | NotArrived> => {
+  const place = caseToken === undefined ? "docs" : "cases";
+  const response = await asking(`/api/v1/${place}/${id}/files/${hash}`, proof, caseToken);
   return response.ok ? new Uint8Array(await response.arrayBuffer()) : ((await response.json()) as NotArrived);
 };
 
-const bytesOfFiles = async ({ id, linkKey, held }: FileAsking): Promise<Bytes[]> => {
+const bytesOfFiles = async ({ id, linkKey, held, caseToken }: FileAsking): Promise<Bytes[]> => {
   const hash = held.files_hash as string;
-  const answer = await answeringProof(await asked(id, hash), (proof) => asked(id, hash, proof));
+  const answer = await answeringProof(await asked(id, hash, undefined, caseToken), (proof) =>
+    asked(id, hash, proof, caseToken),
+  );
   if ("refused" in answer) {
     throw new NotBrought(answer.refused === "missing" ? NOT_THERE : (NOT_ARRIVED[answer.refused] ?? COULD_NOT_ARRIVE));
   }
@@ -79,7 +83,7 @@ const told = (link: HTMLElement, said: string): void => {
   link.after(note);
 };
 
-const saved = ({ name }: Attachment, bytes: Bytes): void => {
+export const saved = ({ name }: Pick<Attachment, "name">, bytes: Bytes): void => {
   const address = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
   const saving = document.createElement("a");
   saving.href = address;

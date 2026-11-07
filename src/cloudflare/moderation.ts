@@ -4,7 +4,14 @@ import { hourOf } from "../core/start";
 
 export type Acted = "done" | "missing";
 
+export interface NewCase {
+  version: number;
+  tokenHash: string;
+  sealedRecords?: string;
+}
+
 const SEEN_AT_MOST = 200;
+const CASE_LINK_DAYS = 30;
 const REPORTS_TO_SEE = "FROM reports r WHERE r.level <> 'light' AND r.cleared = 0";
 
 export const mayCorrect = (row: {
@@ -140,6 +147,68 @@ export class CloudModeration {
       )
       .bind(dayOf(now), hourOf(now), this.#limits.evidenceDays, id);
     return this.#actedAndLogged([blocking], this.#logIfChanged(id, "block", now, note));
+  }
+
+  async panic(id: string, note: string, now: number): Promise<unknown> {
+    const today = dayOf(now);
+    const until = today + this.#limits.evidenceDays;
+    const holding = this.#db
+      .prepare(
+        `UPDATE docs SET blocked_by_operator = 1, blocked_at = COALESCE(blocked_at, ?1),
+           blocked_hour = COALESCE(blocked_hour, ?2), dies_on = ?3, legal_until = MAX(COALESCE(legal_until, 0), ?3)
+         WHERE id = ?4 AND latest >= 0`,
+      )
+      .bind(today, hourOf(now), until, id);
+    const acted = await this.#actedAndLogged([holding], this.#logIfChanged(id, "panic", now, note));
+    return acted === "done" ? this.#records(id) : null;
+  }
+
+  async makeCase(id: string, made: NewCase, now: number): Promise<Acted> {
+    const adding = this.#db
+      .prepare(
+        `INSERT OR IGNORE INTO cases (token_hash, doc, version, until, sealed_records)
+         SELECT ?1, d.id, ?2, ?3, ?4 FROM docs d
+         WHERE d.id = ?5 AND EXISTS (SELECT 1 FROM json_each(d.versions) v WHERE json_extract(v.value, '$.n') = ?2)`,
+      )
+      .bind(made.tokenHash, made.version, dayOf(now) + CASE_LINK_DAYS, made.sealedRecords ?? null, id);
+    return this.#actedAndLogged([adding], this.#logIfChanged(id, "case", now));
+  }
+
+  async handedOver(id: string, now: number): Promise<Acted> {
+    const erasing = this.#db
+      .prepare("UPDATE reports SET sealed_link = NULL WHERE doc = ? AND sealed_link IS NOT NULL")
+      .bind(id);
+    return this.#actedAndLogged([erasing], this.#logIfChanged(id, "handed_over", now));
+  }
+
+  // Never who reported: not the network, nor its provider, nor the link it sealed (decision 152).
+  async #records(id: string): Promise<unknown> {
+    const [doc, reports, actions, openings, ownerKey] = await this.#db.batch([
+      this.#db
+        .prepare("SELECT owner, latest, versions, blocked_at, dies_on, legal_until FROM docs WHERE id = ?")
+        .bind(id),
+      this.#db
+        .prepare("SELECT category, level, detail, version, at, cleared FROM reports WHERE doc = ? ORDER BY at")
+        .bind(id),
+      this.#db.prepare("SELECT at, action, note FROM moderation WHERE doc = ? ORDER BY at").bind(id),
+      this.#db.prepare("SELECT at, reason FROM openings WHERE doc = ? ORDER BY at").bind(id),
+      this.#db
+        .prepare(
+          `SELECT k.first_day, k.terms_version, k.terms_hour FROM keys k
+           WHERE k.root = (SELECT owner FROM docs WHERE id = ?)`,
+        )
+        .bind(id),
+    ]);
+    const row = doc?.results[0] as { versions: string } & Record<string, unknown>;
+    return {
+      id,
+      ...row,
+      versions: JSON.parse(row.versions) as unknown,
+      ownerKey: ownerKey?.results[0] ?? null,
+      reports: reports?.results ?? [],
+      actions: actions?.results ?? [],
+      openings: openings?.results ?? [],
+    };
   }
 
   async reportWasFalse(id: string, net: string, now: number): Promise<Acted> {

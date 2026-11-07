@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 7, in force since November 6, 2026.**
+**Version 8, in force since November 6, 2026.**
 
 ## The short version
 
@@ -146,6 +146,14 @@ you are to report: it keeps a digest of the network.
 - **The operator may report** to the PDI or the prosecutor what, on review,
   looks like a crime, and tell Google Safe Browsing and Cloudflare about
   phishing and malware. One person does this, by hand.
+- **When reporting to an authority,** the operator blocks the document and holds
+  it for 180 days, renewable for as long as the authority asks. The authority
+  gets a link that opens only the reported version for 30 days, with each opening
+  noted, and an encrypted package with the records Folio holds, without the
+  network of whoever reported. The operator may also use such a link to verify a
+  report about a document already blocked. Once the key is handed over, the
+  operator erases the one the report brought, which stays in the encrypted
+  backups for up to 30 days.
 - **The operator only opens what is encrypted** in four cases and always with
   the link to read it: when whoever shared it hands it over to show the block
   was a mistake, to review a grave report with the link it brought, to confirm

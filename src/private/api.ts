@@ -1,4 +1,5 @@
 import { type AdminAction, administer, setPermitHolds } from "../core/admin";
+import { type CaseAsked, readCase, readCaseFiles, readCaseRecords } from "../core/case";
 import { dayOf } from "../core/limits";
 import { netDigest } from "../core/net";
 import {
@@ -19,6 +20,7 @@ import { type FirstUpload, filesEnvelopeBytesAtMost, type UploadTools, uploadDoc
 const PREFIX = "/api/v1/";
 const DOC_PATH = /^docs\/([A-Za-z0-9]{8})(?:\/(report|admin|pause|resume|appeal|latest|permit))?$/;
 const FILES_PATH = /^docs\/([A-Za-z0-9]{8})\/files(?:\/([A-Za-z0-9_-]{43}))?$/;
+const CASE_PATH = /^cases\/([A-Za-z0-9]{8})(?:\/records|\/files\/([A-Za-z0-9_-]{43}))?$/;
 const REPORT_BYTES_AT_MOST = 16 * 1024;
 const PERMIT_BYTES_AT_MOST = 256;
 const REVOCATIONS_BYTES_AT_MOST = 8 * 1024;
@@ -107,16 +109,34 @@ const bytesAnswer = (
   });
 };
 
+const versionHeaders = (answer: Served): Record<string, string> => ({
+  "Folio-Version": String(answer.version.n),
+  "Folio-Hash": answer.version.hash,
+  "Folio-Arrived": String(answer.version.at),
+  "Folio-Dies-On": String(answer.diesOn),
+  "Folio-Revocations": JSON.stringify(answer.revocations),
+});
+
 const answerRead = async (request: Request, id: string, api: Api): Promise<Response> => {
   const answer = await readDoc(askedOf(request, id, api.now), api.tools);
   if (!("served" in answer)) return refusal(answer, api.now);
-  return bytesAnswer(request, id, answer, api, {
-    "Folio-Version": String(answer.version.n),
-    "Folio-Hash": answer.version.hash,
-    "Folio-Arrived": String(answer.version.at),
-    "Folio-Dies-On": String(answer.diesOn),
-    "Folio-Revocations": JSON.stringify(answer.revocations),
-  });
+  return bytesAnswer(request, id, answer, api, versionHeaders(answer));
+};
+
+const answerCase = async (request: Request, path: string, api: Api): Promise<Response> => {
+  const [, id, hash] = CASE_PATH.exec(path) ?? [];
+  if (!id) return json(404, { refused: "missing" });
+  const asked: CaseAsked = { id, now: api.now, ip: ipOf(request), token: request.headers.get("Folio-Case") ?? "" };
+  if (hash) {
+    const files = await readCaseFiles({ ...asked, hash }, api.tools);
+    return "served" in files ? bytesAnswer(request, id, files, api) : refusal(files, api.now);
+  }
+  if (path.endsWith("/records")) {
+    const records = await readCaseRecords(asked, api.tools);
+    return "refused" in records ? refusal(records, api.now) : json(200, records);
+  }
+  const read = await readCase(asked, api.tools);
+  return "served" in read ? bytesAnswer(request, id, read, api, versionHeaders(read)) : refusal(read, api.now);
 };
 
 const answerFiles = async (request: Request, id: string, hash: string, api: Api): Promise<Response> => {
@@ -250,6 +270,7 @@ const route = async (request: Request, api: Api): Promise<Response> => {
 
   if (path === "start" && request.method === "POST") return answerStart(request, api);
   if (path === "revocations" && request.method === "POST") return answerRevocations(request, api);
+  if (path.startsWith("cases/") && request.method === "GET") return answerCase(request, path, api);
   const [, filesOf, named] = FILES_PATH.exec(path) ?? [];
   if (filesOf && named && request.method === "GET") return answerFiles(request, filesOf, named, api);
   if (filesOf && !named && request.method === "PUT") return answerFilesUpload(request, filesOf, api);
