@@ -283,9 +283,9 @@ paths:
         "500": { $ref: "#/components/responses/Failed" }
         "503":
           description: |
-            Uploads are off for now, by the spending cut, or the storage is near its ceiling and the owner's or the
-            signer's key is too new, or this is a new document and the service has not opened yet. What is already
-            shared takes new versions while it has not. Reading goes on.
+            Uploads are off for now, by the spending cut, or the owner's or the signer's key is too new while the
+            storage is near its ceiling or new keys used up what they may store today, or this is a new document and
+            the service has not opened yet. What is already shared takes new versions while it has not. Reading goes on.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UploadsOff" }
@@ -368,7 +368,7 @@ paths:
                   - $ref: "#/components/schemas/Quota"
         "500": { $ref: "#/components/responses/Failed" }
         "503":
-          description: Uploads are off for now, by the spending cut, or the storage is near its ceiling and the owner's or the signer's key is too new. Reading goes on.
+          description: Uploads are off for now, by the spending cut. Reading goes on.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UploadsOff" }

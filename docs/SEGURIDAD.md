@@ -46,8 +46,9 @@ amenazas legales.
   compartido y leer tienen un freno de velocidad por red, y subir tiene un cupo
   por red y una espera por persona. Denunciar tiene su propio freno de velocidad
   por red. Una red trae solo unas pocas llaves nuevas al día, y una llave nueva
-  parte con los topes más bajos. Cerca del tope de almacenamiento solo suben
-  llaves con 30 días o más, y un documento admite hasta 20 idiomas.
+  parte con los topes más bajos. Las llaves de menos de 30 días comparten un tope
+  diario de almacenamiento, y cerca del tope total solo suben las más antiguas.
+  Un documento admite hasta 20 idiomas.
 - **El panel del operador va aparte.** Es otro Worker, en panel.tisty.cl, sin
   acceso al almacenamiento de los documentos ni a sus llaves, así que no puede
   abrir nada. Está detrás de Cloudflare Access, comprueba de nuevo su token y

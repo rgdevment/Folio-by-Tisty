@@ -36,6 +36,7 @@ export interface Upload {
   permit: string | null;
   ownerMark: string;
   files?: string;
+  newKey?: boolean;
 }
 
 export interface KeptFiles {
@@ -90,6 +91,7 @@ export interface News {
   appealed: string[];
   newKeys: number;
   newKeysDay: number;
+  newKeysNearTheirTop: boolean;
 }
 
 // What a read needs of a document, in one row.
@@ -138,7 +140,16 @@ export type Created =
   | "no_anchor"
   | "quota"
   | "bad_ttl";
-export type Uploaded = "stored" | "same" | "behind" | "missing" | "blocked" | "paused" | "quota" | "list_full";
+export type Uploaded =
+  | "stored"
+  | "same"
+  | "behind"
+  | "missing"
+  | "blocked"
+  | "paused"
+  | "quota"
+  | "list_full"
+  | "new_keys_full";
 export type Admitted = "here" | "new" | "over" | "full";
 export type Stage = "open" | "warned" | "new_keys_off" | "no_uploads" | "blocked";
 
@@ -163,6 +174,7 @@ export interface AcceptedTerms {
 export interface Store {
   create(doc: NewDoc, today: number): Promise<Created>;
   upload(upload: Upload, today: number, held?: Held): Promise<Uploaded>;
+  forgetUnsent(id: string, net: string, today: number): Promise<void>;
   held(id: string): Promise<Held | null>;
   setPermit(id: string, permit: string | null): Promise<void>;
   revoke(revocations: Revocation[]): Promise<boolean>;
