@@ -74,8 +74,11 @@ const panicking = async (id: string, version: number, note: string): Promise<voi
   }
 };
 
+let reportsFrom = 0;
+
 const load = async (): Promise<void> => {
-  const response = await answered(() => fetch("/api/queue", { credentials: "same-origin", cache: "no-store" }));
+  const path = reportsFrom === 0 ? "/api/queue" : `/api/queue?from=${reportsFrom}`;
+  const response = await answered(() => fetch(path, { credentials: "same-origin", cache: "no-store" }));
   if (!response?.ok) {
     said.textContent = "No se pudo traer el panel. Recarga la página, quizá debas volver a entrar.";
     return;
@@ -99,6 +102,10 @@ const load = async (): Promise<void> => {
       if (note?.trim()) void panicking(id, version, note);
     },
     verifyLink: (id, version) => void verifying(id, version),
+    reportsPage: (from) => {
+      reportsFrom = from;
+      void load();
+    },
     handedOver: (id) =>
       confirmed(
         "¿Ya entregaste el link de caso y la llave a la autoridad? Se borran las llaves selladas de este documento, aunque siguen hasta 30 días en los respaldos cifrados.",

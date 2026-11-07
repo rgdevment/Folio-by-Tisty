@@ -24,7 +24,7 @@ const textOf = (stage: Stage, was: Stage, news: News, keysSaid: number, panel?: 
     ...(stage === was ? [] : [`Gasto: ${stage} (antes: ${was})`, ""]),
     ...(keysSaid > 0 ? [`Llaves nuevas el ${dateOf(news.newKeysDay)}: ${keysSaid}`, ""] : []),
     ...listOf(
-      "Denuncias nuevas:",
+      `Denuncias nuevas (${news.reportsTotal}):`,
       news.reports.map(({ doc, category, nets }) => `${category}: ${doc}, ${nets} ${nets === 1 ? "red" : "redes"}`),
     ),
     ...listOf("Bloqueados:", news.blocked),

@@ -253,6 +253,17 @@ describe("what it shows", () => {
     expect(reportsTotal).toBe(201);
   });
 
+  it.each([
+    ["2", 2],
+    ["0", 0],
+    ["-1", 0],
+    ["1.5", 0],
+    ["many", 0],
+  ])("reads the page of reports from %s", async (said, from) => {
+    const response = await asked(`/api/queue?from=${said}`);
+    expect(((await response.json()) as { reportsFrom: number }).reportsFrom).toBe(from);
+  });
+
   it("puts what waits for the operator apart, and says who signed each version", async () => {
     await share("someone else");
     await reported();

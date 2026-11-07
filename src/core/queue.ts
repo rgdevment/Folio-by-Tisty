@@ -28,6 +28,7 @@ export interface Queue {
   stage: string;
   newKeys: number;
   reportsTotal: number;
+  reportsFrom: number;
   reports: QueuedReport[];
   docs: QueuedDoc[];
 }

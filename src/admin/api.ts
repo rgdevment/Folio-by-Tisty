@@ -80,12 +80,19 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
   return answerOf(action === "block" ? await moderation.block(id, note, now) : await moderation.opened(id, note, now));
 };
 
+const reportsFromOf = (request: Request): number => {
+  const from = Number(new URL(request.url).searchParams.get("from"));
+  return Number.isSafeInteger(from) && from > 0 ? from : 0;
+};
+
 export const answer = async (request: Request, api: AdminApi): Promise<Response> => {
   const operator = await isOperator(request.headers.get("Cf-Access-Jwt-Assertion"), api.access, api.certs, api.now);
   if (!operator) return json(403, { refused: "not_the_operator" });
 
   const { pathname } = new URL(request.url);
-  if (request.method === "GET" && pathname === "/api/queue") return json(200, await api.moderation.queue(api.now));
+  if (request.method === "GET" && pathname === "/api/queue") {
+    return json(200, await api.moderation.queue(api.now, reportsFromOf(request)));
+  }
   if (request.method !== "POST") return json(404, { refused: "missing" });
   // A form or a link from elsewhere cannot send this header, and the preflight it needs is never answered.
   if (request.headers.get("Folio-Operator") !== "1") return json(403, { refused: "not_the_operator" });
