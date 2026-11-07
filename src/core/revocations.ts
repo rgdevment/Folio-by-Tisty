@@ -25,9 +25,6 @@ export const takeRevocations = async (
   if (!(await store.takeHourly(net, "revocation", hourOf(now), limits.revocationsAnHour, revocations.length))) {
     return { refused: "quota", until: hourEnds(now) };
   }
-  const roots = revocations.map((one) => one.root);
-  if (!(await store.haveSigned(roots))) return { refused: "bad_revocation" };
-  if (await store.anyRootRevokedAsMany(roots, limits.revokedMachinesAtMost)) return { refused: "bad_revocation" };
-  await store.revoke(revocations);
-  return { done: true };
+  if (!(await store.haveSigned(revocations.map((one) => one.root)))) return { refused: "bad_revocation" };
+  return (await store.revoke(revocations)) ? { done: true } : { refused: "machines_full" };
 };

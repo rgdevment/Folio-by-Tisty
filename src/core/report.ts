@@ -1,11 +1,12 @@
 import { dayOf, type Limits, levelOfReport } from "./limits";
 import { netDigest } from "./net";
-import type { ReadTools } from "./read";
+import type { Limiter, ReadTools } from "./read";
 import { askForProof, type Refused, tooFast } from "./refused";
 import { holdsALink, isSealedLink } from "./sealed-link";
 import { hourEnds, hourOf, proofIsFresh } from "./start";
 
 export interface ReportTools extends ReadTools {
+  reportLimiter: Limiter;
   evidenceKey: (today: number) => Promise<string>;
 }
 
@@ -60,11 +61,11 @@ export const saidOf = (body: unknown, limits: Limits): Said | null => {
 // Nothing is written before the proof, so a flood of reports costs no rows (decision 41).
 export const reportDoc = async (
   { id, ip, asn, now, said, proof }: Reporting,
-  { store, limiter, limits, secret, dayKey, evidenceKey }: ReportTools,
+  { store, reportLimiter, limits, secret, dayKey, evidenceKey }: ReportTools,
 ): Promise<{ received: true } | Refused> => {
   const today = dayOf(now);
   const net = await netDigest(await dayKey(today), ip);
-  if (!(await limiter.allows(net))) return tooFast(now);
+  if (!(await reportLimiter.allows(net))) return tooFast(now);
   const scope = `report|${id}|${net}`;
   const proved = proof !== undefined && (await proofIsFresh(secret, scope, proof, limits.proofBits, now));
   if (!proved) return askForProof(secret, scope, limits.proofBits, now);

@@ -145,7 +145,7 @@ describe("the mail", () => {
   it("tells of the spending stage only when it changed", async () => {
     await store.setStage("blocked");
     const { send } = await digest();
-    expect(send.mock.calls[0]?.[1]).toContain("Gasto: blocked (antes: open)");
+    expect(send.mock.calls[0]?.[1]).toContain("Servicio: blocked (antes: open)");
     expect((await digest()).sent).toBe(false);
     expect(await store.stage()).toBe("blocked");
   });

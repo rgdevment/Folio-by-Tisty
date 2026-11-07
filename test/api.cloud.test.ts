@@ -28,6 +28,7 @@ const testEnv = env as unknown as {
 const store = new Cloud(testEnv);
 const TODAY = dayOf(Date.now());
 const ID = "AbCdEfGh";
+const ANCHOR = "AAAAAAAA";
 const TOKEN = "the admin token";
 
 // biome-ignore lint/suspicious/noExplicitAny: the shape of an OpenAPI file is what this test looks through.
@@ -79,11 +80,12 @@ interface Scenario {
   times?: number;
   upload?: () => Promise<Bytes>;
   first?: boolean;
+  anchor?: string;
   said?: object;
 }
 
 const send = async (
-  { method, path, admin, caseToken, body, braked, broken, upload, first }: Scenario,
+  { method, path, admin, caseToken, body, braked, broken, upload, first, anchor }: Scenario,
   proof?: string,
   ip?: string,
 ) => {
@@ -93,6 +95,7 @@ const send = async (
     headers.set("Folio-Start", await macOf("09".repeat(32), `start|${ID}|${hourOf(Date.now())}`));
     headers.set("Folio-Ttl-Days", "3");
   }
+  if (anchor) headers.set("Folio-Anchor", anchor);
   if (admin) headers.set("Folio-Admin", admin);
   if (caseToken) headers.set("Folio-Case", caseToken);
   if (proof) headers.set("Folio-Proof", proof);
@@ -107,7 +110,7 @@ const send = async (
       headers,
       ...(upload ? { body: await upload() } : body === undefined ? {} : { body }),
     }) as Request<unknown, IncomingRequestCfProperties>,
-    { ...testEnv, FOLIO_SECRET: "09".repeat(32), READS: { limit }, SYNCS: { limit } } as never,
+    { ...testEnv, FOLIO_SECRET: "09".repeat(32), READS: { limit }, SYNCS: { limit }, REPORTS: { limit } } as never,
     context,
   );
   await waitOnExecutionContext(context);
@@ -186,6 +189,13 @@ const listFull = async () => {
 const keepsAsManyAsTheyMay = async () => {
   for (const id of ["AAAAAAAA", "BBBBBBBB"]) {
     await store.create({ id, owner: rootOf(owner), adminHash: "a", ttlDays: 3, net: "n" }, TODAY);
+  }
+};
+const keepsAsManyLanguagesAsTheyMay = async () => {
+  const doc = { owner: rootOf(owner), adminHash: "a", ttlDays: 3, net: "n" };
+  await store.create({ ...doc, id: ANCHOR }, TODAY);
+  for (let n = 1; n < LEVEL_ONE.languagesAtMost; n += 1) {
+    await store.create({ ...doc, id: `language${n}`, anchor: ANCHOR }, TODAY);
   }
 };
 const noUploads = async () => {
@@ -402,6 +412,20 @@ const UPLOADING: Scenario[] = [
   {
     method: "POST",
     path: REVOCATIONS_PATH,
+    status: 409,
+    refused: "machines_full",
+    upload: aRevocation,
+    ready: async () => {
+      await shareSigned();
+      const others = Array.from({ length: LEVEL_ONE.revokedMachinesAtMost }, () =>
+        revocationBy({ ...owner, machineBytes: crypto.getRandomValues(new Uint8Array(32)) }, "2026-11-01T10:00:00Z"),
+      );
+      await store.revoke(await Promise.all(others));
+    },
+  },
+  {
+    method: "POST",
+    path: REVOCATIONS_PATH,
     status: 429,
     refused: "quota",
     upload: aRevocation,
@@ -493,6 +517,18 @@ const UPLOADING: Scenario[] = [
     admin: TOKEN,
     solves: true,
     ready: keepsAsManyAsTheyMay,
+  },
+  {
+    method: "PUT",
+    path: UPLOAD_PATH,
+    status: 409,
+    refused: "languages_full",
+    upload: envelope(1),
+    first: true,
+    anchor: ANCHOR,
+    admin: TOKEN,
+    solves: true,
+    ready: keepsAsManyLanguagesAsTheyMay,
   },
   {
     method: "PUT",

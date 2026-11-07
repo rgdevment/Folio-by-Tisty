@@ -82,6 +82,7 @@ const readOrRefuse = async (id: string, bytes: Bytes, kind: EnvelopeKind = "main
 const REFUSAL_OF_CREATED: Partial<Record<Created, Refused["refused"]>> = {
   taken: "not_yours",
   shares_full: "shares_full",
+  languages_full: "languages_full",
   no_anchor: "bad_upload",
   bad_ttl: "bad_upload",
 };
@@ -181,14 +182,18 @@ const openTo = async ({ ip, now }: Uploading, { store, limiter, dayKey }: ReadTo
   return stage === "no_uploads" || stage === "blocked" ? { refused: "uploads_off" } : { net, stage };
 };
 
-// A key costs nothing to make, so near the ceiling only one that has waited may still fill what is left.
+// A key costs nothing to make, so near the ceiling only old ones may fill what is left: the owner too, or one old signer opens it to all.
 const newKeyNearTheCeiling = async (
   stage: Stage,
-  root: string,
+  roots: string[],
   now: number,
   { store, limits }: ReadTools,
-): Promise<boolean> =>
-  stage === "new_keys_off" && !(await store.keySignedBy(root, dayOf(now) - limits.keyDaysOldNearTheCeiling));
+): Promise<boolean> => {
+  if (stage !== "new_keys_off") return false;
+  const oldEnough = dayOf(now) - limits.keyDaysOldNearTheCeiling;
+  const signed = await Promise.all([...new Set(roots)].map((root) => store.keySignedBy(root, oldEnough)));
+  return signed.includes(false);
+};
 
 const answerOf = (uploaded: Uploaded, version: number, now: number): UploadAnswer => {
   switch (uploaded) {
@@ -246,7 +251,7 @@ const storeVersion = async (
   }
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
   if (version === null) return { refused: "terms", version: tools.termsVersion };
-  if (await newKeyNearTheCeiling(stage, signature.root, now, tools)) return { refused: "uploads_off" };
+  if (await newKeyNearTheCeiling(stage, roots, now, tools)) return { refused: "uploads_off" };
   const hourLeft = () => store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour);
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
@@ -339,7 +344,8 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
   if (floor !== null && isBelowVersion(manifest.contract, floor)) return { refused: "outdated" };
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
   if (!mayUpload(read, held)) return { refused: "not_yours" };
-  if (await newKeyNearTheCeiling(stage, signature.root, now, tools)) return { refused: "uploads_off" };
+  const roots = [(manifest.owner as Owner).root, signature.root];
+  if (await newKeyNearTheCeiling(stage, roots, now, tools)) return { refused: "uploads_off" };
 
   const hash = toBase64Url(await sha256(manifestBytes, index));
   if (held.versions.at(-1)?.files !== hash) return { refused: "behind" };

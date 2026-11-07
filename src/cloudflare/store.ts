@@ -91,6 +91,11 @@ const REPORT_REPLACES = `(CASE WHEN reports.cleared = 1 THEN reports.level = 'li
 const HELD_AS_EVIDENCE = (doc: string, today: string): string =>
   `(COALESCE(${doc}.legal_until, 0) >= ${today} OR EXISTS (SELECT 1 FROM reports r WHERE r.doc = ${doc}.id AND ${REPORT_AS_EVIDENCE}))`;
 
+// A language lives by its anchor and not by its own days, so those days cannot say it left; blocked or stopped, it did.
+const LANGUAGES_OF = (owner: string, anchor: string, today: string): string =>
+  `SELECT COUNT(*) FROM docs l WHERE l.owner = ${owner} AND l.anchor = ${anchor} AND l.latest >= 0
+     AND l.blocked_at IS NULL AND (l.paused_at IS NULL OR l.dies_on >= ${today})`;
+
 const LIVES_ON = "CASE WHEN paused_at IS NULL THEN MAX(dies_on, ?1 + ttl_days) ELSE dies_on END";
 
 // What can block now: an appeal that cleared its owner leaves earlier versions on record and out of the count.
@@ -141,9 +146,7 @@ export class Cloud implements Store {
          SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?10
          WHERE (?3 IS NOT NULL AND EXISTS (
            SELECT 1 FROM docs a WHERE a.id = ?3 AND a.owner = ?2 AND a.anchor IS NULL AND a.latest >= 0
-         ) AND (
-           SELECT COUNT(*) FROM docs l WHERE l.owner = ?2 AND l.anchor = ?3 AND l.latest >= 0 AND l.dies_on >= ?8
-         ) < ?11 - 1) OR (?3 IS NULL AND (
+         ) AND (${LANGUAGES_OF("?2", "?3", "?8")}) < ?11 - 1) OR (?3 IS NULL AND (
            SELECT COUNT(*) FROM docs d
            WHERE d.owner = ?2 AND d.anchor IS NULL AND d.latest >= 0 AND d.blocked_at IS NULL
              AND NOT EXISTS (SELECT 1 FROM holds h WHERE h.held = d.id)
@@ -169,9 +172,11 @@ export class Cloud implements Store {
     const raced = await this.#row(doc.id);
     if (raced) return this.#retried(raced, doc);
     if (doc.anchor === undefined) return "shares_full";
-    const anchor = await this.#row(doc.anchor);
-    const takesLanguages = anchor?.owner === doc.owner && anchor.anchor === null && anchor.latest >= 0;
-    return takesLanguages ? "shares_full" : "no_anchor";
+    const languages = await this.#db
+      .prepare(`SELECT (${LANGUAGES_OF("?1", "?2", "?3")}) AS n`)
+      .bind(doc.owner, doc.anchor, today)
+      .first<{ n: number }>();
+    return (languages?.n ?? 0) >= this.#limits.languagesAtMost - 1 ? "languages_full" : "no_anchor";
   }
 
   // A lost answer comes back as the same document, and only that is not somebody else's id.
@@ -303,18 +308,31 @@ export class Cloud implements Store {
   }
 
   // The earliest one found counts, so a later note cannot move a theft forward (contract, revocation).
-  async revoke(revocations: Revocation[]): Promise<void> {
-    await this.#db.batch(
-      revocations.map(({ root, machine, at, signed }) =>
-        this.#db
-          .prepare(
-            `INSERT INTO revocations (root, machine, at, signed) VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT (root, machine) DO UPDATE SET at = excluded.at, signed = excluded.signed
-             WHERE excluded.at < revocations.at`,
-          )
-          .bind(root, machine, Date.parse(at) / 1000, signed),
-      ),
+  // A machine already taken back can always move its date earlier: that adds no row.
+  async revoke(revocations: Revocation[]): Promise<boolean> {
+    const taking = revocations.map(({ root, machine, at, signed }) =>
+      this.#db
+        .prepare(
+          `INSERT INTO revocations (root, machine, at, signed)
+           SELECT ?1, ?2, ?3, ?4
+           WHERE EXISTS (SELECT 1 FROM revocations WHERE root = ?1 AND machine = ?2)
+             OR (SELECT COUNT(*) FROM revocations WHERE root = ?1) < ?5
+           ON CONFLICT (root, machine) DO UPDATE SET at = excluded.at, signed = excluded.signed
+           WHERE excluded.at < revocations.at`,
+        )
+        .bind(root, machine, Date.parse(at) / 1000, signed, this.#limits.revokedMachinesAtMost),
     );
+    const asked = JSON.stringify(revocations.map(({ root, machine }) => [root, machine]));
+    const counting = this.#db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM json_each(?1) j WHERE EXISTS (
+           SELECT 1 FROM revocations r
+           WHERE r.root = json_extract(j.value, '$[0]') AND r.machine = json_extract(j.value, '$[1]')
+         )`,
+      )
+      .bind(asked);
+    const results = await this.#db.batch<{ n: number }>([...taking, counting]);
+    return results.at(-1)?.results[0]?.n === revocations.length;
   }
 
   async isRevoked(root: string, machine: string, now: number): Promise<boolean> {
@@ -372,16 +390,6 @@ export class Cloud implements Store {
       .first<DocRow>();
   }
 
-  async anyRootRevokedAsMany(roots: string[], atMost: number): Promise<boolean> {
-    const full = await this.#db
-      .prepare(
-        `SELECT root FROM revocations WHERE root IN (SELECT value FROM json_each(?1))
-         GROUP BY root HAVING COUNT(*) >= ?2 LIMIT 1`,
-      )
-      .bind(JSON.stringify([...new Set(roots)]), atMost)
-      .first();
-    return full !== null;
-  }
   async keySignedBy(root: string, day: number): Promise<boolean> {
     const known = await this.#db
       .prepare("SELECT 1 FROM keys WHERE root = ?1 AND first_day <= ?2")

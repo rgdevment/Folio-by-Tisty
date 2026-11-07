@@ -423,26 +423,39 @@ describe("expiring", () => {
     expect(await row("held")).toBeNull();
   });
 
-  it("takes languages up to the top, and only those still alive count", async () => {
+  it("counts a language past its own days, since it lives by its anchor, and not one blocked or stopped", async () => {
     await store.create(newDoc("anchor", { ttlDays: 15 }), DAY);
     const language = (id: string) => newDoc(id, { anchor: "anchor", ttlDays: 1 });
     for (let n = 1; n < LEVEL_ONE.languagesAtMost; n += 1) {
       expect(await store.create(language(`lang${n}`), DAY)).toBe("created");
     }
-    expect(await store.create(language("toomany"), DAY)).toBe("shares_full");
-    expect(await store.create(language("toomany"), DAY + 2)).toBe("created");
+    expect(await store.create(language("toomany"), DAY)).toBe("languages_full");
+    expect(await store.create(language("toomany"), DAY + 2)).toBe("languages_full");
+
+    await store.stop("lang1", DAY + 2);
+    expect(await store.create(language("afterstop"), DAY + 2)).toBe("created");
+    await testEnv.DB.prepare("UPDATE docs SET blocked_at = ?, dies_on = ? WHERE id = 'lang2'")
+      .bind(DAY + 2, DAY + 182)
+      .run();
+    expect(await store.create(language("afterblock"), DAY + 2)).toBe("created");
+    expect(await store.create(language("toomany"), DAY + 2)).toBe("languages_full");
   });
 
-  it("calls a missing anchor missing, even for its top", async () => {
+  it("calls an anchor that is not there, or not this owner's, missing", async () => {
     expect(await store.create(newDoc("orphan", { anchor: "nothing" }), DAY)).toBe("no_anchor");
+    await store.create(newDoc("anchor", { owner: "someone else" }), DAY);
+    expect(await store.create(newDoc("orphan", { anchor: "anchor" }), DAY)).toBe("no_anchor");
   });
 
-  it("counts the machines a root took back", async () => {
-    const taken = (machine: string) => ({ root: "o1", machine, at: "2026-11-01T00:00:00Z", signed: "s" });
-    await store.revoke([taken("m1"), taken("m2")]);
-    expect(await store.anyRootRevokedAsMany(["o1", "other"], 2)).toBe(true);
-    expect(await store.anyRootRevokedAsMany(["o1", "other"], 3)).toBe(false);
-    expect(await store.anyRootRevokedAsMany(["other"], 1)).toBe(false);
+  it("keeps to the machines a root may take back, and a known one can still move earlier", async () => {
+    const taken = (machine: string, at = "2026-11-02T00:00:00Z") => ({ root: "o1", machine, at, signed: "s" });
+    const top = LEVEL_ONE.revokedMachinesAtMost;
+    expect(await store.revoke(Array.from({ length: top }, (_, n) => taken(`m${n}`)))).toBe(true);
+    expect(await store.revoke([taken("one more")])).toBe(false);
+    expect(await store.revoke([{ ...taken("m0", "2026-11-01T00:00:00Z"), root: "o1" }])).toBe(true);
+    const held = await testEnv.DB.prepare("SELECT COUNT(*) AS n, MIN(at) AS earliest FROM revocations").first();
+    expect(held).toEqual({ n: top, earliest: Date.parse("2026-11-01T00:00:00Z") / 1000 });
+    expect(await store.revoke([{ ...taken("m0"), root: "another" }])).toBe(true);
   });
 
   it("knows a key by the day it first signed", async () => {

@@ -162,6 +162,7 @@ describe("a report", () => {
     const set: ReportTools = {
       store,
       limiter: { allows: async () => true },
+      reportLimiter: { allows: async () => true },
       limits: EASY,
       secret: testEnv.FOLIO_SECRET,
       dayKey: async () => "a key for the day",
@@ -193,13 +194,19 @@ describe("a report", () => {
     const asked = await reportDoc({ id: ID, ip: "203.0.113.7", asn: 1, now: NOW, said: { category: "spam" } }, set);
     if (!("salt" in asked)) throw new Error("no proof was asked for");
     const proof = await solve(asked.salt, asked.bits);
-    const braked = tools({ limiter: { allows: async () => false } }).set;
+    const braked = tools({ reportLimiter: { allows: async () => false } }).set;
     const answer = await reportDoc(
       { id: ID, ip: "203.0.113.7", asn: 1, now: NOW, said: { category: "spam" }, proof },
       braked,
     );
     expect(answer).toMatchObject({ refused: "slow" });
     expect(await reports()).toHaveLength(0);
+  });
+
+  it("is not stopped by what its network reads", async () => {
+    await share();
+    const busy = tools({ limiter: { allows: async () => false } }).set;
+    expect(await proved(ID, "203.0.113.7", busy, "phishing", 1)).toEqual({ received: true });
   });
 
   it("does not block on one report of CSAM", async () => {

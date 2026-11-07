@@ -921,6 +921,38 @@ describe("what stops a version", () => {
     expect(await send(id, version2, waited)).toEqual({ stored: true, version: 2 });
   });
 
+  it("near the ceiling, from a new owner, whatever old key signs for it", async () => {
+    await shared();
+    const waited = LATER + LIMITS.keyDaysOldNearTheCeiling * DAY_MS;
+    await store.setStage("new_keys_off");
+    const { pair, permit } = await newToken();
+    const first = await started(waited);
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: ana, signer: mario, permit, token: pair });
+    expect(await send(first.id, bytes, waited, first)).toEqual({ refused: "uploads_off" });
+    expect(await row(first.id)).toBeNull();
+  });
+
+  it("near the ceiling, from a new editor of an old owner", async () => {
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    await store.setStage("new_keys_off");
+    const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+    const waited = LATER + LIMITS.keyDaysOldNearTheCeiling * DAY_MS;
+    expect(await send(id, edited, waited)).toEqual({ refused: "uploads_off" });
+  });
+
+  it("past the languages a document may have", async () => {
+    const id = await shared();
+    const language = async () => {
+      const first = { ...(await started()), anchor: id };
+      return send(first.id, await sealedEnvelope({ id: first.id, version: 1, owner: mario }), NOW, first);
+    };
+    for (let n = 1; n < LIMITS.languagesAtMost; n += 1) {
+      expect(await language()).toEqual({ stored: true, version: 1 });
+    }
+    expect(await language()).toEqual({ refused: "languages_full" });
+  });
+
   it("a refused first version counts against the hour, and writes nothing after it", async () => {
     const oneAnHour = { ...tools, limits: { ...LIMITS, uploadsAnHour: 1 } };
     const sendOnce = async () => {
@@ -1042,7 +1074,7 @@ describe("a machine its root took back", () => {
 
   it("finds its machine among all the others its root took back", async () => {
     const id = await shared();
-    await store.revoke(await otherMachines(mario, 20));
+    await store.revoke(await otherMachines(mario, LIMITS.revokedMachinesAtMost - 1));
     await store.revoke([await revocationBy(mario, AT)]);
     expect(await send(id, await sealedEnvelope({ id, version: 2, owner: mario }), LATER)).toEqual({
       refused: "revoked",
@@ -1063,7 +1095,8 @@ describe("a machine its root took back", () => {
     const id = await shared({ permit });
     const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
     expect(await send(id, edited, LATER)).toEqual({ stored: true, version: 2 });
-    const others = [...(await otherMachines(mario, 20)), ...(await otherMachines(ana, 20))];
+    const fit = LIMITS.revokedMachinesAtMost - 1;
+    const others = [...(await otherMachines(mario, fit)), ...(await otherMachines(ana, fit))];
     await store.revoke(others);
     const asked = [await revocationBy(mario, AT), await revocationBy(ana, AT)];
     await store.revoke(asked);
@@ -1131,15 +1164,15 @@ describe("a machine its root took back", () => {
     expect(await ask({ ...quick, limiter: { allows: async () => false } })).toMatchObject({ refused: "slow" });
   });
 
-  it("stops at the machines a root may take back, and what it took back stays", async () => {
+  it("stops at the machines a root may take back, says so, and keeps what fit", async () => {
     await shared();
-    const few = { ...tools, limits: { ...LIMITS, revokedMachinesAtMost: 2 } };
+    const top = LIMITS.revokedMachinesAtMost;
     const ask = async (howMany: number) =>
-      takeRevocations({ said: await otherMachines(mario, howMany), ip: "203.0.113.9", now: NOW }, few);
-    expect(await ask(2)).toEqual({ done: true });
-    expect(await ask(1)).toEqual({ refused: "bad_revocation" });
+      takeRevocations({ said: await otherMachines(mario, howMany), ip: "203.0.113.9", now: NOW }, tools);
+    expect(await ask(top - 1)).toEqual({ done: true });
+    expect(await ask(2)).toEqual({ refused: "machines_full" });
     const { n } = (await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM revocations").first<{ n: number }>()) ?? {};
-    expect(n).toBe(2);
+    expect(n).toBe(top);
   });
 });
 
