@@ -87,8 +87,7 @@ export const ago = (ms: number, now: number): string => {
   const minutes = Math.round((now - ms) / 60_000);
   if (minutes < 1) return "recién";
   if (minutes < 60) return `hace ${minutes} min`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `hace ${hours} h`;
+  if (minutes < 24 * 60) return `hace ${Math.round(minutes / 60)} h`;
   const at = new Date(ms);
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
