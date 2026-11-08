@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AccessSettings, type Certs, isOperator, issuerOf } from "../src/admin/access";
 import { answer } from "../src/admin/api";
+import { CloudDashboard } from "../src/cloudflare/dashboard";
 import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
 import { dayOf } from "../src/core/limits";
@@ -22,6 +23,8 @@ const ID = "AbCdEfGh";
 const ACCESS: AccessSettings = { team: "rina", audience: "the-panel", email: "mario@example.test" };
 const store = new Cloud(testEnv);
 const moderation = new CloudModeration(testEnv.DB);
+const dashboard = new CloudDashboard(testEnv.DB);
+const ABOUT = { sharingOpen: true, termsVersion: "14", limitsSerial: 25 };
 
 let keys: CryptoKeyPair;
 let certs: Certs;
@@ -46,6 +49,8 @@ const asked = async (path: string, init: RequestInit = {}, token?: string) => {
   headers.set("Cf-Access-Jwt-Assertion", token ?? (await tokenBy(keys.privateKey)));
   return answer(new Request(`https://panel.test${path}`, { ...init, headers }), {
     moderation,
+    dashboard,
+    about: ABOUT,
     access: ACCESS,
     certs,
     now: NOW,
@@ -181,6 +186,8 @@ describe("who may enter", () => {
     await share();
     const response = await answer(new Request("https://panel.test/api/queue"), {
       moderation,
+      dashboard,
+      about: ABOUT,
       access: ACCESS,
       certs,
       now: NOW,
@@ -192,7 +199,7 @@ describe("who may enter", () => {
         headers: { "Folio-Operator": "1" },
         body: JSON.stringify({ note: "x" }),
       }),
-      { moderation, access: ACCESS, certs, now: NOW },
+      { moderation, dashboard, about: ABOUT, access: ACCESS, certs, now: NOW },
     );
     expect(acted.status).toBe(403);
     expect((await row())?.blocked_at).toBeNull();

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Doing, drawQueue } from "../src/admin/page/draw";
+import { dayText } from "../src/admin/page/say";
 import type { Queue } from "../src/core/queue";
 
 const HARM = '<img src=x onerror="alert(1)">';
@@ -105,7 +106,7 @@ beforeEach(() => {
     accept: vi.fn(),
     reject: vi.fn(),
     reportWasFalse: vi.fn(),
-    opened: vi.fn(),
+    openReport: vi.fn(),
     copy: vi.fn(),
     panic: vi.fn(),
     purgeOwner: vi.fn(),
@@ -115,6 +116,7 @@ beforeEach(() => {
     reportsPage: vi.fn(),
     networkWasFalse: vi.fn(),
     clearWarning: vi.fn(),
+    showKey: vi.fn(),
   };
   drawQueue(page, QUEUE, doing as unknown as Doing);
 });
@@ -250,7 +252,7 @@ describe("a warning by light reports", () => {
     const shown = page.getElementById("warned")?.textContent;
     expect(shown).toContain("WaRnEdDc");
     expect(shown).toContain("12 redes");
-    expect(shown).toContain(new Date(20_003 * 86_400_000).toISOString().slice(0, 10));
+    expect(shown).toContain(dayText(20_003));
     pressing("warned", "Quitar aviso");
     expect(doing.clearWarning).toHaveBeenCalledWith("WaRnEdDc");
   });
@@ -386,7 +388,7 @@ describe("a case in the panel", () => {
     pressing("reports", "Botón de pánico");
     await vi.waitFor(() => expect(CASE_LINK()).toContain("#caso."));
     expect(CASE_LINK().split("#")[1]?.split(".")).toHaveLength(3);
-    const sent = paths(fetching).filter((path) => path !== "/api/queue");
+    const sent = paths(fetching).filter((path) => path.startsWith("/api/docs/"));
     expect(sent).toEqual(["/api/docs/AbCdEfGh/panic", "/api/docs/AbCdEfGh/case"]);
     const made = JSON.parse(fetching.mock.calls.at(-1)?.[1]?.body as string);
     expect(made.version).toBe(2);
@@ -394,11 +396,38 @@ describe("a case in the panel", () => {
     expect(page.getElementById("case-link")?.hidden).toBe(false);
   });
 
+  it("opens a report with one button: notes why, then copies what gives its link", async () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const fetching = answering();
+    await opened(fetching, "verificar la denuncia");
+    pressing("reports", "Abrir denuncia");
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
+    const noted = fetching.mock.calls.find(([path]) => path === "/api/docs/AbCdEfGh/opened");
+    expect(JSON.parse(String(noted?.[1]?.body))).toEqual({ note: "verificar la denuncia" });
+    expect(writeText).toHaveBeenCalledWith("node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque");
+    expect(page.getElementById("said")?.textContent).toContain("te da el link de la denuncia");
+  });
+
+  it("copies nothing when the opening could not be noted, or had no reason", async () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const refusing = answering({ "/opened": () => new Response("{}", { status: 500 }) });
+    await opened(refusing);
+    pressing("reports", "Abrir denuncia");
+    await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toContain("No se pudo"));
+    const silent = answering();
+    await opened(silent, " ");
+    pressing("reports", "Abrir denuncia");
+    expect(silent.mock.calls.some(([path]) => path.endsWith("/opened"))).toBe(false);
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
   it("does nothing without a reason", async () => {
     const fetching = answering();
     await opened(fetching, "  ");
     pressing("reports", "Botón de pánico");
-    expect(paths(fetching).filter((path) => path !== "/api/queue")).toEqual([]);
+    expect(paths(fetching).filter((path) => path.startsWith("/api/docs/"))).toEqual([]);
   });
 
   it("makes no link when the panic did not hold", async () => {
@@ -437,7 +466,7 @@ describe("a case in the panel", () => {
 
 describe("the panel", () => {
   it("says the state of the service", () => {
-    expect(page.getElementById("state")?.textContent).toBe("Servicio con aviso de gasto. Llaves nuevas hoy: 7.");
+    expect(page.getElementById("state")?.textContent).toBe("Servicio con aviso de gasto");
   });
 
   it("offers to purge a key from a report and from a blocked document", () => {
@@ -477,17 +506,42 @@ describe("the panel", () => {
   });
 
   it("hands over a sealed link only as a command for the operator's own machine", () => {
-    pressing("reports", "Copiar para abrir");
-    expect(doing.copy).toHaveBeenCalledWith("node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque");
-    pressing("reports", "Anotar apertura");
-    expect(doing.opened).toHaveBeenCalledWith("AbCdEfGh");
+    pressing("reports", "Abrir denuncia");
+    expect(doing.openReport).toHaveBeenCalledWith(
+      "AbCdEfGh",
+      "node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque",
+    );
+    expect(page.getElementById("reports")?.textContent).not.toContain("sealed1.opaque");
   });
 
   it("offers to mark any report false, and opening only where a link came", () => {
     pressing("reports", "Era falsa", 1);
     expect(doing.reportWasFalse).toHaveBeenCalledWith("IjKlMnOp", "n2");
     const second = (page.getElementById("reports") as Element).querySelectorAll(".card")[1];
-    expect(second?.textContent).not.toContain("Copiar para abrir");
+    expect(second?.textContent).not.toContain("Abrir denuncia");
+  });
+
+  it("says how many networks and providers reported each document, and how far it is from a block", () => {
+    const [first, second] = (page.getElementById("reports") as Element).querySelectorAll(".card");
+    expect(first?.textContent).toContain("1 red de 1 proveedor · bloqueado · trae link sellado");
+    expect(second?.textContent).toContain("1 red de 1 proveedor · 0 de 3 redes y 0 de 2 proveedores para bloquear");
+    const [grave, medium] = QUEUE.reports as [(typeof QUEUE.reports)[number], (typeof QUEUE.reports)[number]];
+    drawQueue(
+      page,
+      {
+        ...QUEUE,
+        docs: [],
+        reports: [
+          { ...medium, fromFalseNet: false, net: "a", asn: 1 },
+          { ...medium, fromFalseNet: false, net: "b", asn: 2 },
+          { ...medium, fromFalseNet: false, net: "c", asn: 2, overCap: true },
+          { ...grave, doc: "IjKlMnOp", sealedLink: null, net: "d", asn: 9 },
+        ],
+      },
+      doing as unknown as Doing,
+    );
+    const counted = (page.getElementById("reports") as Element).querySelector(".card")?.textContent;
+    expect(counted).toContain("4 redes de 3 proveedores · 2 de 3 redes y 2 de 2 proveedores para bloquear");
   });
 
   it("says which reports come from a network already marked false", () => {

@@ -156,6 +156,12 @@ export type Uploaded =
 export type Admitted = "here" | "new" | "over" | "full";
 export type Stage = "open" | "warned" | "new_keys_off" | "no_uploads" | "blocked";
 
+export interface Spent {
+  bill: number;
+  line: number;
+  storedGb: number;
+}
+
 export interface Swept {
   summed: number;
   forgotten: number;
@@ -213,5 +219,6 @@ export interface Store {
   news(after: number, before: number, atMost: number): Promise<News>;
   setDigested(hour: number, stage: Stage): Promise<void>;
   setStage(stage: Stage): Promise<void>;
+  noteSpend(spent: Spent, at: number): Promise<void>;
   liftCut(today: number): Promise<void>;
 }

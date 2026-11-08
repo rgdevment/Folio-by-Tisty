@@ -12,12 +12,12 @@ export interface Usage {
 
 // Decision 118. Prices per million as published, with what the 5 USD plan includes.
 const PLAN_USD = 5;
-const CAP_USD = 20;
+export const CAP_USD = 20;
 const BURST_USD = 3;
 const WARN_USD = 10;
 const UPLOADS_CUT_AT = 0.75;
-const STORED_GB_AT_MOST = 100;
-const STORED_GB_FOR_NEW_KEYS = 80;
+export const STORED_GB_AT_MOST = 100;
+export const STORED_GB_FOR_NEW_KEYS = 80;
 // An estimate: CPU is a small part of the bill, and this is what a read was measured to take.
 const CPU_MS_PER_REQUEST = 2;
 
@@ -69,7 +69,7 @@ export const stageOf = (usage: Usage, cycle: Cycle): Stage => {
 };
 
 export interface SpendTools {
-  store: Pick<Store, "stage" | "setStage" | "liftCut">;
+  store: Pick<Store, "stage" | "setStage" | "liftCut"> & Partial<Pick<Store, "noteSpend">>;
   usageSince: (start: number, now: number) => Promise<Usage>;
   setBlocked: (blocked: boolean) => Promise<void>;
 }
@@ -84,6 +84,12 @@ export const checkSpend = async (now: number, renewalDay: number, tools: SpendTo
     if ((stage === "blocked") !== (was === "blocked")) await setBlocked(stage === "blocked");
     if (was === "blocked") await store.liftCut(dayOf(now));
     await store.setStage(stage);
+  }
+  try {
+    await store.noteSpend?.({ bill: billOf(usage), line: lineOf(cycle), storedGb: usage.storedGb }, now);
+  } catch (error) {
+    // Only the panel reads it, so failing to note it must not look like a review that failed.
+    console.error("what the review found could not be noted", String(error));
   }
   return stage;
 };
