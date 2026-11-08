@@ -645,3 +645,16 @@ td.note {
 .key-docs[hidden] {
   display: none;
 }
+
+.card-steps {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+.card-steps p {
+  margin: 0;
+}

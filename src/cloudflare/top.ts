@@ -100,6 +100,7 @@ const topDocOf = (row: Row, today: number, limits: Limits): TopDoc => {
     diesOn: row.dies_on,
     blocked: row.blocked_at !== null,
     paused: row.paused_at !== null,
+    stopped: row.dies_on < today,
     signals,
   };
 };

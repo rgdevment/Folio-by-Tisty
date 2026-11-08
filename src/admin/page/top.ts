@@ -62,6 +62,13 @@ export const signalText = (signals: Signal[]): { said: string; tone: Tone } => {
   return { said, tone: alarming ? "danger" : "warn" };
 };
 
+// Past its last day it is no longer served, and the next sweep erases it unless a report holds it.
+const stateOf = (doc: TopDoc): string | null => {
+  if (!doc.stopped) return doc.paused ? "en pausa" : null;
+  const held = doc.signals.some((one) => one.kind === "report" && one.level !== "light");
+  return held ? "ya no se sirve · lo retiene su denuncia" : "ya no se sirve · se borra en la próxima limpieza";
+};
+
 const rowOf = (page: Document, doc: TopDoc, now: number, ranking: Ranking): HTMLTableRowElement => {
   const today = todayOf(now);
   const { said, tone } = signalText(doc.signals);
@@ -74,8 +81,9 @@ const rowOf = (page: Document, doc: TopDoc, now: number, ranking: Ranking): HTML
       ? [" ", piece(page, "span", "soft", `+${doc.languages} ${doc.languages === 1 ? "idioma" : "idiomas"}`)]
       : []),
     ...(doc.blocked ? [" ", piece(page, "span", "chip is-blocked", "bloqueado")] : []),
-    ...(doc.paused ? [" ", piece(page, "span", "chip is-light", "en pausa")] : []),
   );
+  const state = stateOf(doc);
+  if (state) id.append(" ", piece(page, "span", "chip is-light", state));
   const key = page.createElement("td");
   key.className = "nowrap";
   const age = doc.keyDay === null ? "" : ` · ${daysText(today - doc.keyDay)}`;
