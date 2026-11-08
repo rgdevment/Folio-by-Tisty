@@ -15,8 +15,14 @@ const LEAF = [
   "M16 13H8",
   "M16 17H8",
 ];
+const PLAY = ["M8 5v14l11-7z"];
+const HUES = ["red", "orange", "amber", "green", "teal", "blue", "indigo", "purple", "pink", "brown", "gray"];
 const GLIMPSE_CHARACTERS = 160;
 const PRESS_TO_ASK = "Presiona para traerlo.";
+const SOUND = /^audio\/|\.(mp3|m4a|aac|ogg|oga|opus|wav|flac)$/i;
+const MOVING = /^video\/|\.(mp4|m4v|webm|mov)$/i;
+const TRAILING_SLASHES = /\/+$/;
+const BARE_WWW = /^www\./;
 
 const piece = (link: Element, kind: string, said = ""): HTMLElement => {
   const one = link.ownerDocument.createElement("span");
@@ -74,13 +80,75 @@ const standsAlone = (link: Element, words: DocumentFragment): boolean => {
   );
 };
 
+const looksOf = ({ name, kind = "" }: { name: string; kind?: string }) => {
+  if (SOUND.test(kind) || SOUND.test(name)) return { under: "Presiona para escucharlo.", paths: PLAY, chip: "Audio" };
+  if (MOVING.test(kind) || MOVING.test(name)) return { under: "Presiona para verlo.", paths: PLAY, chip: "Video" };
+  return { under: PRESS_TO_ASK, paths: LEAF, chip: "Adjunto" };
+};
+
 const drawFiles = (words: DocumentFragment, held: Document): void => {
   for (const link of words.querySelectorAll("a[data-file]")) {
     const file = held.files?.find((one) => one.at === Number(link.getAttribute("data-file")));
     link.setAttribute("title", PRESS_TO_ASK);
     if (!file || !link.matches("p > a.card") || !standsAlone(link, words)) continue;
-    fill(link, file.name, PRESS_TO_ASK, LEAF, "Adjunto");
+    const { under, paths, chip } = looksOf(file);
+    fill(link, file.name, under, paths, chip);
     link.classList.add("doc-card");
+  }
+};
+
+const hostOf = (where: string): string | null => {
+  try {
+    const url = new URL(where);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.hostname.replace(BARE_WWW, "") : null;
+  } catch {
+    return null;
+  }
+};
+
+const readable = (where: string, host: string): string =>
+  `${host}${new URL(where).pathname.replace(TRAILING_SLASHES, "")}`;
+
+// Its site's letter in its site's colour, as Tisty draws a link that brings nothing of its own.
+const lettered = (link: Element, host: string): HTMLElement => {
+  const tile = piece(link, "card-tile is-letter", host.charAt(0).toUpperCase());
+  const sum = [...host].reduce((total, one) => total + one.charCodeAt(0), 0);
+  tile.style.setProperty("--hue", `var(--tisty-hue-${HUES[sum % HUES.length]})`);
+  return tile;
+};
+
+const aloneWithItsNote = (link: Element, words: DocumentFragment): boolean => {
+  const paragraph = link.parentElement;
+  if (paragraph?.parentNode !== words) return false;
+  const others = [...paragraph.children].filter((one) => one !== link);
+  if (!others.every((one) => one.classList.contains("link-where"))) return false;
+  const said = [...paragraph.childNodes].filter((one) => !others.includes(one as Element));
+  return (
+    said
+      .map((one) => one.textContent)
+      .join("")
+      .trim() === link.textContent?.trim()
+  );
+};
+
+// The card always says where it goes, so the note beside the link has nothing left to say.
+const drawWebLinks = (words: DocumentFragment): void => {
+  for (const link of words.querySelectorAll("p > a[href][target]")) {
+    const where = link.getAttribute("href") ?? "";
+    const host = hostOf(where);
+    if (!host || link.children.length > 0 || !aloneWithItsNote(link, words)) continue;
+    for (const note of (link.parentElement as Element).querySelectorAll(".link-where")) note.remove();
+    const said = link.textContent?.trim() ?? "";
+    const meta = piece(link, "card-meta");
+    meta.append(piece(link, "chip", host), piece(link, "card-go", "›"));
+    const name = !said || said === where ? readable(where, host) : said;
+    link.replaceChildren(
+      lettered(link, host),
+      piece(link, "card-name", name),
+      piece(link, "card-blurb", readable(where, host)),
+      meta,
+    );
+    link.classList.add("doc-card", "is-web");
   }
 };
 
@@ -100,6 +168,7 @@ export const cardsFor = (held: Document, wordsOf: (html: string) => DocumentFrag
   return (words: DocumentFragment, signal: AbortSignal): DocumentFragment => {
     drawWidgets(words, signal);
     drawFiles(words, held);
+    drawWebLinks(words);
     for (const link of words.querySelectorAll("p > a.card")) {
       if (!standsAlone(link, words)) continue;
       const reference = referenceOf(link.getAttribute("href") ?? "");

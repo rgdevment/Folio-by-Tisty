@@ -26,7 +26,7 @@ const HELD: Document = {
     '<h1 id="paseos">Paseos</h1>',
     '<p><a href="#rio">río</a> <a href="tisty:page/1">Enero</a></p>',
     '<p><a href="tisty:cited/0">otro</a> <a href="tisty:file/0">adjunto</a></p>',
-    '<p><a href="https://www.tisty.app/">web</a></p>',
+    '<p>En la <a href="https://www.tisty.app/">web</a> de Tisty.</p>',
     '<h2 id="rio">Río</h2>',
   ].join(""),
   pages: [ENERO],
@@ -216,6 +216,44 @@ describe("where a link goes", () => {
     const words = finished(domPurifyCleaner(place).clean('<a href="mailto:&lt;img src=x&gt;@e.example">x</a>'), []);
     expect(words.querySelector(".link-where img")).toBeNull();
     expect(words.querySelector(".link-where")?.textContent).toContain("<img");
+  });
+});
+
+describe("a web link alone in its paragraph", () => {
+  const cardOf = (html: string) => {
+    draw({ ...HELD, html });
+    return root.querySelector("a.doc-card.is-web");
+  };
+
+  it("becomes a card of its site that says where it goes, and still leaves in another tab", () => {
+    const card = cardOf('<p><a href="https://www.github.com/rgdevment/Tisty/">Tisty en GitHub</a></p>');
+    expect(card?.querySelector(".card-name")?.textContent).toBe("Tisty en GitHub");
+    expect(card?.querySelector(".card-blurb")?.textContent).toBe("github.com/rgdevment/Tisty");
+    expect(card?.querySelector(".chip")?.textContent).toBe("github.com");
+    expect(card?.querySelector(".card-tile")?.textContent).toBe("G");
+    expect(card?.getAttribute("target")).toBe("_blank");
+    expect(card?.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(root.querySelector(".link-where")).toBeNull();
+  });
+
+  it("names itself by its address when its words are the address", () => {
+    const card = cardOf('<p><a href="https://tisty.app/guia">https://tisty.app/guia</a></p>');
+    expect(card?.querySelector(".card-name")?.textContent).toBe("tisty.app/guia");
+  });
+
+  it("shows the real site whatever its words say", () => {
+    const card = cardOf('<p><a href="https://evil.example/login">banco.cl</a></p>');
+    expect(card?.querySelector(".card-name")?.textContent).toBe("banco.cl");
+    expect(card?.querySelector(".chip")?.textContent).toBe("evil.example");
+    expect(card?.querySelector(".card-blurb")?.textContent).toBe("evil.example/login");
+  });
+
+  it.each([
+    ["inside a sentence", '<p>Mira <a href="https://tisty.app/">tisty.app</a> ahora.</p>'],
+    ["with more than words inside", '<p><a href="https://tisty.app/"><b>tisty</b></a></p>'],
+    ["to a mail", '<p><a href="mailto:a@b.example">a@b.example</a></p>'],
+  ])("stays a link %s", (_, html) => {
+    expect(cardOf(html)).toBeNull();
   });
 });
 
@@ -739,6 +777,22 @@ describe("widgets and files", () => {
     ],
     files_hash: "x",
   };
+
+  it.each([
+    ["a sound", { name: "bark.mp3", kind: "audio/mpeg" }, "Audio", "escucharlo"],
+    ["a video", { name: "walk.mp4", kind: "video/mp4" }, "Video", "verlo"],
+    ["a sound its kind does not say", { name: "bark.ogg" }, "Audio", "escucharlo"],
+  ])("says %s can be played", (_, file, chip, verb) => {
+    draw({
+      ...HELD,
+      html: '<p><a class="card" href="tisty:file/0">x</a></p>',
+      files: [{ at: 0, ...file }],
+      files_hash: "x",
+    });
+    const card = root.querySelector(".doc-card");
+    expect(card?.querySelector(".chip")?.textContent).toBe(chip);
+    expect(card?.querySelector(".card-blurb")?.textContent).toContain(verb);
+  });
 
   it("draws an HTML file as a card like any other, and never opens it", () => {
     draw(WITH_FILES);
