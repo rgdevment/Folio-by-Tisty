@@ -41,6 +41,12 @@ info:
     client's own message. Both are signals for clients: what is already shared does not depend on them, and the
     server does not read them.
 
+    **The maker's root** may be named there too. `maker_root` is the root of whoever makes Tisty and Folio, base64url
+    as an envelope carries it. While sharing is not open, the server still takes a new document whose owner and
+    signer are both that root, checked like anyone else's, and answers `uploads_off` to everyone else. A client
+    whose own root is that one may offer to share while the others do not. The server reads it from the file it
+    was deployed with, so a new one takes a deploy as well as a signature.
+
     **The terms in force** are named there too. In `terms`, `es` and `en` are the SHA-256, in hex, of
     `docs/TERMINOS.md` and `docs/TERMS.md` as served from the same place, and `version`, a whole number written as a
     string, grows with every change to either text. A text and the signed file that names it reach `main` together.

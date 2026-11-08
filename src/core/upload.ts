@@ -28,8 +28,12 @@ export interface Uploading {
 
 export interface UploadTools extends ReadTools {
   sharingOpen: boolean;
+  makerRoot: string | null;
   termsVersion: string;
 }
+
+const madeByMaker = ({ manifest, signature }: ReadEnvelope, makerRoot: string | null): boolean =>
+  makerRoot !== null && (manifest.owner as Owner).root === makerRoot && signature.root === makerRoot;
 
 // One ahead while a deploy catches up with the signed file, and one behind while readers' caches do: nobody waits on either.
 const termsAccepted = ({ terms }: Envelope, { termsVersion }: UploadTools): string | null => {
@@ -242,7 +246,7 @@ const storeVersion = async (
   const sharing = first && (!held || held.latest === 0) ? first : null;
   if (!held && !sharing) return { refused: "missing" };
   if (sharing) {
-    if (!tools.sharingOpen) return { refused: "uploads_off" };
+    if (!tools.sharingOpen && tools.makerRoot === null) return { refused: "uploads_off" };
     const refused = await mayShare(uploading, sharing, tools);
     if (refused) return refused;
   }
@@ -251,6 +255,7 @@ const storeVersion = async (
 
   const read = await readOrRefuse(id, bytes);
   if ("refused" in read) return read;
+  if (sharing && !tools.sharingOpen && !madeByMaker(read, tools.makerRoot)) return { refused: "uploads_off" };
   const { manifest, signature } = read;
   if (!withinTops(manifest, limits)) return { refused: "too_big" };
   const floor = limits.oldestContractTaken;

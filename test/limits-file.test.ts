@@ -89,6 +89,17 @@ describe("the sharing fields", () => {
     expect(sharingFaults({ sharing_open: false })).toEqual([]);
   });
 
+  it("take a maker's root, or none", () => {
+    expect(sharingFaults({ sharing_open: false, maker_root: "A".repeat(43) })).toEqual([]);
+  });
+
+  it.each([["A".repeat(42)], ["A".repeat(44)], [`${"A".repeat(42)}=`], [""], [null], [1]])(
+    "refuse %j as a maker's root",
+    (maker) => {
+      expect(sharingFaults({ sharing_open: false, maker_root: maker })).toEqual(["maker_root is not a root"]);
+    },
+  );
+
   it.each([[undefined], ["true"], [1], [null]])("refuse %j as whether it is open", (open) => {
     expect(sharingFaults({ sharing_open: open })).toEqual(["sharing_open is not true or false"]);
   });

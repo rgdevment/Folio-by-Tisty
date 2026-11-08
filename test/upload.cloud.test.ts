@@ -45,6 +45,7 @@ const tools = {
   limits: LIMITS,
   secret: SECRET,
   sharingOpen: true,
+  makerRoot: null,
   termsVersion: TERMS_ACCEPTED,
   limiter: { allows: async () => true },
   syncLimiter: { allows: async () => true },
@@ -1171,6 +1172,48 @@ describe("what stops a version", () => {
       const bytes = await sealedEnvelope({ id, version: 2, owner: mario });
       const sent = uploadDoc({ id, now: LATER, ip: "203.0.113.9", bytes: async () => bytes }, closed);
       expect(await sent).toEqual({ stored: true, version: 2 });
+    });
+
+    describe("with a maker's root", () => {
+      const forMaker = () => ({ ...closed, makerRoot: rootOf(mario) });
+      const firstOf = async (sealing: Omit<Parameters<typeof sealedEnvelope>[0], "id" | "version">) => {
+        const first = await started();
+        const bytes = await sealedEnvelope({ id: first.id, version: 1, ...sealing });
+        return {
+          first,
+          sent: await uploadDoc(
+            { id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => bytes, first },
+            forMaker(),
+          ),
+        };
+      };
+
+      it("takes a new document the maker owns and signs", async () => {
+        const { first, sent } = await firstOf({ owner: mario });
+        expect(sent).toEqual({ stored: true, version: 1 });
+        expect(await row(first.id)).toMatchObject({ owner: rootOf(mario) });
+      });
+
+      it("refuses anyone else's, and keeps nothing of it", async () => {
+        const { first, sent } = await firstOf({ owner: ana });
+        expect(sent).toEqual({ refused: "uploads_off" });
+        expect(await row(first.id)).toBeNull();
+      });
+
+      it("refuses one in the maker's name that another root signs", async () => {
+        const { pair, permit } = await newToken();
+        const { first, sent } = await firstOf({ owner: mario, signer: ana, permit, token: pair });
+        expect(sent).toEqual({ refused: "uploads_off" });
+        expect(await row(first.id)).toBeNull();
+      });
+
+      it("takes everyone's once the service opens", async () => {
+        const first = await started();
+        const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: ana });
+        const open = { ...forMaker(), sharingOpen: true };
+        const sent = uploadDoc({ id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => bytes, first }, open);
+        expect(await sent).toEqual({ stored: true, version: 1 });
+      });
     });
   });
 
