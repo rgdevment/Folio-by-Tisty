@@ -31,7 +31,7 @@ curl() {
   if [ "$browser" = 1 ] && [ -n "\${ADDS_SCRIPT:-}" ]; then echo cloudflareinsights >> "$out"; fi
   printf 'HTTP/2 200\\n' > "$head"
   case $file in
-    assets/*) printf '%s\\n' "\${ASSET_CACHE:-Cache-Control: public, immutable}" >> "$head" ;;
+    assets/*) printf '%s\\n%s\\n' "\${ASSET_CACHE:-Cache-Control: public, immutable}" "\${ASSET_ENCODING:-Content-Encoding: br}" >> "$head" ;;
     *) printf '%s\\n' "\${MORE_HEADERS:-X-None: 1}" >> "$head" ;;
   esac
 }
@@ -82,6 +82,12 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     const answer = run(`served "${site}" ${ADDRESS}`, { ASSET_CACHE: "Cache-Control: public, max-age=0" });
     expect(answer.status).toBe(1);
     expect(answer.stdout).toContain("the cache of assets/app.js");
+  });
+
+  it("refuses assets served without compression", () => {
+    const answer = run(`served "${site}" ${ADDRESS}`, { ASSET_ENCODING: "X-None: 1" });
+    expect(answer.status).toBe(1);
+    expect(answer.stdout).toContain("the compression of assets/app.js");
   });
 
   it("does not blame a deploy for a challenge to its runner", () => {
