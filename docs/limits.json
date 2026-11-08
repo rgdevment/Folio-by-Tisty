@@ -1,5 +1,5 @@
 {
-  "serial": 25,
+  "serial": 27,
   "ttl_days": [
     1,
     3,
@@ -35,5 +35,5 @@
     "es": "45b494b7a9496173898e0f973dc8ddaf824148d3952a96946138d2f9fe4a223e",
     "en": "dbb8d93c4729bae225db09839d0b9a4e0cd8f384876bf00f94f3a307300fc61c"
   },
-  "sharing_open": true
+  "sharing_open": false
 }
