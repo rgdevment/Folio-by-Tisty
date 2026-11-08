@@ -71,7 +71,8 @@ export const LEVEL_ONE: Limits = {
   picturesBytesAtMost: 5_000_000,
   firstBytesAtMost: 2_512_000,
   restBytesAtMost: 15_572_000,
-  filesAtMost: 2,
+  // Weight is what costs; the count only keeps the files manifest inside its frame.
+  filesAtMost: 64,
   filesBytesAtMost: 5_000_000,
   uploadsAnHour: 60,
   revocationsAnHour: 30,

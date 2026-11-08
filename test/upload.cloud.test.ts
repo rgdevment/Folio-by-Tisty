@@ -298,10 +298,18 @@ describe("the files a version names", () => {
     expect(said).toEqual({ refused: "bad_upload" });
   });
 
+  it("takes many small files, since their weight is what counts", async () => {
+    const id = await shared();
+    const thirty = await sealedEnvelope({ id, version: 2, owner: mario, files: Array(30).fill(16) });
+    const hash = await filesHashOf(id, thirty);
+    await sendNaming(id, 2, hash, LATER);
+    expect(await sendFiles(id, thirty)).toEqual({ stored: true, hash });
+  });
+
   it("refuses more files, or more bytes, than a document may have", async () => {
     const id = await shared();
-    const three = await sealedEnvelope({ id, version: 2, owner: mario, files: [16, 16, 16] });
-    expect(await sendFiles(id, three)).toEqual({ refused: "too_big" });
+    const many = await sealedEnvelope({ id, version: 2, owner: mario, files: Array(LIMITS.filesAtMost + 1).fill(16) });
+    expect(await sendFiles(id, many)).toEqual({ refused: "too_big" });
     const heavy = await sealedEnvelope({ id, version: 2, owner: mario, files: [LIMITS.filesBytesAtMost + 1] });
     expect(await sendFiles(id, heavy)).toEqual({ refused: "too_big" });
   });
