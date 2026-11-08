@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DOMAIN, PROOF, proofOf, SHARD_BYTES_AT_MOST, shardOf } from "../src/core/checked-domain.ts";
-import { dnsLookup, type Lookup, retried, txtFaults } from "./doh.ts";
+import { dnsLookup, type Lookup, retried, txtFaults } from "./dns.ts";
 import { holdsSignature, signedFile } from "./limits-key.ts";
 
 const ROOT = /^[A-Za-z0-9_-]{43}$/;
@@ -11,6 +11,7 @@ export const SHARDS = "docs/domains";
 const PUBLIC_KEY = "docs/limits.pub";
 const TRIES = 5;
 const BETWEEN_TRIES_MS = 60_000;
+const ASKED_AT_ONCE = 16;
 const USAGE =
   "node scripts/domains.ts check <domain> <root> | build <private list> | sign <key file> | watch (reads DOMAINS_CLEAR)";
 
@@ -49,18 +50,24 @@ export const listFaults = (approved: Approved[]): string[] => {
   ];
 };
 
-export const dnsFaults = async (approved: Approved[], lookup: Lookup): Promise<string[]> =>
-  (await Promise.all(approved.map(({ domain, root }) => txtFaults(domain, root, lookup)))).flat();
+// A few at a time, so the resolvers never see a flood and blame good records for their own limits.
+const inTurns = async <T>(approved: Approved[], ask: (one: Approved, at: number) => Promise<T[]>): Promise<T[]> => {
+  const answers: T[] = [];
+  for (let start = 0; start < approved.length; start += ASKED_AT_ONCE) {
+    const turn = approved.slice(start, start + ASKED_AT_ONCE);
+    answers.push(...(await Promise.all(turn.map((one, at) => ask(one, start + at)))).flat());
+  }
+  return answers;
+};
+
+export const dnsFaults = (approved: Approved[], lookup: Lookup): Promise<string[]> =>
+  inTurns(approved, ({ domain, root }) => txtFaults(domain, root, lookup));
 
 // Lines of the private list, never its domains: the watch's output is public.
-export const failingLines = async (approved: Approved[], lookup: Lookup): Promise<string[]> =>
-  (
-    await Promise.all(
-      approved.map(async ({ domain, root }, at) =>
-        (await txtFaults(domain, root, lookup)).length > 0 ? [`line ${at + 1}`] : [],
-      ),
-    )
-  ).flat();
+export const failingLines = (approved: Approved[], lookup: Lookup): Promise<string[]> =>
+  inTurns(approved, async ({ domain, root }, at) =>
+    (await txtFaults(domain, root, lookup)).length > 0 ? [`line ${at + 1}`] : [],
+  );
 
 export const shardsOf = async (approved: Approved[]): Promise<Map<string, string>> => {
   const proofs = (await Promise.all(approved.map(({ domain, root }) => proofOf(root, domain)))).sort();
@@ -80,7 +87,12 @@ export const writeShards = (shards: Map<string, string>, dir = SHARDS): void => 
   for (const name of readdirSync(dir)) {
     if (!shards.has(name.slice(0, 2))) rmSync(join(dir, name));
   }
-  for (const [shard, said] of shards) writeFileSync(join(dir, `${shard}.json`), said);
+  for (const [shard, said] of shards) {
+    const file = join(dir, `${shard}.json`);
+    if (existsSync(file) && readFileSync(file, "utf8") === said) continue;
+    writeFileSync(file, said);
+    rmSync(`${file}.minisig`, { force: true });
+  }
 };
 
 export const signShards = (keyFile: string, now: number, dir = SHARDS, publicKeyFile = PUBLIC_KEY): number => {

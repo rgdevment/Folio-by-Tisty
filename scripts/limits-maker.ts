@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DOMAIN } from "../src/core/checked-domain.ts";
 import type { Maker } from "../src/core/look-alike.ts";
-import { dnsLookup, type Lookup, recordName, retried, txtFaults } from "./doh.ts";
+import { dnsLookup, type Lookup, recordName, retried, txtFaults } from "./dns.ts";
 
 const ROOT = /^[A-Za-z0-9_-]{43}$/;
 const NAME = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;

@@ -38,15 +38,16 @@ export const keyIn = (said: string): Bytes | undefined => {
   }
 };
 
-const standingFor = async (
+export const standingFor = async (
   root: string,
   verdict: Verdict,
   alias: string | undefined,
   load?: ShardLoader,
+  shards?: ReadonlySet<string>,
 ): Promise<Standing> => {
   const standing = standingOf(root, verdict, alias, MAKER);
   if (standing !== "plain" || !stillSpeaks(verdict)) return standing;
-  return (await isChecked(root, alias, load)) ? "checked" : standing;
+  return (await isChecked(root, alias, load, shards)) ? "checked" : standing;
 };
 
 export const openLink = async (id: string, linkKey: string, arrived: Arrived, load?: ShardLoader): Promise<Opened> => {
@@ -57,14 +58,18 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived, lo
   const signer = await verdictOf(signature, served);
   const owner = manifest.owner;
   const ownerVerdict = owner ? await verdictOf(owner, served) : signer;
+  const [signerStanding, ownerStanding] = await Promise.all([
+    standingFor(signature.root, signer, held.signed_as, load),
+    standingFor(owner?.root ?? signature.root, ownerVerdict, held.owner_name, load),
+  ]);
   return {
     held,
     pictures: open.opened.slice(FIRST_PICTURE_PART),
     verdict: worseOf(signer, ownerVerdict),
     fingerprint: await fingerprintOf(signature.root),
     ownerFingerprint: owner && owner.root !== signature.root ? await fingerprintOf(owner.root) : null,
-    signerStanding: await standingFor(signature.root, signer, held.signed_as, load),
-    ownerStanding: await standingFor(owner?.root ?? signature.root, ownerVerdict, held.owner_name, load),
+    signerStanding,
+    ownerStanding,
     diesOn: arrived.diesOn,
   };
 };

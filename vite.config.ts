@@ -44,11 +44,13 @@ const licenses = (): Plugin => ({
 
 const SHARDS = "docs/domains";
 
+const shardNames = (): string[] =>
+  existsSync(SHARDS) ? readdirSync(SHARDS).filter((one) => /^[0-9a-f]{2}\.json$/.test(one)) : [];
+
 const domains = (): Plugin => ({
   name: "folio-domains",
   generateBundle() {
-    if (!existsSync(SHARDS)) return;
-    for (const name of readdirSync(SHARDS).filter((one) => /^[0-9a-f]{2}\.json$/.test(one))) {
+    for (const name of shardNames()) {
       this.emitFile({ type: "asset", fileName: `domains/${name}`, source: readFileSync(`${SHARDS}/${name}`, "utf8") });
     }
   },
@@ -57,6 +59,7 @@ const domains = (): Plugin => ({
 export default defineConfig({
   root: "src/page",
   plugins: [tokens(), licenses(), domains()],
+  define: { __FOLIO_SHARDS__: JSON.stringify(shardNames().map((name) => name.slice(0, 2))) },
   build: {
     outDir: "../../dist/page",
     emptyOutDir: true,

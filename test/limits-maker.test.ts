@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Lookup, recordName } from "../scripts/doh";
+import { type Lookup, recordName } from "../scripts/dns";
 import { domainFaults, makerFaults } from "../scripts/limits-maker";
 
 const ROOT = "A".repeat(43);

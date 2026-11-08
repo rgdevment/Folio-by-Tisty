@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Lookup } from "../scripts/doh";
+import type { Lookup } from "../scripts/dns";
 import {
   approvedIn,
   failingLines,
@@ -16,6 +16,7 @@ import {
 import { createKeys } from "../scripts/limits-key";
 import { proofOf, shardOf } from "../src/core/checked-domain";
 import { isChecked } from "../src/page/checked";
+import { standingFor } from "../src/page/read";
 
 const ROOT = "AfnGoRnNecrr5RMnprcTbdZdk7_LABXtpqchY-L0b0s";
 const OTHER = "B".repeat(43);
@@ -49,6 +50,21 @@ describe("the private list", () => {
     ]);
     expect(listFaults(approvedIn(`ana.dev ${ROOT}\nana.dev ${OTHER}`))).toEqual(["ana.dev has more than one root"]);
     expect(listFaults(approvedIn(`ana.dev ${ROOT}\nluis.cl ${ROOT}`))).toEqual([`${ROOT} has more than one domain`]);
+  });
+
+  it("asks the resolvers a few domains at a time", async () => {
+    let now = 0;
+    let most = 0;
+    const counting: Lookup = async () => {
+      now += 1;
+      most = Math.max(most, now);
+      await new Promise((done) => setTimeout(done, 1));
+      now -= 1;
+      return [];
+    };
+    const many = Array.from({ length: 100 }, (_, at) => ({ domain: `d${at}.dev`, root: ROOT }));
+    await failingLines(many, counting);
+    expect(most).toBeLessThanOrEqual(32);
   });
 
   it("names failing domains by their line, never by the domain", async () => {
@@ -91,6 +107,34 @@ describe("the shards", () => {
     expect(JSON.parse(said)).toEqual(["7532a62348e8a81b78e532d9e81c87e0"]);
   });
 
+  it("drop the old signature of a shard whose proofs changed, and keep an unchanged one's", async () => {
+    const dir = join(place, "domains");
+    writeShards(
+      await shardsOf(
+        approvedIn(`rgdevment.dev ${ROOT}
+ana.dev ${OTHER}`),
+      ),
+      dir,
+    );
+    signShards(keyFile, Date.UTC(2026, 10, 8), dir, publicKey);
+    const kept = await shardsOf(
+      approvedIn(`rgdevment.dev ${ROOT}
+ana.dev ${OTHER}`),
+    );
+    writeShards(kept, dir);
+    expect(shardFaults(dir, readFileSync(publicKey, "utf8"))).toEqual([]);
+    const anaShard = shardOf(await proofOf(OTHER, "ana.dev"));
+    const changed = new Map(kept);
+    changed.set(
+      anaShard,
+      `${JSON.stringify([`${anaShard}${"0".repeat(30)}`], null, 1)}
+`,
+    );
+    writeShards(changed, dir);
+    expect(existsSync(join(dir, `${anaShard}.json.minisig`))).toBe(false);
+    expect(existsSync(join(dir, "75.json.minisig"))).toBe(true);
+  });
+
   it("drop a shard nobody is left in", async () => {
     const dir = join(place, "domains");
     writeShards(await shardsOf(approvedIn(`rgdevment.dev ${ROOT}\nana.dev ${OTHER}`)), dir);
@@ -117,31 +161,40 @@ describe("the shards Folio publishes", () => {
 
 describe("the page asking for a domain", () => {
   const shardHolding = (proofs: string[]) => async () => proofs;
+  const BUILT = new Set(["75"]);
+  const never = async () => {
+    throw new Error("asked");
+  };
 
   it("finds a checked domain in its shard", async () => {
     const proof = await proofOf(ROOT, "rgdevment.dev");
-    expect(await isChecked(ROOT, "rgdevment.dev", shardHolding([proof]))).toBe(true);
+    expect(await isChecked(ROOT, "rgdevment.dev", shardHolding([proof]), BUILT)).toBe(true);
   });
 
   it("does not take the same domain under another root", async () => {
     const proof = await proofOf(ROOT, "rgdevment.dev");
-    expect(await isChecked(OTHER, "rgdevment.dev", shardHolding([proof]))).toBe(false);
+    expect(await isChecked(OTHER, "rgdevment.dev", shardHolding([proof]), new Set([shardOf(proof)]))).toBe(false);
   });
 
   it("asks nothing for a name that is not a domain", async () => {
-    const never = async () => {
-      throw new Error("asked");
-    };
-    expect(await isChecked(ROOT, "Ana", never)).toBe(false);
-    expect(await isChecked(ROOT, undefined, never)).toBe(false);
+    expect(await isChecked(ROOT, "Ana", never, BUILT)).toBe(false);
+    expect(await isChecked(ROOT, undefined, never, BUILT)).toBe(false);
   });
 
-  it("takes a shard that is missing or not a list as holding nothing", async () => {
-    expect(await isChecked(ROOT, "rgdevment.dev", async () => "<!doctype html>")).toBe(false);
-    expect(
-      await isChecked(ROOT, "rgdevment.dev", async () => {
-        throw new Error("offline");
-      }),
-    ).toBe(false);
+  it("asks nothing when its shard was not built, as none is today", async () => {
+    expect(await isChecked(ROOT, "rgdevment.dev", never, new Set())).toBe(false);
+    expect(await isChecked(ROOT, "rgdevment.dev", never)).toBe(false);
+  });
+
+  it("takes a shard that is unreadable or out of reach as holding nothing", async () => {
+    expect(await isChecked(ROOT, "rgdevment.dev", async () => "<!doctype html>", BUILT)).toBe(false);
+    expect(await isChecked(ROOT, "rgdevment.dev", never, BUILT)).toBe(false);
+  });
+
+  it("checks a domain only while its signature still speaks", async () => {
+    const proof = await proofOf(OTHER, "ana.dev");
+    const built = new Set([shardOf(proof)]);
+    expect(await standingFor(OTHER, "holds", "ana.dev", shardHolding([proof]), built)).toBe("checked");
+    expect(await standingFor(OTHER, "doubtful", "ana.dev", shardHolding([proof]), built)).toBe("plain");
   });
 });
