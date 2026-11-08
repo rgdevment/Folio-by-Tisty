@@ -70,8 +70,8 @@ const open = async (file, id, sealedLink) => {
     console.log(`${ORIGIN}/${said}`);
     return;
   }
-  console.error("What the seal brings, written by whoever reported and not checked:");
-  console.log(shown(said));
+  // On the same line and with its links broken, so a terminal never offers the reporter's words as something to click.
+  console.log(`Not checked, written by whoever reported: ${shown(said).replaceAll("://", ":/ /")}`);
 };
 
 const manifestOf = async (id, caseLink) => {

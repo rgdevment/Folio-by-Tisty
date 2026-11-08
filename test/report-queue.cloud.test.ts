@@ -270,8 +270,11 @@ describe("marking a report false", () => {
     expect(left.results).toEqual([{ doc: "Otherdoc", net: "clean" }]);
     const named = await testEnv.DB.prepare("SELECT net, at, since FROM false_reporters").all();
     expect(named.results).toEqual([{ net: "shared", at: DAY + 1, since: DAY + 1 }]);
-    const logged = await testEnv.DB.prepare("SELECT doc, action FROM moderation").all();
-    expect(logged.results).toEqual([{ doc: "Falsedoc", action: "false_network" }]);
+    const logged = await testEnv.DB.prepare("SELECT doc, action FROM moderation ORDER BY doc").all();
+    expect(logged.results).toEqual([
+      { doc: "Falsedoc", action: "false_network" },
+      { doc: "Otherdoc", action: "false_network" },
+    ]);
     expect(await moderation.networkWasFalse("Falsedoc", "shared", (DAY + 1) * DAY_MS)).toBe("missing");
   });
 

@@ -102,6 +102,7 @@ beforeEach(() => {
   page = new JSDOM(readFileSync("src/admin/page/index.html", "utf8")).window.document;
   doing = {
     blockKey: vi.fn(),
+    block: vi.fn(),
     unblockKey: vi.fn(),
     accept: vi.fn(),
     reject: vi.fn(),
@@ -389,7 +390,7 @@ describe("a case in the panel", () => {
   it("panics first, then makes the link for the authority with its records sealed", async () => {
     const fetching = answering();
     await opened(fetching);
-    pressing("reports", "Bloquear documento");
+    pressing("reports", "Preparar entrega a la autoridad");
     await vi.waitFor(() => expect(CASE_LINK()).toContain("#caso."));
     expect(CASE_LINK().split("#")[1]?.split(".")).toHaveLength(3);
     const sent = paths(fetching).filter((path) => path.startsWith("/api/docs/"));
@@ -455,14 +456,14 @@ describe("a case in the panel", () => {
   it("does nothing without a reason", async () => {
     const fetching = answering();
     await opened(fetching, "  ");
-    pressing("reports", "Bloquear documento");
+    pressing("reports", "Preparar entrega a la autoridad");
     expect(paths(fetching).filter((path) => path.startsWith("/api/docs/"))).toEqual([]);
   });
 
   it("makes no link when the panic did not hold", async () => {
     const fetching = answering({ "/panic": () => new Response("{}", { status: 500 }) });
     await opened(fetching);
-    pressing("reports", "Bloquear documento");
+    pressing("reports", "Preparar entrega a la autoridad");
     await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toContain("No se pudo"));
     expect(paths(fetching).some((path) => path.endsWith("/case"))).toBe(false);
   });
@@ -470,7 +471,7 @@ describe("a case in the panel", () => {
   it("says it stayed held when only the link failed", async () => {
     const fetching = answering({ "/case": () => new Response("{}", { status: 400 }) });
     await opened(fetching);
-    pressing("reports", "Bloquear documento");
+    pressing("reports", "Preparar entrega a la autoridad");
     await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toContain("Quedó bloqueado y retenido"));
     expect(page.getElementById("case-link")?.hidden).toBe(true);
   });
@@ -486,10 +487,30 @@ describe("a case in the panel", () => {
     expect(link.split("#")[1]?.split(".")).toHaveLength(2);
     pressing("appeals", "Rechazar");
     await vi.waitFor(() => expect(paths(fetching).some((path) => path.endsWith("/reject"))).toBe(true));
-    await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toBe(""));
+    await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toBe("Hecho."));
     expect(CASE_LINK()).toBe(link);
     page.getElementById("case-link-copy")?.click();
     expect(writeText).toHaveBeenCalledWith(link);
+    await vi.waitFor(() => expect(page.getElementById("case-link")?.hidden).toBe(true));
+    expect(CASE_LINK()).toBe("");
+  });
+
+  it("says when an action changed nothing, and brings the page up to date anyway", async () => {
+    const fetching = answering({ "/reject": () => new Response("{}", { status: 404 }) });
+    await opened(fetching);
+    const before = paths(fetching).filter((path) => path === "/api/queue").length;
+    pressing("appeals", "Rechazar");
+    await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toContain("No cambió nada"));
+    expect(paths(fetching).filter((path) => path === "/api/queue").length).toBe(before + 1);
+  });
+
+  it("blocks from a report without holding it for an authority", async () => {
+    const fetching = answering();
+    await opened(fetching, "phishing claro");
+    pressing("reports", "Bloquear documento");
+    await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toBe("Hecho."));
+    const sent = paths(fetching).filter((path) => path.startsWith("/api/docs/"));
+    expect(sent).toEqual(["/api/docs/AbCdEfGh/block"]);
   });
 });
 
@@ -540,6 +561,7 @@ describe("the panel", () => {
       "AbCdEfGh",
       "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.opaque",
       expect.anything(),
+      "link",
     );
     expect(page.getElementById("reports")?.textContent).not.toContain("sealed1.opaque");
   });
@@ -595,21 +617,22 @@ describe("the panel", () => {
   });
 
   it("hands over a sealed email only as a command, on the report that brought one", () => {
-    pressing("reports", "Copiar para leer su correo");
-    expect(doing.copy).toHaveBeenCalledWith(
-      expect.stringContaining("report-key.mjs open ~/folio-reports.key AbCdEfGh contact1.opaque"),
-      "Imprime el correo que dejó quien denunció.",
+    pressing("reports", "Leer su correo");
+    expect(doing.openReport).toHaveBeenCalledWith(
+      "AbCdEfGh",
+      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh contact1.opaque",
       expect.anything(),
+      "contact",
     );
     expect(page.getElementById("reports")?.textContent).not.toContain("contact1.opaque");
     const offered = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
-    expect(offered.filter((one) => one.textContent === "Copiar para leer su correo")).toHaveLength(1);
+    expect(offered.filter((one) => one.textContent === "Leer su correo")).toHaveLength(1);
   });
 
   it("offers a report's own version to verify and to panic", () => {
     pressing("reports", "Link para verificar");
     expect(doing.verifyLink).toHaveBeenCalledWith("AbCdEfGh", 2);
-    pressing("reports", "Bloquear documento", 1);
+    pressing("reports", "Preparar entrega a la autoridad", 1);
     expect(doing.panic).toHaveBeenCalledWith("IjKlMnOp", 1);
     expect(page.getElementById("reports")?.textContent).not.toContain("Ya lo entregué");
   });

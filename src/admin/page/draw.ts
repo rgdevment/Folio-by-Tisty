@@ -9,7 +9,8 @@ export interface Doing {
   reportWasFalse: (id: string, net: string) => void;
   forgetContact: (id: string, net: string) => void;
   networkWasFalse: (id: string, net: string) => void;
-  openReport: (id: string, command: string, where: HTMLElement) => void;
+  openReport: (id: string, command: string, where: HTMLElement, reading: Reading) => void;
+  block: (id: string) => void;
   blockKey: (root: string) => void;
   unblockKey: (root: string) => void;
   copy: (command: string, then: string, where: HTMLElement) => void;
@@ -23,6 +24,7 @@ export interface Doing {
 }
 
 export type Owners = Record<string, Owner>;
+export type Reading = "link" | "contact";
 
 export const STAGES: Record<string, string> = {
   open: "abierto",
@@ -63,7 +65,11 @@ const signersText = ({ signers }: QueuedDoc): string => {
 const REPORTS_KEY = "~/folio-reports.key";
 const CHECKING =
   "Cambia <link para verificar> por uno del panel, entre las comillas. Dice si la llave abre ese documento, sin leer nada.";
-const CONTACT = "Imprime el correo que dejó quien denunció.";
+const SAFE_ID = /^[A-Za-z0-9]{8}$/;
+const SAFE_SEALED = /^(sealed1|contact1)\.[A-Za-z0-9_-]+$/;
+
+// What the panel hands to the operator's shell holds nothing but these characters, whatever got into the database.
+const isSafe = (doc: string, sealed: string): boolean => SAFE_ID.test(doc) && SAFE_SEALED.test(sealed);
 
 const openCommand = (doc: string, sealed: string): string =>
   `node scripts/report-key.mjs open ${REPORTS_KEY} ${doc} ${sealed}`;
@@ -166,15 +172,23 @@ const reportCard = (
       piece(page, "span", "soft", standingText(report, standing)),
     ),
   );
-  if (report.detail) card.append(piece(page, "p", "card-detail", report.detail));
+  if (report.detail) {
+    const said = page.createElement("blockquote");
+    said.className = "card-detail";
+    said.append(piece(page, "span", "said-by", "Escribió quien denunció, sin comprobar: "), report.detail);
+    card.append(said);
+  }
   if (report.overCap)
     card.append(
       piece(page, "p", "card-line", "Esta red pasó su tope de documentos: no cuenta para bloquear ni retener."),
     );
   if (report.fromFalseNet)
     card.append(piece(page, "p", "card-line", "Esta red ya tuvo una denuncia falsa: no cuenta para bloquear."));
-  const sealed = report.sealedLink;
-  const contact = report.sealedContact;
+  const sealed = report.sealedLink !== null && isSafe(report.doc, report.sealedLink) ? report.sealedLink : null;
+  const contact =
+    report.sealedContact !== null && isSafe(report.doc, report.sealedContact) ? report.sealedContact : null;
+  if ((report.sealedLink !== null && !sealed) || (report.sealedContact !== null && !contact))
+    card.append(piece(page, "p", "card-line", "Lo sellado no tiene la forma esperada: no se ofrece ningún comando."));
   if (contact)
     card.append(
       piece(
@@ -187,10 +201,12 @@ const reportCard = (
   const verifying = button(page, "Link para verificar", () => doing.verifyLink(report.doc, report.version));
   const main = [
     sealed
-      ? button(page, "Abrir denuncia", () => doing.openReport(report.doc, openCommand(report.doc, sealed), card))
+      ? button(page, "Abrir denuncia", () =>
+          doing.openReport(report.doc, openCommand(report.doc, sealed), card, "link"),
+        )
       : verifying,
     button(page, "Era falsa", () => doing.reportWasFalse(report.doc, report.net)),
-    button(page, "Bloquear documento", () => doing.panic(report.doc, report.version), true),
+    button(page, "Bloquear documento", () => doing.block(report.doc), true),
   ];
   const rest = [
     ...(sealed
@@ -201,13 +217,16 @@ const reportCard = (
       : []),
     ...(contact
       ? [
-          button(page, "Copiar para leer su correo", () => doing.copy(openCommand(report.doc, contact), CONTACT, card)),
+          button(page, "Leer su correo", () =>
+            doing.openReport(report.doc, openCommand(report.doc, contact), card, "contact"),
+          ),
           button(page, "Borrar su correo", () => doing.forgetContact(report.doc, report.net)),
         ]
       : []),
     ...(report.fromFalseNet
       ? [button(page, "Descartar todas las de esta red", () => doing.networkWasFalse(report.doc, report.net), true)]
       : []),
+    button(page, "Preparar entrega a la autoridad", () => doing.panic(report.doc, report.version), true),
     ...againstOwner(page, report.doc, report.ownerToBlock, doing),
   ];
   card.append(...ownerLine(page, owner, today, doing), actions(page, ...main, ...more(page, ...rest)));
@@ -247,17 +266,10 @@ const docCard = (
   const rest = [
     button(page, "Link para verificar", () => doing.verifyLink(doc.id, doc.versionToOpen)),
     button(page, "Preparar entrega a la autoridad", () => doing.panic(doc.id, doc.versionToOpen), true),
+    ...(doc.mayHandOver ? [button(page, "Ya lo entregué", () => doing.handedOver(doc.id), true)] : []),
     ...againstOwner(page, doc.id, doc.ownerToBlock, doing),
   ];
-  card.append(
-    ...ownerLine(page, owner, today, doing),
-    actions(
-      page,
-      ...main,
-      ...(doc.mayHandOver ? [button(page, "Ya lo entregué", () => doing.handedOver(doc.id))] : []),
-      ...more(page, ...rest),
-    ),
-  );
+  card.append(...ownerLine(page, owner, today, doing), actions(page, ...main, ...more(page, ...rest)));
   return card;
 };
 

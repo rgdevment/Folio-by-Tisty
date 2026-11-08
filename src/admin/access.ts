@@ -21,6 +21,7 @@ interface Claims {
   email?: string;
 }
 
+const CERTS_KEPT_SECONDS = 600;
 const decoder = new TextDecoder();
 const jsonOf = <T>(part: string): T => JSON.parse(decoder.decode(fromBase64Url(part))) as T;
 
@@ -29,7 +30,10 @@ export const issuerOf = (team: string): string => `https://${team}.cloudflareacc
 export const certsFrom =
   (team: string, fetcher: typeof fetch = fetch): Certs =>
   async () => {
-    const response = await fetcher(`${issuerOf(team)}/cdn-cgi/access/certs`);
+    // Kept at the edge for a while: every panel load makes several calls, and Access publishes new keys ahead of use.
+    const response = await fetcher(`${issuerOf(team)}/cdn-cgi/access/certs`, {
+      cf: { cacheTtl: CERTS_KEPT_SECONDS, cacheEverything: true },
+    });
     if (!response.ok) throw new Error(`Access answered ${response.status}`);
     return ((await response.json()) as { keys: JsonWebKey[] }).keys;
   };

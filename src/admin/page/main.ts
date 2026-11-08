@@ -11,17 +11,24 @@ import type {
 } from "../../core/dashboard";
 import { drawAbout, drawDays, drawHealth, drawLog, drawNets, drawTiles, type Overlook } from "./board";
 import { madeCase } from "./case";
-import { type Doing, drawQueue, sayWhenEmpty } from "./draw";
+import { type Doing, drawQueue, type Reading, sayWhenEmpty } from "./draw";
 import { drawKey } from "./key";
 import { count, isoDay, megabytes, piece, shortKey, todayOf } from "./say";
 import { asked, fetched, fetchedAt, sent } from "./talk";
 import { drawTop } from "./top";
 
 const COULD_NOT = "No se pudo. Recarga la página para ver cómo quedó.";
+const UNCHANGED = "No cambió nada: ya estaba así o ya no existe. La vista quedó al día.";
+const ON_RECORD = "Queda en el registro, y en los registros que se entregan a la autoridad si hay un caso.";
+const READING_SAID: Record<Reading, string> = {
+  link: "Anotado el motivo. Imprime el link de la denuncia, listo para abrir en el navegador y leer la versión denunciada.",
+  contact: "Anotado el motivo. Imprime el correo que dejó quien denunció.",
+};
 const PART_FAILED = "No se pudo traer esta parte. Recarga la página.";
 const RUN_IT =
   "Córrelo en una terminal, en la carpeta de Folio. Usa tu llave de denuncias en ~/folio-reports.key: si está en otro lugar, cambia esa ruta. Tu llave nunca pasa por el panel.";
 const DOWNLOAD_KEPT_MS = 60_000;
+const MISSING = 404;
 
 const foundText = (answer: Found): string => {
   switch (answer.kind) {
@@ -91,9 +98,12 @@ class Panel {
     }
   }
 
-  #copying(text: string, says: string): void {
+  #copying(text: string, says: string, then?: () => void): void {
     void navigator.clipboard.writeText(text).then(
-      () => this.#say(says),
+      () => {
+        this.#say(says);
+        then?.();
+      },
       () => this.#say("No se pudo copiar: selecciónalo y cópialo."),
     );
   }
@@ -259,7 +269,11 @@ class Panel {
 
   #doing(): Doing {
     return {
-      accept: (id) => this.#confirmed(`¿Aceptar y desbloquear ${id}?`, `docs/${id}/accept`),
+      accept: (id) =>
+        this.#confirmed(
+          `¿Desbloquear ${id}? Vuelve a servirse, se descartan sus denuncias abiertas, se levanta su retención y dejan de servir sus links de caso, también el de la autoridad.`,
+          `docs/${id}/accept`,
+        ),
       reject: (id) => this.#confirmed(`¿Rechazar el reclamo de ${id}? Sigue bloqueado.`, `docs/${id}/reject`),
       clearWarning: (id) =>
         this.#confirmed(`¿Quitar el aviso de ${id}? Sus denuncias leves dejan de contar.`, `docs/${id}/clear_warning`),
@@ -274,13 +288,26 @@ class Panel {
           `docs/${id}/reports/${net}/forget_contact`,
         ),
       reportWasFalse: (id, net) =>
-        this.#confirmed("¿Esta denuncia era falsa? Esa red dejará de contar.", `docs/${id}/reports/${net}/false`),
-      openReport: (id, command, where) => {
-        const reason = prompt(`¿Por qué abres la denuncia de ${id}? Queda anotado en el registro.`);
-        if (reason?.trim()) void this.#openingReport(id, reason, command, where);
+        this.#confirmed(
+          "¿Esta denuncia era falsa? Esa red no contará por 180 días: si es compartida, tampoco contarán sus denuncias reales. No se deshace desde el panel.",
+          `docs/${id}/reports/${net}/false`,
+        ),
+      openReport: (id, command, where, reading) => {
+        const what = reading === "link" ? "abres la denuncia" : "lees el correo de quien denunció";
+        const reason = prompt(`¿Por qué ${what} de ${id}? ${ON_RECORD}`);
+        if (reason?.trim())
+          void this.#openingReport(id, reading === "link" ? reason : `correo: ${reason}`, command, where, reading);
+      },
+      block: (id) => {
+        const note = prompt(
+          `¿Por qué bloquear ${id}? Deja de servirse; no se retiene más allá de lo que pidan sus denuncias. ${ON_RECORD}`,
+        );
+        if (note?.trim()) void this.#acting(`docs/${id}/block`, note);
       },
       panic: (id, version) => {
-        const note = prompt(`¿Por qué bloquear y retener ${id}? Dejará de servirse y se retiene 180 días.`);
+        const note = prompt(
+          `¿Por qué preparar la entrega de ${id} a la autoridad? Deja de servirse, se retiene 180 días, se crea un link de caso y se sellan sus registros, también los motivos que escribiste.`,
+        );
         if (note?.trim()) void this.#panicking(id, version, note);
       },
       blockKey: (root) => this.#blockingKey(root),
@@ -293,7 +320,7 @@ class Panel {
       },
       handedOver: (id) =>
         this.#confirmed(
-          "¿Ya entregaste el link de caso y la llave a la autoridad? Se borran las llaves selladas de este documento, aunque siguen hasta 30 días en los respaldos cifrados.",
+          "¿Ya entregaste el link de caso y la llave a la autoridad? Se borra lo sellado de sus denuncias: si no copiaste la llave del documento, nadie podrá volver a leerlo. Sigue hasta 30 días en los respaldos cifrados.",
           `docs/${id}/handed_over`,
         ),
       copy: (command, then, where) => this.#handing(command, then, where),
@@ -319,24 +346,27 @@ class Panel {
   }
 
   // Noted before the command is handed over, so no report is opened without its reason on record.
-  async #openingReport(id: string, reason: string, command: string, where: HTMLElement): Promise<void> {
+  async #openingReport(
+    id: string,
+    reason: string,
+    command: string,
+    where: HTMLElement,
+    reading: Reading,
+  ): Promise<void> {
     this.#say("Trabajando…");
     if (!(await asked(`docs/${id}/opened`, reason))) {
       this.#say(COULD_NOT);
       return;
     }
-    this.#handing(
-      command,
-      "Anotado el motivo. Imprime el link de la denuncia, listo para abrir en el navegador y leer la versión denunciada.",
-      where,
-    );
+    this.#handing(command, READING_SAID[reading], where);
     void this.#loadBoard();
   }
 
   async #acting(path: string, note?: string): Promise<void> {
     this.#say("Trabajando…");
-    if (await asked(path, note)) await this.#reload();
-    else this.#say(COULD_NOT);
+    const answer = await sent(path, note === undefined ? undefined : { note });
+    await this.#reload();
+    this.#say(answer?.ok ? "Hecho." : answer?.status === MISSING ? UNCHANGED : COULD_NOT);
   }
 
   #confirmed(question: string, path: string): void {
@@ -392,20 +422,28 @@ class Panel {
       if (asking) void this.#finding(asking);
     });
     place("case-link-copy").addEventListener("click", () => {
-      this.#copying(place("case-link-code").textContent ?? "", "Link copiado.");
+      this.#copying(place("case-link-code").textContent ?? "", "Link copiado. Ya no se muestra.", () => {
+        place("case-link-code").textContent = "";
+        place("case-link").hidden = true;
+      });
     });
     place("block-form").addEventListener("submit", (event) => {
       event.preventDefault();
       const id = (place("block-id") as HTMLInputElement).value.trim();
       const note = (place("block-note") as HTMLInputElement).value;
-      if (confirm(`¿Bloquear ${id}? Dejará de servirse.`)) void this.#acting(`docs/${id}/block`, note);
+      if (confirm(`¿Bloquear ${id}? Dejará de servirse.`)) {
+        void this.#acting(`docs/${id}/block`, note);
+        (place("block-form") as HTMLFormElement).reset();
+      }
     });
     place("key-form").addEventListener("submit", (event) => {
       event.preventDefault();
       const root = (place("key-root") as HTMLInputElement).value.trim();
       const note = (place("key-note") as HTMLInputElement).value;
-      if (confirm(`¿Bloquear la llave ${root}? No podrá subir nada más.`))
+      if (confirm(`¿Bloquear la llave ${root}? No podrá subir nada más.`)) {
         void this.#acting(`keys/${root}/block`, note);
+        (place("key-form") as HTMLFormElement).reset();
+      }
     });
   }
 }

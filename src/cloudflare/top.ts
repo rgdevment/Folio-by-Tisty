@@ -5,7 +5,7 @@ import { HELD_BYTES } from "./room";
 import { seenOf } from "./seen";
 
 const LISTED = 50;
-const ALL = -1;
+const FLAGGED_SCANNED = 1000;
 
 const DAY_OF = (at: string): string => `${at} / 86400000`;
 // Without its first day, the oldest version kept and the first day it was read only bound how long it has lived.
@@ -144,7 +144,7 @@ export const topDocs = async (
        WHERE d.latest > 0
        ORDER BY ${ORDERS[order]} LIMIT ?2`,
     )
-    .bind(today, flaggedOnly ? ALL : LISTED, LONE_AFTER_DAYS)
+    .bind(today, flaggedOnly ? FLAGGED_SCANNED : LISTED, LONE_AFTER_DAYS)
     .all<Row>();
   const docs = rows.results.map((row) => topDocOf(row, today, limits));
   return {

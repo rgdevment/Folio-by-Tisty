@@ -17,8 +17,10 @@ const RECORD_ROWS_AT_MOST = 200;
 const REPORT_ROWS_AT_MOST = 1000;
 const REPORTS_BYTES_IN_RECORDS = 300_000;
 const CASE_FOR_THE_AUTHORITY = "c.doc = ?1 AND c.sealed_records IS NOT NULL AND c.until >= ?2";
+// Only after the report was opened: erasing the seal before that would leave nobody able to read the document.
 const READY_TO_HAND_OVER = `EXISTS (SELECT 1 FROM docs d WHERE d.id = ?1 AND d.blocked_by_operator = 1)
-  AND EXISTS (SELECT 1 FROM cases c WHERE ${CASE_FOR_THE_AUTHORITY})`;
+  AND EXISTS (SELECT 1 FROM cases c WHERE ${CASE_FOR_THE_AUTHORITY})
+  AND EXISTS (SELECT 1 FROM openings o WHERE o.doc = ?1 AND o.reason NOT LIKE 'case %')`;
 
 const reportsThatFit = (reports: unknown[]): { kept: unknown[]; leftOut: number } => {
   const kept: unknown[] = [];
@@ -127,6 +129,7 @@ export class CloudModeration {
              blocked_by_operator = 1
                AND EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND r.sealed_link IS NOT NULL)
                AND EXISTS (SELECT 1 FROM cases c WHERE c.doc = docs.id AND c.sealed_records IS NOT NULL AND c.until >= ?2)
+               AND EXISTS (SELECT 1 FROM openings o WHERE o.doc = docs.id AND o.reason NOT LIKE 'case %')
                AS may_hand_over
            FROM docs WHERE blocked_at IS NOT NULL
            ORDER BY appealed_hour IS NULL, blocked_at DESC, id LIMIT ?1`,
@@ -426,10 +429,17 @@ export class CloudModeration {
     );
   }
 
+  // Logged on every document it clears, so each one's records say why its reports stopped counting.
   async networkWasFalse(id: string, net: string, now: number): Promise<Acted> {
+    const logging = this.#db
+      .prepare(
+        `INSERT OR IGNORE INTO moderation (at, doc, action, note)
+         SELECT DISTINCT ?2, doc, 'false_network', ?3 FROM reports WHERE net = ?1 AND cleared = 0 AND doc <> ?3`,
+      )
+      .bind(net, now, id);
     const clearing = this.#db.prepare("UPDATE reports SET cleared = 1 WHERE net = ? AND cleared = 0").bind(net);
     return this.#actedAndLogged(
-      [this.#namingFalse(id, net, now), clearing],
+      [this.#namingFalse(id, net, now), logging, clearing],
       this.#logIfChanged(id, "false_network", now),
     );
   }

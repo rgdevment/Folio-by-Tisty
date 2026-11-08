@@ -451,6 +451,13 @@ describe("what it can do", () => {
     expect((await asked(`/api/docs/${ID}/reports/n1/false_network`, { method: "POST" })).status).toBe(403);
     expect((await acting(`/api/docs/${ID}/reports/n1/false_network`)).status).toBe(200);
     expect((await moderation.queue(NOW)).reportsTotal).toBe(0);
+    const rows = await testEnv.DB.prepare(
+      "SELECT doc, note FROM moderation WHERE action = 'false_network' ORDER BY doc",
+    ).all<{ doc: string; note: string | null }>();
+    expect(rows.results).toEqual([
+      { doc: ID, note: null },
+      { doc: "OtherDoc", note: ID },
+    ]);
     expect((await acting(`/api/docs/${ID}/reports/n1/false_network`)).status).toBe(404);
   });
 
@@ -672,6 +679,8 @@ describe("what it can do", () => {
       await acting(`/api/docs/${ID}/panic`, "looks real");
       await sendingCase(ID, { version: 1, tokenHash: HASH, sealedRecords: "case1.abc" });
       expect((await asked(`/api/docs/${ID}/handed_over`, { method: "POST" })).status).toBe(403);
+      expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(404);
+      await acting(`/api/docs/${ID}/opened`, "revisar antes de entregar");
       expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(200);
       expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(404);
     });

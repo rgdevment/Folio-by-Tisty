@@ -14,6 +14,7 @@ import { sealContact, sealLink } from "../src/page/ui/seal";
 const ID = "k7Qm2xPa";
 const WHY = "imita a un banco";
 const LINK_KEY = "nlt35tFEpAhP5bWJr2p2hIFCFml15FNS5LD2AsBbd2s";
+const UNCHECKED = "Not checked, written by whoever reported: ";
 const folder = mkdtempSync(join(tmpdir(), "folio-report-"));
 const file = join(folder, "report.key");
 
@@ -38,7 +39,9 @@ describe("a link sealed for the operator", () => {
 
   it("gives a link to open only for its own document, and anything else as text", async () => {
     const elsewhere = await sealContact(ID, `another1#${LINK_KEY}`, operatorKey);
-    expect(keyScript("open", file, ID, elsewhere)).toBe(`another1#${LINK_KEY}`);
+    expect(keyScript("open", file, ID, elsewhere)).toBe(`${UNCHECKED}another1#${LINK_KEY}`);
+    const lure = await sealContact(ID, "https://panel-tisty.example/x", operatorKey);
+    expect(keyScript("open", file, ID, lure)).toBe(`${UNCHECKED}https:/ /panel-tisty.example/x`);
   });
 
   it("finds the key under the home folder when its path starts with ~, as PowerShell hands it over", () => {
@@ -67,7 +70,7 @@ describe("a link sealed for the operator", () => {
     const sealed = await sealContact(ID, "a@b.co", operatorKey);
     expect(isSealedContact(sealed)).toBe(true);
     expect(sealed.startsWith("contact1.")).toBe(true);
-    expect(keyScript("open", file, ID, sealed)).toBe("a@b.co");
+    expect(keyScript("open", file, ID, sealed)).toBe(`${UNCHECKED}a@b.co`);
     expect(() => keyScript("open", file, "another1", sealed)).toThrow();
     const longest = await sealContact(ID, `${"a".repeat(244)}@example.co`, operatorKey);
     expect(isSealedContact(longest)).toBe(true);
@@ -84,7 +87,7 @@ describe("a link sealed for the operator", () => {
   it("shows what controls a terminal as text, since anyone can seal anything", async () => {
     const sealed = await sealContact(ID, "a\u001b[2Jb\u202Ec\nd", operatorKey);
     const shown = keyScript("open", file, ID, sealed);
-    expect(shown).toBe("a\\u{1b}[2Jb\\u{202e}c\\u{a}d");
+    expect(shown).toBe(`${UNCHECKED}a\\u{1b}[2Jb\\u{202e}c\\u{a}d`);
   });
 
   it("does not overwrite a key already there", () => {

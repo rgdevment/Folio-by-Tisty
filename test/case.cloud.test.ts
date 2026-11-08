@@ -252,6 +252,8 @@ describe("saying it was handed over", () => {
     await sealedReport(OTHER);
     await moderation.panic(ID, "looks real", NOW);
     await madeCase(1, SEALED);
+    expect(await moderation.handedOver(ID, NOW)).toBe("missing");
+    await moderation.opened(ID, "to copy its key", NOW);
     expect(await moderation.handedOver(ID, NOW)).toBe("done");
     expect(await links()).toBeNull();
     const other = await testEnv.DB.prepare("SELECT sealed_link FROM reports WHERE doc = ?").bind(OTHER).first();
@@ -265,6 +267,7 @@ describe("saying it was handed over", () => {
     await moderation.panic(ID, "looks real", NOW);
     await madeCase(1, SEALED);
     await moderation.makeCase(ID, { version: 1, tokenHash: "V".repeat(43) }, NOW);
+    await moderation.opened(ID, "to copy its key", NOW);
     await moderation.handedOver(ID, NOW);
     const left = await testEnv.DB.prepare("SELECT token_hash FROM cases").all();
     expect(left.results).toEqual([{ token_hash: await tokenHash(TOKEN) }]);
@@ -368,6 +371,10 @@ describe("the queue of blocked documents", () => {
     await madeCase(1);
     expect((await blockedDoc())?.mayHandOver).toBe(false);
     await moderation.makeCase(ID, { version: 1, tokenHash: "V".repeat(43), sealedRecords: SEALED }, NOW);
+    expect((await blockedDoc())?.mayHandOver).toBe(false);
+    await testEnv.DB.prepare("INSERT INTO openings (doc, at, reason) VALUES (?, ?, ?)").bind(ID, NOW, "case AbCd").run();
+    expect((await blockedDoc())?.mayHandOver).toBe(false);
+    await moderation.opened(ID, "to copy its key", NOW + 1);
     expect((await blockedDoc())?.mayHandOver).toBe(true);
     await moderation.handedOver(ID, NOW);
     expect((await blockedDoc())?.mayHandOver).toBe(false);
