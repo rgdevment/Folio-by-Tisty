@@ -765,6 +765,12 @@ a.doc-card:focus-visible {
   color: var(--tisty-soft);
 }
 
+.card-tile.is-letter {
+  background: color-mix(in srgb, var(--hue) 16%, transparent);
+  color: var(--hue);
+  font-weight: 650;
+}
+
 .is-page .card-tile {
   background: var(--tisty-accent-soft);
   color: var(--tisty-accent);
