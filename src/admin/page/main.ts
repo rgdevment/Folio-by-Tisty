@@ -19,6 +19,7 @@ import { drawTop } from "./top";
 
 const COULD_NOT = "No se pudo. Recarga la página para ver cómo quedó.";
 const UNCHANGED = "No cambió nada: ya estaba así o ya no existe. La vista quedó al día.";
+const STALE = "No se pudo traer el panel. Recarga la página, quizá debas volver a entrar.";
 const ON_RECORD = "Queda en el registro, y en los registros que se entregan a la autoridad si hay un caso.";
 const READING_SAID: Record<Reading, string> = {
   link: "Anotado el motivo. Imprime el link de la denuncia, listo para abrir en el navegador y leer la versión denunciada.",
@@ -194,9 +195,10 @@ class Panel {
     ]);
   }
 
-  async #reload(): Promise<void> {
-    await this.#load();
+  async #reload(): Promise<boolean> {
+    const loaded = await this.#load();
     void this.#loadBoard();
+    return loaded;
   }
 
   async #panicking(id: string, version: number, note: string): Promise<void> {
@@ -328,21 +330,21 @@ class Panel {
     };
   }
 
-  async #load(): Promise<void> {
+  async #load(): Promise<boolean> {
     const path = this.#reportsFrom === 0 ? "/api/queue" : `/api/queue?from=${this.#reportsFrom}`;
     const response = await fetchedAt(path);
     if (!response?.ok) {
-      this.#say("No se pudo traer el panel. Recarga la página, quizá debas volver a entrar.");
-      return;
+      this.#say(STALE);
+      return false;
     }
     const queue = (await response.json()) as Reviewed;
     if (queue.reports.length === 0 && this.#reportsFrom > 0) {
       this.#reportsFrom = 0;
-      await this.#load();
-      return;
+      return this.#load();
     }
     drawQueue(this.#page, queue, this.#doing(), queue.owners ?? {}, todayOf(Date.now()));
     this.#say("");
+    return true;
   }
 
   // Noted before the command is handed over, so no report is opened without its reason on record.
@@ -358,15 +360,20 @@ class Panel {
       this.#say(COULD_NOT);
       return;
     }
-    this.#handing(command, READING_SAID[reading], where);
-    void this.#loadBoard();
+    // Redrawn first, so what the opening unlocks shows, and the steps go on the card as it is now.
+    await this.#reload();
+    const card = this.#page.querySelector<HTMLElement>(`#reports .card[data-doc="${id}"]`) ?? where;
+    this.#handing(command, READING_SAID[reading], card);
   }
 
-  async #acting(path: string, note?: string): Promise<void> {
+  async #acting(path: string, note?: string): Promise<boolean> {
     this.#say("Trabajando…");
     const answer = await sent(path, note === undefined ? undefined : { note });
-    await this.#reload();
-    this.#say(answer?.ok ? "Hecho." : answer?.status === MISSING ? UNCHANGED : COULD_NOT);
+    const fresh = await this.#reload();
+    const said = answer?.ok ? "Hecho." : answer?.status === MISSING ? UNCHANGED : COULD_NOT;
+    // An action that went through on a page that could not be brought up to date says both.
+    this.#say(fresh ? said : `${said} ${STALE}`);
+    return answer?.ok ?? false;
   }
 
   #confirmed(question: string, path: string): void {
@@ -429,7 +436,10 @@ class Panel {
       if (asking) void this.#finding(asking);
     });
     place("case-link-copy").addEventListener("click", () => {
-      this.#copying(place("case-link-code").textContent ?? "", "Link copiado. Ya no se muestra.", () => {
+      const copied = place("case-link-code").textContent ?? "";
+      this.#copying(copied, "Link copiado. Ya no se muestra.", () => {
+        // A newer link may have taken its place while the copy ran, and that one has not been copied.
+        if (place("case-link-code").textContent !== copied) return;
         place("case-link-code").textContent = "";
         place("case-link").hidden = true;
       });
@@ -439,8 +449,9 @@ class Panel {
       const id = (place("block-id") as HTMLInputElement).value.trim();
       const note = (place("block-note") as HTMLInputElement).value;
       if (confirm(`¿Bloquear ${id}? Dejará de servirse.`)) {
-        void this.#acting(`docs/${id}/block`, note);
-        (place("block-form") as HTMLFormElement).reset();
+        void this.#acting(`docs/${id}/block`, note).then((done) => {
+          if (done) (place("block-form") as HTMLFormElement).reset();
+        });
       }
     });
     place("key-form").addEventListener("submit", (event) => {
@@ -448,8 +459,9 @@ class Panel {
       const root = (place("key-root") as HTMLInputElement).value.trim();
       const note = (place("key-note") as HTMLInputElement).value;
       if (confirm(`¿Bloquear la llave ${root}? No podrá subir nada más.`)) {
-        void this.#acting(`keys/${root}/block`, note);
-        (place("key-form") as HTMLFormElement).reset();
+        void this.#acting(`keys/${root}/block`, note).then((done) => {
+          if (done) (place("key-form") as HTMLFormElement).reset();
+        });
       }
     });
   }

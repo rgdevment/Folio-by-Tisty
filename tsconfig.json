@@ -31,6 +31,8 @@
     "test/report.test.ts",
     "test/theme.test.ts",
     "test/show.test.ts",
-    "test/show-languages.test.ts"
+    "test/show-languages.test.ts",
+    "test/round2-panel.test.ts",
+    "test/round2-core.test.ts"
   ]
 }

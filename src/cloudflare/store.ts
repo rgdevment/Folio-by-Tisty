@@ -706,19 +706,21 @@ export class Cloud implements Store {
     const kept = await this.#db
       .prepare(
         `UPDATE docs SET files_bytes = ?1
-         WHERE id = ?2 AND json_extract(versions, '$[#-1].files') = ?3
+         WHERE id = ?2 AND json_extract(versions, '$[#-1].files') = ?3 AND files_bytes <> ?1
            AND ?1 + COALESCE(json_extract(versions, '$[#-1].bytes'), 0) + (SELECT COALESCE(SUM(${HELD_BYTES}), 0)
              FROM docs d WHERE d.owner = docs.owner AND d.id <> docs.id AND ${HOLDS_ROOM("?4")}) <= ?5`,
       )
       .bind(body.length, id, hash, today, roomAtMost)
       .run();
     if (kept.meta.changes > 0) return "stored";
-    await this.#envelopes.delete(key);
     await this.#giveRoomBack(net, body.length, today, newKey, 0);
     const named = await this.#db
-      .prepare("SELECT 1 FROM docs WHERE id = ? AND json_extract(versions, '$[#-1].files') = ?")
+      .prepare("SELECT files_bytes FROM docs WHERE id = ? AND json_extract(versions, '$[#-1].files') = ?")
       .bind(id, hash)
-      .first();
+      .first<{ files_bytes: number }>();
+    // The same files sent at once: one write kept them, the object is theirs too, and they were charged once.
+    if (named?.files_bytes === body.length) return "stored";
+    await this.#envelopes.delete(key);
     return named ? "room_full" : "behind";
   }
 
@@ -1395,13 +1397,23 @@ export class Cloud implements Store {
       const idOf = (key: string): string => key.split("/", 1)[0] ?? key;
       const ids = [...new Set(page.objects.map((one) => idOf(one.key)))];
       const held = await this.#db
-        .prepare("SELECT id FROM docs WHERE id IN (SELECT value FROM json_each(?))")
+        .prepare("SELECT id, versions FROM docs WHERE id IN (SELECT value FROM json_each(?))")
         .bind(JSON.stringify(ids))
-        .all<{ id: string }>();
+        .all<{ id: string; versions: string }>();
       const known = new Set(held.results.map((one) => one.id));
+      // What a document's versions still name; anything else under it is what a failed delete left.
+      const named = new Set(
+        held.results.flatMap(({ id, versions }) => {
+          const listed = JSON.parse(versions) as Version[];
+          return [...listed.map((one) => objectKey(id, one)), ...filesKeysOf(id, listed)];
+        }),
+      );
       const old = now - DAY_MS;
       const orphans = page.objects.filter(
-        (one) => !one.key.startsWith(KEY_OBJECTS) && !known.has(idOf(one.key)) && one.uploaded.getTime() < old,
+        (one) =>
+          !one.key.startsWith(KEY_OBJECTS) &&
+          one.uploaded.getTime() < old &&
+          (!known.has(idOf(one.key)) || !named.has(one.key)),
       );
       if (orphans.length > 0) await this.#envelopes.delete(orphans.map((one) => one.key));
       forgotten += orphans.length;
