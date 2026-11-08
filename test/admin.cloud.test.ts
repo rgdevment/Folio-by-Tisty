@@ -399,6 +399,34 @@ describe("what it can do", () => {
     ]);
   });
 
+  it("erases a key at its holder's request, and a blocked one starts over as new but stays blocked", async () => {
+    const free = "F".repeat(43);
+    const blocked = "B".repeat(43);
+    await knownKey(free);
+    await knownKey(blocked);
+    await testEnv.DB.prepare("UPDATE keys SET first_day = ?, terms_version = '14' WHERE root = ?")
+      .bind(TODAY - 40, blocked)
+      .run();
+    await acting(`/api/keys/${blocked}/block`, "abuse");
+    expect((await acting(`/api/keys/${free}/forget`)).status).toBe(400);
+    expect((await acting(`/api/keys/${free}/forget`, "petición firmada por correo")).status).toBe(200);
+    expect(await testEnv.DB.prepare("SELECT 1 FROM keys WHERE root = ?").bind(free).first()).toBeNull();
+    expect((await acting(`/api/keys/${free}/forget`, "otra vez")).status).toBe(404);
+    expect((await acting(`/api/keys/${blocked}/forget`, "petición firmada")).status).toBe(200);
+    const kept = await testEnv.DB.prepare("SELECT first_day, blocked_at, terms_version FROM keys WHERE root = ?")
+      .bind(blocked)
+      .first<{ first_day: number; blocked_at: number | null; terms_version: string | null }>();
+    expect(kept).toMatchObject({ first_day: TODAY, terms_version: null });
+    expect(kept?.blocked_at).not.toBeNull();
+    const notes = await testEnv.DB.prepare(
+      "SELECT doc, note FROM moderation WHERE action = 'forget_key' ORDER BY doc",
+    ).all();
+    expect(notes.results).toEqual([
+      { doc: blocked, note: "petición firmada" },
+      { doc: free, note: "petición firmada por correo" },
+    ]);
+  });
+
   it("will not block a key without a reason, what is not a key, or one Folio never saw", async () => {
     await knownKey("R".repeat(43));
     expect((await acting(`/api/keys/${"R".repeat(43)}/block`)).status).toBe(400);

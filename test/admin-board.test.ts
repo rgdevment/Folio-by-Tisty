@@ -174,7 +174,7 @@ describe("the top documents", () => {
 });
 
 describe("a key in the panel", () => {
-  const keying = () => ({ blockKey: vi.fn(), unblockKey: vi.fn(), exportKey: vi.fn() });
+  const keying = () => ({ blockKey: vi.fn(), unblockKey: vi.fn(), exportKey: vi.fn(), forgetKey: vi.fn() });
   const press = (said: string) =>
     ([...place("key").querySelectorAll("button")].find((one) => one.textContent === said) as HTMLButtonElement).click();
 

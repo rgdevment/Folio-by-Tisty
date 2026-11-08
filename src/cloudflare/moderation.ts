@@ -265,6 +265,22 @@ export class CloudModeration {
     return this.#actedAndLogged([blocking], this.#logIfChanged(root, "block_key", now, note));
   }
 
+  // Its holder asked, with a request signed by it: it starts over as new, and a block the operator placed stays.
+  async forgetKey(root: string, note: string, now: number): Promise<Acted> {
+    const known = await this.#db
+      .prepare("SELECT blocked_at FROM keys WHERE root = ?")
+      .bind(root)
+      .first<{ blocked_at: number | null }>();
+    if (!known) return "missing";
+    const forgetting =
+      known.blocked_at === null
+        ? this.#db.prepare("DELETE FROM keys WHERE root = ? AND blocked_at IS NULL").bind(root)
+        : this.#db
+            .prepare("UPDATE keys SET first_day = ?1, terms_version = NULL, terms_hour = NULL WHERE root = ?2")
+            .bind(dayOf(now), root);
+    return this.#actedAndLogged([forgetting], this.#logIfChanged(root, "forget_key", now, note));
+  }
+
   async unblockKey(root: string, now: number): Promise<Acted> {
     const lifting = this.#db
       .prepare("UPDATE keys SET blocked_at = NULL WHERE root = ? AND blocked_at IS NOT NULL")

@@ -23,6 +23,7 @@ export interface AdminApi {
     | "clearWarning"
     | "blockKey"
     | "unblockKey"
+    | "forgetKey"
   >;
   dashboard: Dashboard;
   about: About;
@@ -42,7 +43,7 @@ const ON_REPORT = {
   false_network: "networkWasFalse",
   forget_contact: "forgetContact",
 } as const;
-const KEY_PATH = /^\/api\/keys\/([A-Za-z0-9_-]{43})\/(block|unblock)$/;
+const KEY_PATH = /^\/api\/keys\/([A-Za-z0-9_-]{43})\/(block|unblock|forget)$/;
 const KEY_VIEW_PATH = /^\/api\/keys\/([A-Za-z0-9_-]{43})(\/records)?$/;
 const TOP_ORDERS: readonly TopOrder[] = ["readers", "weight", "edits", "oldest"];
 const OWNERS_AT_MOST = 200;
@@ -94,7 +95,9 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
   if (root) {
     const reason = await noteOf(request);
     if (!reason) return json(400, { refused: "no_reason" });
-    return answerOf(await moderation.blockKey(root, reason, now));
+    return answerOf(
+      onKey === "forget" ? await moderation.forgetKey(root, reason, now) : await moderation.blockKey(root, reason, now),
+    );
   }
   const [, id, action] = ACTION_PATH.exec(path) ?? [];
   if (!id) return json(404, { refused: "missing" });

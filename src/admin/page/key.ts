@@ -19,6 +19,7 @@ export interface Keying {
   blockKey: (root: string) => void;
   unblockKey: (root: string) => void;
   exportKey: (root: string) => void;
+  forgetKey: (root: string) => void;
 }
 
 const firstSaid = ({ firstDay }: KeyView, today: number): string => {
@@ -101,6 +102,7 @@ export const drawKey = (page: Document, place: HTMLElement, view: KeyView, now: 
       view.blockedAt === null
         ? button(page, "Bloquear llave", () => keying.blockKey(view.root), true)
         : button(page, "Desbloquear llave", () => keying.unblockKey(view.root)),
+      button(page, "Borrar a pedido del titular", () => keying.forgetKey(view.root), true),
     ),
     docs,
   );

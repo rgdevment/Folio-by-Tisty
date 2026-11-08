@@ -329,6 +329,18 @@ const FILES: Scenario[] = [
     method: "PUT",
     path: FILES_PATH,
     status: 403,
+    refused: "key_blocked",
+    upload: filesEnvelope,
+    ready: async () => {
+      await shareNamingSentFiles();
+      await store.keepKeys([toBase64Url(owner.rootBytes)], TODAY);
+      await new CloudModeration(testEnv.DB).blockKey(toBase64Url(owner.rootBytes), "abuse", Date.now());
+    },
+  },
+  {
+    method: "PUT",
+    path: FILES_PATH,
+    status: 403,
     refused: "not_yours",
     upload: filesEnvelope,
     ready: () => shareNamingSentFiles(() => stranger),

@@ -149,7 +149,7 @@ describe("the tones that warn the operator", () => {
       reports: { grave: 0, medium: 0, light: 0 },
       listed: [],
     };
-    drawKey(page, where, view, NOW, { blockKey: vi.fn(), unblockKey: vi.fn(), exportKey: vi.fn() });
+    drawKey(page, where, view, NOW, { blockKey: vi.fn(), unblockKey: vi.fn(), exportKey: vi.fn(), forgetKey: vi.fn() });
     expect(fillOf(where)).toContain(tone);
   });
 });

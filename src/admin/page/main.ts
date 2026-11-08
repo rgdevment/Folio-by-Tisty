@@ -156,6 +156,7 @@ class Panel {
         blockKey: (one) => this.#blockingKey(one),
         unblockKey: (one) => this.#unblockingKey(one),
         exportKey: (one) => void this.#exporting(one),
+        forgetKey: (one) => this.#forgettingKey(one),
       }),
     );
   }
@@ -375,6 +376,13 @@ class Panel {
   #blockingKey(root: string): void {
     const reason = prompt(`¿Por qué bloquear la llave ${root}? No podrá subir nada más, y lo ya compartido sigue.`);
     if (reason?.trim()) void this.#acting(`keys/${root}/block`, reason);
+  }
+
+  #forgettingKey(root: string): void {
+    const reason = prompt(
+      `¿Borrar la llave ${root} a pedido de su titular? Hazlo solo con su petición firmada por esa llave. Parte de nuevo como nueva; si está bloqueada, sigue bloqueada. Escribe cómo llegó la petición.`,
+    );
+    if (reason?.trim()) void this.#acting(`keys/${root}/forget`, reason);
   }
 
   #unblockingKey(root: string): void {
