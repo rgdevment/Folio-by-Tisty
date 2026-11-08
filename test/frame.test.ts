@@ -167,7 +167,16 @@ describe("where a link goes", () => {
     ],
     ["look-alike letters", '<a href="https://xn--bnco-53d.cl/">b\u0430nco.cl</a>', " (xn--bnco-53d.cl)"],
     ["its address among other words", '<a href="https://evil.example/">mira evil.example ahora</a>', " (evil.example)"],
-    ["a mail to someone else", '<a href="mailto:a@evil.example?subject=x">escríbenos</a>', " (a@evil.example)"],
+    [
+      "a mail to someone else",
+      '<a href="mailto:a@evil.example?subject=x">escríbenos</a>',
+      " (a@evil.example?subject=x)",
+    ],
+    [
+      "a mail to its own words carrying hidden copies",
+      '<a href="mailto:a@b.example?bcc=c@evil.example">a@b.example</a>',
+      " (a@b.example?bcc=c@evil.example)",
+    ],
     [
       "a name before an at sign in its own words",
       '<a href="https://banco.cl@evil.example/">https://banco.cl@evil.example/</a>',
@@ -242,7 +251,7 @@ describe("a card in the words", () => {
     };
     draw(shared);
     expect(root.querySelector("a.doc-card .card-name")?.textContent).toBe("Sobre el río");
-    expect(root.querySelector("a.doc-card .chip")?.textContent).toBe("Documento");
+    expect(root.querySelector("a.doc-card .chip")?.textContent).toBe("Abre otro documento");
   });
 
   it("is not drawn for a document that did not come along, which it could not open", () => {
@@ -1160,16 +1169,5 @@ describe("another language in the same frame", () => {
     expect(place.document.title).toBe("Walks · Folio");
     expect(place.document.getElementById("crumb")?.hidden).toBe(true);
     expect(place.document.getElementById("pages-card")?.hidden).toBe(true);
-  });
-
-  it("says so when the language shown is shared by someone other than the anchor's owner", () => {
-    const warning = () => place.document.getElementById("shared-by-another") as HTMLElement;
-    const redraw = drawFrame(shownOf(SPANISH));
-    expect(warning().hidden).toBe(true);
-    redraw(shownOf(ENGLISH, undefined, { ...SEAL, sharedByAnother: true }));
-    expect(warning().hidden).toBe(false);
-    expect(warning().textContent).toContain("otra persona");
-    redraw(shownOf(SPANISH));
-    expect(warning().hidden).toBe(true);
   });
 });

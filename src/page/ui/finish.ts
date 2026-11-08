@@ -52,8 +52,8 @@ const saysItsHost = (said: string, host: string): boolean => {
 
 const whereItGoes = (where: string, said: string): string | null => {
   if (/^mailto:/i.test(where)) {
-    const address = where.slice("mailto:".length).split("?", 1)[0] ?? "";
-    return said.trim().toLowerCase() === address.toLowerCase() ? null : address;
+    const target = where.slice("mailto:".length);
+    return said.trim().toLowerCase() === target.toLowerCase() ? null : target;
   }
   const url = urlOf(where);
   if (url === null || url.host === "") return null;

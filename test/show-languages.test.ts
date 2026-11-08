@@ -83,7 +83,7 @@ beforeEach(() => {
   opens = {
     [ANCHOR]: openedOf(SPANISH, "owner"),
     [ENGLISH]: openedOf(page(ENGLISH, "Walks", "en"), "editor", "owner"),
-    [FRENCH]: openedOf(page(FRENCH, "Promenades", "fr"), "stranger"),
+    [FRENCH]: openedOf(page(FRENCH, "Promenades", "fr"), "owner"),
   };
   vi.mocked(openLink).mockImplementation(async (id) => opens[id] ?? refuse("unsigned", "not in this test"));
   fetched = vi.fn(async (path: string) => {
@@ -173,22 +173,31 @@ describe("a document in several languages", () => {
     expect(byId("language-said").textContent).toContain("sigues en este");
   });
 
-  it("warns only when the language shown has another owner, whoever signed it", async () => {
-    const warning = () => byId("shared-by-another");
+  it.each([
+    ["another owner", () => openedOf(page(FRENCH, "Promenades", "fr"), "stranger")],
+    [
+      "another owner who let the anchor's owner sign",
+      () => openedOf(page(FRENCH, "Promenades", "fr"), "owner", "stranger"),
+    ],
+    ["another language than it says", () => openedOf(page(FRENCH, "Spaziergänge", "de"), "owner")],
+  ])("refuses a translation with %s, and stays on what was shown", async (_, opening) => {
+    opens[FRENCH] = opening();
     await opened(["es"]);
-    expect(warning().hidden).toBe(true);
-    await choose("en");
-    expect(warning().hidden).toBe(true);
     await choose("fr");
-    expect(warning().hidden).toBe(false);
-    await choose("es");
-    expect(warning().hidden).toBe(true);
+    expect(place.document.title).toBe("Paseos · Folio");
+    expect(byId<HTMLSelectElement>("language").value).toBe("es");
+    expect(byId("language-said").textContent).toContain("sigues en este");
   });
 
-  it("does not warn when the owner signed the translation themselves", async () => {
-    opens[ENGLISH] = openedOf(page(ENGLISH, "Walks", "en"), "owner");
+  it("does not open a translation with another owner, even in the reader's language", async () => {
+    opens[FRENCH] = openedOf(page(FRENCH, "Promenades", "fr"), "stranger");
+    await opened(["fr"]);
+    expect(place.document.title).toBe("Paseos · Folio");
+  });
+
+  it("takes a translation an editor signed for the same owner", async () => {
     await opened(["en"]);
-    expect(byId("shared-by-another").hidden).toBe(true);
+    expect(place.document.title).toBe("Walks · Folio");
   });
 
   it.each([

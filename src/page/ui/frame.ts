@@ -37,7 +37,6 @@ export interface Seal {
   fingerprint: string;
   ownerFingerprint: string | null;
   diesOn: string;
-  sharedByAnother?: boolean;
 }
 
 // Through the object model, since the page's policy lets no style be written into it.
@@ -241,7 +240,7 @@ const drawOwner = (held: Document, ownerFingerprint: string | null): void => {
   element("owner-fingerprint").textContent = ownerFingerprint ?? "";
 };
 
-const drawSeal = (held: Document, { verdict, fingerprint, ownerFingerprint, diesOn, sharedByAnother }: Seal): void => {
+const drawSeal = (held: Document, { verdict, fingerprint, ownerFingerprint, diesOn }: Seal): void => {
   const { text, tone } = VERDICTS[verdict];
   const seal = element("seal");
   seal.hidden = false;
@@ -250,7 +249,6 @@ const drawSeal = (held: Document, { verdict, fingerprint, ownerFingerprint, dies
   element("signer").textContent = held.signed_as ?? "Sin nombre";
   element("fingerprint").textContent = fingerprint;
   drawOwner(held, ownerFingerprint);
-  element("shared-by-another").hidden = sharedByAnother !== true;
   element("dies-on").textContent = diesOn;
 };
 

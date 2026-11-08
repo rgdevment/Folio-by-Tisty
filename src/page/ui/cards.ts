@@ -113,7 +113,7 @@ export const cardsFor = (held: Document, wordsOf: (html: string) => DocumentFrag
       } else if (reference?.kind === "cited") {
         const cited = held.cited?.[reference.at];
         if (!cited) continue;
-        fill(link, cited.title ?? said, "", LEAF, "Documento");
+        fill(link, cited.title ?? said, "", LEAF, "Abre otro documento");
         link.classList.add("doc-card");
       }
     }

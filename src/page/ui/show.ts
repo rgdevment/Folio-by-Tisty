@@ -58,7 +58,7 @@ const opening = async (id: string, linkKey: string, arrived: Arrived): Promise<S
 
 const ownerOf = ({ fingerprint, ownerFingerprint }: Opened): string => ownerFingerprint ?? fingerprint;
 
-const shownOf = ({ id, linkKey, opened }: Showing, anchor: Opened, caseToken?: string): Shown => {
+const shownOf = ({ id, linkKey, opened }: Showing, caseToken?: string): Shown => {
   const { held, pictures, verdict, fingerprint, ownerFingerprint, diesOn } = opened;
   const cleaner = domPurifyCleaner(window);
   const addresses = pictureAddresses(held.pictures ?? [], pictures);
@@ -70,7 +70,6 @@ const shownOf = ({ id, linkKey, opened }: Showing, anchor: Opened, caseToken?: s
       fingerprint,
       ownerFingerprint,
       diesOn: lastDay(diesOn),
-      sharedByAnother: ownerOf(opened) !== ownerOf(anchor),
     },
     pressFile: filePresser({ id, linkKey, held, ...(caseToken === undefined ? {} : { caseToken }) }),
   };
@@ -84,6 +83,10 @@ const reportableOf = ({ id, linkKey, arrived: { version } }: Showing): Reportabl
 });
 
 // Whatever keeps a translation from opening, the reader stays on what was already checked.
+// The server keeps a language under its anchor's owner, so a translation by anyone else, or in another tongue, is a lie.
+const belongs = ({ opened }: Showing, { lang }: Translation, anchor: Opened): boolean =>
+  ownerOf(opened) === ownerOf(anchor) && opened.held.lang === lang;
+
 const translated = async ({ document: id, key = "" }: Translation): Promise<Showing | undefined> => {
   try {
     const answer = await answeringProof(await askFor(id), (proof) => askFor(id, proof));
@@ -95,15 +98,15 @@ const translated = async ({ document: id, key = "" }: Translation): Promise<Show
 
 const shownInLanguages = async (anchor: Showing): Promise<void> => {
   const { lang = "", languages = [] } = anchor.opened.held;
-  const anchorLanguage = { lang, showing: anchor, shown: shownOf(anchor, anchor.opened) };
+  const anchorLanguage = { lang, showing: anchor, shown: shownOf(anchor) };
   const kept = new Map<string, Language>([[lang, anchorLanguage]]);
   const languageOf = async (chosen: string): Promise<Language | undefined> => {
     const known = kept.get(chosen);
     const translation = languages.find((one) => one.lang === chosen);
     if (known || !translation) return known;
     const showing = await translated(translation);
-    if (!showing) return undefined;
-    const language = { lang: chosen, showing, shown: shownOf(showing, anchor.opened) };
+    if (!showing || !belongs(showing, translation, anchor.opened)) return undefined;
+    const language = { lang: chosen, showing, shown: shownOf(showing) };
     kept.set(chosen, language);
     return language;
   };
@@ -130,7 +133,7 @@ const shownInLanguages = async (anchor: Showing): Promise<void> => {
 const shown = async (id: string, linkKey: string, arrived: Arrived, caseToken?: string): Promise<void> => {
   const anchor = await opening(id, linkKey, arrived);
   if (caseToken === undefined) await shownInLanguages(anchor);
-  else drawFrame(shownOf(anchor, anchor.opened, caseToken));
+  else drawFrame(shownOf(anchor, caseToken));
 };
 
 const opened = async (id: string, linkKey: string, arrived: Arrived, caseToken?: string): Promise<boolean> => {
