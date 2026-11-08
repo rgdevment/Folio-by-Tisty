@@ -1,5 +1,5 @@
 {
-  "serial": 29,
+  "serial": 30,
   "ttl_days": [
     1,
     3,
@@ -36,6 +36,9 @@
     "en": "e97149394fb1ca500816c1b2ccaf078ef65e801676555761692d544336447b1c"
   },
   "sharing_open": false,
-  "maker_root": "AfnGoRnNecrr5RMnprcTbdZdk7_LABXtpqchY-L0b0s",
-  "maker_name": "rgdevment"
+  "maker": {
+    "root": "AfnGoRnNecrr5RMnprcTbdZdk7_LABXtpqchY-L0b0s",
+    "name": "rgdevment",
+    "domain": "rgdevment.dev"
+  }
 }
