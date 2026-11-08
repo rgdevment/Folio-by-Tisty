@@ -33,7 +33,7 @@ describe("checking a dump", () => {
     expect(() => check(`${TABLES}\nINSERT INTO d1_migrations VALUES ('0001');`)).toThrow(/no indexes/);
   });
 
-  it.each(["seen_20000", "net_day", "net_hour"])("refuses one that carries rows of %s", (name) => {
+  it.each(["seen_20000", "net_day", "net_hour", "net_doc"])("refuses one that carries rows of %s", (name) => {
     expect(() => check(`${WHOLE}\nCREATE TABLE ${name} (doc TEXT);\nINSERT INTO ${name} VALUES ('a');`)).toThrow(
       new RegExp(`carries rows of ${name}`),
     );

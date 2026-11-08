@@ -5,7 +5,7 @@ database=${1:?the D1 database to export}
 out=${2:?the file to write}
 shift 2
 
-tables_worth_restoring="SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT GLOB 'seen_[0-9]*' AND name NOT GLOB 'sqlite_*' AND name NOT GLOB '_cf_*' AND name NOT IN ('net_day', 'net_hour') ORDER BY name"
+tables_worth_restoring="SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT GLOB 'seen_[0-9]*' AND name NOT GLOB 'sqlite_*' AND name NOT GLOB '_cf_*' AND name NOT IN ('net_day', 'net_hour', 'net_doc') ORDER BY name"
 attempts=3
 wait_seconds=${BACKUP_WAIT_SECONDS:-20}
 

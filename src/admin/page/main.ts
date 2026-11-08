@@ -1,201 +1,384 @@
 import "./panel.css";
-import type { Queue } from "../../core/queue";
+import type {
+  Found,
+  KeyView,
+  Logged,
+  NetsNearTheirTop,
+  Reviewed,
+  ServiceDay,
+  Top,
+  TopOrder,
+} from "../../core/dashboard";
+import { drawAbout, drawDays, drawHealth, drawLog, drawNets, drawTiles, type Overlook } from "./board";
 import { madeCase } from "./case";
-import { drawQueue } from "./draw";
+import { type Doing, drawQueue } from "./draw";
+import { drawKey } from "./key";
+import { count, isoDay, megabytes, piece, shortKey, todayOf } from "./say";
+import { asked, fetched, fetchedAt, sent } from "./talk";
+import { drawTop } from "./top";
 
-const said = document.getElementById("said") as HTMLElement;
 const COULD_NOT = "No se pudo. Recarga la página para ver cómo quedó.";
+const PART_FAILED = "No se pudo traer esta parte. Recarga la página.";
+const DOWNLOAD_KEPT_MS = 60_000;
 
-// A session of Access that ended redirects to its login, and the browser refuses that: the fetch rejects.
-const answered = async (asking: () => Promise<Response>): Promise<Response | null> => {
-  try {
-    return await asking();
-  } catch {
-    return null;
+const foundText = (answer: Found): string => {
+  switch (answer.kind) {
+    case "doc":
+      return `Documento ${answer.id}, de la llave ${shortKey(answer.owner)}.`;
+    case "key":
+      return `Llave ${shortKey(answer.root)}.`;
+    case "net": {
+      const days = answer.days
+        .map(
+          (one) =>
+            `${isoDay(one.day)}: ${count(one.docs)} documentos, ${count(one.keys)} llaves, ${megabytes(one.bytes)}`,
+        )
+        .join(" · ");
+      return `Red ${shortKey(answer.net)}, resumen del día. ${days}`;
+    }
+    case "reporter":
+      return `Red que denunció ${shortKey(answer.net)}: ${answer.reports} denuncias. Su resumen cambia cada 180 días, así que no se cruza con las subidas.`;
+    default:
+      return "No se encontró. Una red solo se reconoce el mismo día, porque su resumen cambia cada día.";
   }
 };
 
-const sent = (path: string, body?: unknown): Promise<Response | null> =>
-  answered(() =>
-    fetch(`/api/${path}`, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Folio-Operator": "1", "Content-Type": "application/json" },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    }),
-  );
-
-const asked = async (path: string, note?: string): Promise<boolean> =>
-  (await sent(path, note === undefined ? undefined : { note }))?.ok ?? false;
-
-const showCaseLink = (link: string, says: string): void => {
-  (document.getElementById("case-link-said") as HTMLElement).textContent = says;
-  (document.getElementById("case-link-code") as HTMLElement).textContent = link;
-  (document.getElementById("case-link") as HTMLElement).hidden = false;
-};
-
-const copying = (text: string, says: string): void => {
-  void navigator.clipboard.writeText(text).then(
-    () => {
-      said.textContent = says;
-    },
-    () => {
-      said.textContent = "No se pudo copiar. Es este:";
-      said.append(" ", text);
-    },
-  );
-};
-
-const caseMade = async (id: string, version: number, says: string, records?: unknown): Promise<boolean> => {
-  const made = await madeCase(id, version, records);
-  if (!(await sent(`docs/${id}/case`, made.body))?.ok) return false;
-  showCaseLink(made.link, says);
-  return true;
-};
-
-const verifying = async (id: string, version: number): Promise<void> => {
-  said.textContent = "Trabajando…";
-  const made = await caseMade(id, version, "Link para verificar, se muestra una vez. Pide la llave al abrirlo:");
-  said.textContent = made ? "" : COULD_NOT;
-};
-
-const panicking = async (id: string, version: number, note: string): Promise<void> => {
-  said.textContent = "Trabajando…";
-  const held = await sent(`docs/${id}/panic`, { note });
-  if (!held?.ok) {
-    said.textContent = COULD_NOT;
-    return;
-  }
-  const { records } = (await held.json()) as { records: unknown };
-  await load();
-  const says = "Bloqueado y retenido. Link de caso para la autoridad, se muestra una vez. Entrégalo con la llave:";
-  if (!(await caseMade(id, version, says, records))) {
-    said.textContent = "Quedó bloqueado y retenido, pero no se pudo crear el link. Presiona de nuevo el botón.";
+const pressedIn = (nav: HTMLElement, pressed: HTMLElement, attribute: string): void => {
+  for (const one of nav.querySelectorAll<HTMLElement>(`button[${attribute}]`)) {
+    one.setAttribute("aria-pressed", String(one === pressed));
   }
 };
 
-const purging = async (id: string): Promise<void> => {
-  said.textContent = "Trabajando…";
-  const preview = await answered(() =>
-    fetch(`/api/docs/${id}/purge_owner`, { credentials: "same-origin", cache: "no-store" }),
-  );
-  if (!preview?.ok) {
-    said.textContent = COULD_NOT;
-    return;
+class Panel {
+  readonly #page: Document;
+  readonly #said: HTMLElement;
+  readonly #found: HTMLElement;
+  #reportsFrom = 0;
+  #topOrder: TopOrder = "readers";
+  #topFlagged = false;
+  #keyShown: string | null = null;
+
+  constructor(page: Document) {
+    this.#page = page;
+    this.#said = this.#place("said");
+    this.#found = this.#place("found");
   }
-  const { purged, kept } = (await preview.json()) as { purged: number; kept: number };
-  said.textContent = "";
-  if (purged === 0) {
-    said.textContent = `No hay nada que borrar de esta llave. Se conservan ${kept}.`;
-    return;
+
+  start(): void {
+    this.#listen();
+    void this.#load();
+    void this.#loadBoard();
   }
-  const count = prompt(
-    `Se borrarán ${purged} documentos de la llave dueña de ${id}, no de quien haya firmado una versión, y se conservan ${kept}: retenidos, con denuncia grave o citados por otra persona. No se puede deshacer. Escribe ${purged} para seguir.`,
-  );
-  if (count?.trim() !== String(purged)) return;
-  const note = prompt("¿Por qué se borran?");
-  if (!note?.trim()) return;
-  said.textContent = "Trabajando…";
-  const purge = await sent(`docs/${id}/purge_owner`, { note });
-  if (!purge?.ok) {
-    said.textContent = COULD_NOT;
-    return;
+
+  #place(id: string): HTMLElement {
+    return this.#page.getElementById(id) as HTMLElement;
   }
-  const done = (await purge.json()) as { purged: number; kept: number };
-  await load();
-  said.textContent = `Dejaron de servirse ${done.purged}. Se vacían en la próxima limpieza, que espera si el servicio está cortado. Se conservan ${done.kept}.`;
-};
 
-let reportsFrom = 0;
-
-const load = async (): Promise<void> => {
-  const path = reportsFrom === 0 ? "/api/queue" : `/api/queue?from=${reportsFrom}`;
-  const response = await answered(() => fetch(path, { credentials: "same-origin", cache: "no-store" }));
-  if (!response?.ok) {
-    said.textContent = "No se pudo traer el panel. Recarga la página, quizá debas volver a entrar.";
-    return;
+  #say(text: string): void {
+    this.#said.textContent = text;
   }
-  const queue = (await response.json()) as Queue;
-  if (queue.reports.length === 0 && reportsFrom > 0) {
-    reportsFrom = 0;
-    await load();
-    return;
+
+  // Each part stands alone, so one that fails, or an older Worker that lacks it, leaves the rest working.
+  async #shown<T>(path: string, where: HTMLElement, draw: (answer: T) => void): Promise<void> {
+    const response = await fetched(path);
+    try {
+      if (!response?.ok) throw new Error(`no ${path}`);
+      draw((await response.json()) as T);
+    } catch {
+      where.replaceChildren(piece(this.#page, "p", "card-line", PART_FAILED));
+    }
   }
-  drawQueue(document, queue, {
-    accept: (id) => confirmed(`¿Aceptar y desbloquear ${id}?`, `docs/${id}/accept`),
-    reject: (id) => confirmed(`¿Rechazar el reclamo de ${id}? Sigue bloqueado.`, `docs/${id}/reject`),
-    clearWarning: (id) =>
-      confirmed(`¿Quitar el aviso de ${id}? Sus denuncias leves dejan de contar.`, `docs/${id}/clear_warning`),
-    networkWasFalse: (id, net) =>
-      confirmed(
-        "¿Descartar todas las denuncias de esta red? Si es compartida, puede incluir denuncias reales, y sus documentos dejarán de retenerse.",
-        `docs/${id}/reports/${net}/false_network`,
-      ),
-    forgetContact: (id, net) =>
-      confirmed(
-        "¿Borrar el correo de esta denuncia? Sigue hasta 30 días en los respaldos cifrados.",
-        `docs/${id}/reports/${net}/forget_contact`,
-      ),
-    reportWasFalse: (id, net) =>
-      confirmed("¿Esta denuncia era falsa? Esa red dejará de contar.", `docs/${id}/reports/${net}/false`),
-    opened: (id) => {
-      const reason = prompt("¿Por qué se abrió este documento?");
-      if (reason?.trim()) void doing(`docs/${id}/opened`, reason);
-    },
-    panic: (id, version) => {
-      const note = prompt(`¿Por qué bloquear y retener ${id}? Dejará de servirse y se retiene 180 días.`);
-      if (note?.trim()) void panicking(id, version, note);
-    },
-    blockKey: (root) => {
-      const reason = prompt(`¿Por qué bloquear la llave ${root}? No podrá subir nada más, y lo ya compartido sigue.`);
-      if (reason?.trim()) void doing(`keys/${root}/block`, reason);
-    },
-    unblockKey: (root) => {
-      if (confirm(`¿Desbloquear la llave ${root}?`)) void doing(`keys/${root}/unblock`);
-    },
-    purgeOwner: (id) => void purging(id),
-    verifyLink: (id, version) => void verifying(id, version),
-    reportsPage: (from) => {
-      reportsFrom = from;
-      void load();
-    },
-    handedOver: (id) =>
-      confirmed(
-        "¿Ya entregaste el link de caso y la llave a la autoridad? Se borran las llaves selladas de este documento, aunque siguen hasta 30 días en los respaldos cifrados.",
-        `docs/${id}/handed_over`,
-      ),
-    copy: (command) => copying(command, "Copiado. Reemplaza <llave> por la ruta de tu llave y ábrelo en tu equipo."),
-  });
-  said.textContent = "";
-};
 
-const doing = async (path: string, note?: string): Promise<void> => {
-  said.textContent = "Trabajando…";
-  if (await asked(path, note)) await load();
-  else said.textContent = COULD_NOT;
-};
+  #copying(text: string, says: string): void {
+    void navigator.clipboard.writeText(text).then(
+      () => this.#say(says),
+      () => {
+        this.#say("No se pudo copiar. Es este:");
+        this.#said.append(" ", text);
+      },
+    );
+  }
 
-const confirmed = (question: string, path: string): void => {
-  if (confirm(question)) void doing(path);
-};
+  async #caseMade(id: string, version: number, says: string, records?: unknown): Promise<boolean> {
+    const made = await madeCase(id, version, records);
+    if (!(await sent(`docs/${id}/case`, made.body))?.ok) return false;
+    this.#place("case-link-said").textContent = says;
+    this.#place("case-link-code").textContent = made.link;
+    this.#place("case-link").hidden = false;
+    return true;
+  }
 
-(document.getElementById("case-link-copy") as HTMLElement).addEventListener("click", () => {
-  const link = (document.getElementById("case-link-code") as HTMLElement).textContent ?? "";
-  copying(link, "Link copiado.");
-});
+  async #verifying(id: string, version: number): Promise<void> {
+    this.#say("Trabajando…");
+    const made = await this.#caseMade(
+      id,
+      version,
+      "Link para verificar, se muestra una vez. Pide la llave al abrirlo:",
+    );
+    this.#say(made ? "" : COULD_NOT);
+  }
 
-(document.getElementById("block-form") as HTMLFormElement).addEventListener("submit", (event) => {
-  event.preventDefault();
-  const id = (document.getElementById("block-id") as HTMLInputElement).value.trim();
-  const note = (document.getElementById("block-note") as HTMLInputElement).value;
-  if (confirm(`¿Bloquear ${id}? Dejará de servirse.`)) void doing(`docs/${id}/block`, note);
-});
+  async #showKey(root: string): Promise<void> {
+    this.#keyShown = root;
+    const where = this.#place("key");
+    await this.#shown<KeyView>(`keys/${root}`, where, (view) =>
+      drawKey(this.#page, where, view, Date.now(), {
+        blockKey: (one) => this.#blockingKey(one),
+        unblockKey: (one) => this.#unblockingKey(one),
+        exportKey: (one) => void this.#exporting(one),
+      }),
+    );
+  }
 
-(document.getElementById("key-form") as HTMLFormElement).addEventListener("submit", (event) => {
-  event.preventDefault();
-  const root = (document.getElementById("key-root") as HTMLInputElement).value.trim();
-  const note = (document.getElementById("key-note") as HTMLInputElement).value;
-  if (confirm(`¿Bloquear la llave ${root}? No podrá subir nada más.`)) void doing(`keys/${root}/block`, note);
-});
+  #loadTop(): Promise<void> {
+    const where = this.#place("top");
+    return this.#shown<Top>(`top?by=${this.#topOrder}${this.#topFlagged ? "&flagged=1" : ""}`, where, (top) =>
+      drawTop(this.#page, where, top, Date.now(), { showKey: (root) => void this.#showKey(root) }),
+    );
+  }
 
-void load();
+  async #loadBoard(): Promise<void> {
+    const now = Date.now();
+    const page = this.#page;
+    const place = (id: string) => this.#place(id);
+    await Promise.all([
+      this.#shown<Overlook>("overview", place("tiles"), (overview) => {
+        drawTiles(page, place("tiles"), overview);
+        drawHealth(page, place("health"), overview, now);
+        drawAbout(page, place("about"), overview, now);
+      }),
+      this.#shown<ServiceDay[]>("days", place("days"), (days) => drawDays(page, place("days"), days)),
+      this.#shown<Logged[]>("log", place("log"), (logged) => drawLog(page, place("log"), logged, now)),
+      this.#shown<NetsNearTheirTop>("nets", place("nets"), (nets) => drawNets(page, place("nets"), nets)),
+      this.#loadTop(),
+      ...(this.#keyShown ? [this.#showKey(this.#keyShown)] : []),
+    ]);
+  }
+
+  async #reload(): Promise<void> {
+    await this.#load();
+    void this.#loadBoard();
+  }
+
+  async #panicking(id: string, version: number, note: string): Promise<void> {
+    this.#say("Trabajando…");
+    const held = await sent(`docs/${id}/panic`, { note });
+    if (!held?.ok) {
+      this.#say(COULD_NOT);
+      return;
+    }
+    const { records } = (await held.json()) as { records: unknown };
+    await this.#reload();
+    const says = "Bloqueado y retenido. Link de caso para la autoridad, se muestra una vez. Entrégalo con la llave:";
+    if (!(await this.#caseMade(id, version, says, records))) {
+      this.#say("Quedó bloqueado y retenido, pero no se pudo crear el link. Presiona de nuevo el botón.");
+    }
+  }
+
+  async #purging(id: string): Promise<void> {
+    this.#say("Trabajando…");
+    const preview = await fetched(`docs/${id}/purge_owner`);
+    if (!preview?.ok) {
+      this.#say(COULD_NOT);
+      return;
+    }
+    const { purged, kept } = (await preview.json()) as { purged: number; kept: number };
+    this.#say("");
+    if (purged === 0) {
+      this.#say(`No hay nada que borrar de esta llave. Se conservan ${kept}.`);
+      return;
+    }
+    const typed = prompt(
+      `Se borrarán ${purged} documentos de la llave dueña de ${id}, no de quien haya firmado una versión, y se conservan ${kept}: retenidos, con denuncia grave o citados por otra persona. No se puede deshacer. Escribe ${purged} para seguir.`,
+    );
+    if (typed?.trim() !== String(purged)) return;
+    const note = prompt("¿Por qué se borran?");
+    if (!note?.trim()) return;
+    this.#say("Trabajando…");
+    const purge = await sent(`docs/${id}/purge_owner`, { note });
+    if (!purge?.ok) {
+      this.#say(COULD_NOT);
+      return;
+    }
+    const done = (await purge.json()) as { purged: number; kept: number };
+    await this.#reload();
+    this.#say(
+      `Dejaron de servirse ${done.purged}. Se vacían en la próxima limpieza, que espera si el servicio está cortado. Se conservan ${done.kept}.`,
+    );
+  }
+
+  // Saved only where the operator chooses, as a file: the page itself keeps nothing in the browser.
+  async #exporting(root: string): Promise<void> {
+    if (!confirm(`¿Exportar los registros de la llave ${root}? Se descarga un archivo JSON a este equipo.`)) return;
+    this.#say("Trabajando…");
+    const records = await fetched(`keys/${root}/records`);
+    if (!records?.ok) {
+      this.#say(COULD_NOT);
+      return;
+    }
+    const file = URL.createObjectURL(new Blob([await records.text()], { type: "application/json" }));
+    const link = this.#page.createElement("a");
+    link.href = file;
+    link.download = `folio-llave-${root.slice(0, 8)}-${isoDay(todayOf(Date.now()))}.json`;
+    link.hidden = true;
+    this.#page.body.append(link);
+    link.click();
+    link.remove();
+    // Some browsers start the download after the click returns, and a link let go at once saves nothing.
+    setTimeout(() => URL.revokeObjectURL(file), DOWNLOAD_KEPT_MS);
+    this.#say("Exportado. No contiene la red ni el correo de quien denunció.");
+  }
+
+  #doing(): Doing {
+    return {
+      accept: (id) => this.#confirmed(`¿Aceptar y desbloquear ${id}?`, `docs/${id}/accept`),
+      reject: (id) => this.#confirmed(`¿Rechazar el reclamo de ${id}? Sigue bloqueado.`, `docs/${id}/reject`),
+      clearWarning: (id) =>
+        this.#confirmed(`¿Quitar el aviso de ${id}? Sus denuncias leves dejan de contar.`, `docs/${id}/clear_warning`),
+      networkWasFalse: (id, net) =>
+        this.#confirmed(
+          "¿Descartar todas las denuncias de esta red? Si es compartida, puede incluir denuncias reales, y sus documentos dejarán de retenerse.",
+          `docs/${id}/reports/${net}/false_network`,
+        ),
+      forgetContact: (id, net) =>
+        this.#confirmed(
+          "¿Borrar el correo de esta denuncia? Sigue hasta 30 días en los respaldos cifrados.",
+          `docs/${id}/reports/${net}/forget_contact`,
+        ),
+      reportWasFalse: (id, net) =>
+        this.#confirmed("¿Esta denuncia era falsa? Esa red dejará de contar.", `docs/${id}/reports/${net}/false`),
+      openReport: (id, command) => {
+        const reason = prompt(`¿Por qué abres la denuncia de ${id}? Queda anotado en el registro.`);
+        if (reason?.trim()) void this.#openingReport(id, reason, command);
+      },
+      panic: (id, version) => {
+        const note = prompt(`¿Por qué bloquear y retener ${id}? Dejará de servirse y se retiene 180 días.`);
+        if (note?.trim()) void this.#panicking(id, version, note);
+      },
+      blockKey: (root) => this.#blockingKey(root),
+      unblockKey: (root) => this.#unblockingKey(root),
+      purgeOwner: (id) => void this.#purging(id),
+      verifyLink: (id, version) => void this.#verifying(id, version),
+      reportsPage: (from) => {
+        this.#reportsFrom = from;
+        void this.#load();
+      },
+      handedOver: (id) =>
+        this.#confirmed(
+          "¿Ya entregaste el link de caso y la llave a la autoridad? Se borran las llaves selladas de este documento, aunque siguen hasta 30 días en los respaldos cifrados.",
+          `docs/${id}/handed_over`,
+        ),
+      copy: (command) =>
+        this.#copying(command, "Copiado. Reemplaza <llave> por la ruta de tu llave y ábrelo en tu equipo."),
+      showKey: (root) => void this.#showKey(root),
+    };
+  }
+
+  async #load(): Promise<void> {
+    const path = this.#reportsFrom === 0 ? "/api/queue" : `/api/queue?from=${this.#reportsFrom}`;
+    const response = await fetchedAt(path);
+    if (!response?.ok) {
+      this.#say("No se pudo traer el panel. Recarga la página, quizá debas volver a entrar.");
+      return;
+    }
+    const queue = (await response.json()) as Reviewed;
+    if (queue.reports.length === 0 && this.#reportsFrom > 0) {
+      this.#reportsFrom = 0;
+      await this.#load();
+      return;
+    }
+    drawQueue(this.#page, queue, this.#doing(), queue.owners ?? {}, todayOf(Date.now()));
+    this.#say("");
+  }
+
+  // Noted before the command is handed over, so no report is opened without its reason on record.
+  async #openingReport(id: string, reason: string, command: string): Promise<void> {
+    this.#say("Trabajando…");
+    if (!(await asked(`docs/${id}/opened`, reason))) {
+      this.#say(COULD_NOT);
+      return;
+    }
+    this.#copying(
+      command,
+      "Copiado. Pégalo en tu terminal, en la carpeta de Folio, con la ruta de tu llave en vez de <llave>: te da el link de la denuncia.",
+    );
+    void this.#loadBoard();
+  }
+
+  async #acting(path: string, note?: string): Promise<void> {
+    this.#say("Trabajando…");
+    if (await asked(path, note)) await this.#reload();
+    else this.#say(COULD_NOT);
+  }
+
+  #confirmed(question: string, path: string): void {
+    if (confirm(question)) void this.#acting(path);
+  }
+
+  #blockingKey(root: string): void {
+    const reason = prompt(`¿Por qué bloquear la llave ${root}? No podrá subir nada más, y lo ya compartido sigue.`);
+    if (reason?.trim()) void this.#acting(`keys/${root}/block`, reason);
+  }
+
+  #unblockingKey(root: string): void {
+    if (confirm(`¿Desbloquear la llave ${root}?`)) void this.#acting(`keys/${root}/unblock`);
+  }
+
+  async #finding(asking: string): Promise<void> {
+    this.#found.textContent = "Buscando…";
+    const response = await fetched(`find?q=${encodeURIComponent(asking)}`);
+    if (!response?.ok) {
+      this.#found.textContent = COULD_NOT;
+      return;
+    }
+    const answer = (await response.json()) as Found;
+    this.#found.textContent = foundText(answer);
+    if (answer.kind === "doc") void this.#showKey(answer.owner);
+    if (answer.kind === "key") void this.#showKey(answer.root);
+  }
+
+  #listen(): void {
+    const place = (id: string) => this.#place(id);
+    place("queue-filters").addEventListener("click", (event) => {
+      const pressed = (event.target as HTMLElement).closest<HTMLElement>("button[data-filter]");
+      if (!pressed) return;
+      place("queue").dataset.filter = pressed.dataset.filter ?? "all";
+      pressedIn(place("queue-filters"), pressed, "data-filter");
+    });
+    place("top-order").addEventListener("click", (event) => {
+      const pressed = (event.target as HTMLElement).closest<HTMLElement>("button");
+      if (!pressed) return;
+      if (pressed.id === "top-flagged") {
+        this.#topFlagged = !this.#topFlagged;
+        pressed.setAttribute("aria-pressed", String(this.#topFlagged));
+      } else {
+        this.#topOrder = (pressed.dataset.by as TopOrder | undefined) ?? "readers";
+        pressedIn(place("top-order"), pressed, "data-by");
+      }
+      void this.#loadTop();
+    });
+    place("find-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const asking = (place("find") as HTMLInputElement).value.trim();
+      if (asking) void this.#finding(asking);
+    });
+    place("case-link-copy").addEventListener("click", () => {
+      this.#copying(place("case-link-code").textContent ?? "", "Link copiado.");
+    });
+    place("block-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const id = (place("block-id") as HTMLInputElement).value.trim();
+      const note = (place("block-note") as HTMLInputElement).value;
+      if (confirm(`¿Bloquear ${id}? Dejará de servirse.`)) void this.#acting(`docs/${id}/block`, note);
+    });
+    place("key-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const root = (place("key-root") as HTMLInputElement).value.trim();
+      const note = (place("key-note") as HTMLInputElement).value;
+      if (confirm(`¿Bloquear la llave ${root}? No podrá subir nada más.`))
+        void this.#acting(`keys/${root}/block`, note);
+    });
+  }
+}
+
+new Panel(document).start();
