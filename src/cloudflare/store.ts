@@ -250,7 +250,7 @@ export class Cloud implements Store {
              owner_mark = CASE WHEN ?7 THEN ?8 ELSE owner_mark END, fix_by = NULL,
              dies_on = CASE WHEN blocked_at IS NULL THEN ${LIVES_ON} WHEN paused_at IS NULL THEN ?1 + ttl_days ELSE paused_at + ?10 END,
              active_day = MAX(active_day, ?1),
-             blocked_at = NULL, blocked_hour = NULL, appealed_at = NULL, appealed_hour = NULL
+             blocked_at = NULL, blocked_hour = NULL, appealed_hour = NULL
            WHERE id = ?5 AND latest = ?6 AND permit IS ?9
              AND ((blocked_at IS NULL AND paused_at IS NULL) OR (?7 AND blocked_at IS NOT NULL AND blocked_by_operator = 0 AND counts_from = ?2))
              AND (?12 IS NULL OR ?13 + (SELECT COALESCE(SUM(${HELD_BYTES}), 0) FROM docs d
@@ -976,8 +976,9 @@ export class Cloud implements Store {
     let forgotten = 0;
     let failed = failedDays;
     try {
-      // Replaced here too, so a day with no reader does not leave yesterday's key in storage.
+      // Replaced here too, so a quiet day or period does not leave an old key in storage.
       await this.dayKey(today);
+      await this.evidenceKey(today);
     } catch (error) {
       failed += 1;
       console.error("the day's key could not be replaced", String(error));

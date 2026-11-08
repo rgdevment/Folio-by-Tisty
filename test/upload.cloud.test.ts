@@ -613,7 +613,7 @@ describe("an appeal that says someone else uploaded it", () => {
     expect(await sendAt(id, fromOwner, DAYS(5))).toEqual({ stored: true, version: 3 });
     const row = await appealRow(id);
     expect(row?.blocked_at).toBeNull();
-    expect(row?.appealed_at).toBeNull();
+    expect(row?.appealed_at).not.toBeNull();
     expect(row?.dies_on).toBe(today(DAYS(5)) + (row?.ttl_days ?? 0));
     expect((await status(id, DAYS(5))).mayCorrect).toBe(false);
   });
@@ -642,10 +642,10 @@ describe("an appeal that says someone else uploaded it", () => {
     expect((await status(id, DAYS(6))).blockedAt).toBeNull();
     await reported(id, 3, ["new3"], DAYS(6));
     expect((await status(id, DAYS(6))).blockedAt).not.toBeNull();
-    expect(await appeal(id, DAYS(6))).toEqual({ done: true, claim: "review" });
+    expect(await appeal(id, DAYS(6))).toEqual({ refused: "appealed" });
   });
 
-  it("lifts itself once per document: a second block by an editor's version goes to the operator", async () => {
+  it("takes one appeal per document, as the terms say: a second block cannot be appealed", async () => {
     const { id } = await editedByAna();
     await reported(id, 2, THREE, LATER);
     expect(await appeal(id, LATER)).toEqual({ done: true, claim: "accepted" });
@@ -655,7 +655,7 @@ describe("an appeal that says someone else uploaded it", () => {
     const again = await sealedEnvelope({ id, version: 4, owner: mario, signer: ana, permit, token: pair });
     expect(await sendAt(id, again, DAYS(6))).toEqual({ stored: true, version: 4 });
     await reported(id, 4, ["new1", "new2", "new3"], DAYS(6));
-    expect(await appeal(id, DAYS(6))).toEqual({ done: true, claim: "review" });
+    expect(await appeal(id, DAYS(6))).toEqual({ refused: "appealed" });
   });
 
   it("goes to the operator when its owner signed a version reported", async () => {

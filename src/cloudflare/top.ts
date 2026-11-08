@@ -5,7 +5,7 @@ import { HELD_BYTES, SERVED } from "./room";
 import { seenOf } from "./seen";
 
 const LISTED = 50;
-const FLAGGED_SCANNED = 1000;
+const FLAGGED_SCANNED = 5000;
 
 const DAY_OF = (at: string): string => `${at} / 86400000`;
 // Without its first day, the oldest version kept and the first day it was read only bound how long it has lived.
