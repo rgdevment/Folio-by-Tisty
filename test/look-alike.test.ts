@@ -16,13 +16,19 @@ describe("a name that imitates the maker's", () => {
     ["rgdev\u03bdment".replace("v\u03bd", "\u03bd")],
     ["rgdevm\u00e9nt"],
     ["rgdevment\u200b"],
+    ["r\u0261devment"],
+    ["rg\u0501evment"],
+    ["r\u0261\u0501evment"],
   ])("catches %j", (alias) => {
     expect(imitates(alias, "rgdevment")).toBe(true);
   });
 
-  it.each([["Ana"], ["rgdev"], ["rgdevments"], ["devment"], [""]])("lets %j be", (alias) => {
-    expect(imitates(alias, "rgdevment")).toBe(false);
-  });
+  it.each([["Ana"], ["rgdev"], ["rgdevments"], ["devment"], [""], ["\u96e8".repeat(9)], ["\u0436\u0436\u0436devment"]])(
+    "lets %j be",
+    (alias) => {
+      expect(imitates(alias, "rgdevment")).toBe(false);
+    },
+  );
 });
 
 describe("how a root stands", () => {
@@ -32,11 +38,13 @@ describe("how a root stands", () => {
   });
 
   it("is not verified on a doubtful signature, even from the maker's root", () => {
-    expect(standingOf(MAKER.root, "doubtful", "rgdevment", MAKER)).toBe("plain");
+    expect(standingOf(MAKER.root, "doubtful", "rgdevment", MAKER)).toBe("takenBack");
   });
 
-  it("imitates when another root goes by the maker's name", () => {
+  it("imitates when another root goes by the maker's name or its domain", () => {
     expect(standingOf(OTHER, "holds", "rgdevrnent", MAKER)).toBe("imitates");
+    expect(standingOf(OTHER, "holds", "rgdevment.dev", MAKER)).toBe("imitates");
+    expect(standingOf(OTHER, "holds", "RG-DEVMENT.DEV", MAKER)).toBe("imitates");
   });
 
   it("is plain for any other name, no name, or no named maker", () => {

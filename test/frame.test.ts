@@ -552,7 +552,10 @@ describe("who signed it", () => {
 
 describe("whom it names", () => {
   const byId = (id: string) => place.document.getElementById(id) as HTMLElement;
-  const drawStanding = (signedAs: string | undefined, signerStanding: "verified" | "imitates" | "plain") => {
+  const drawStanding = (
+    signedAs: string | undefined,
+    signerStanding: "verified" | "imitates" | "takenBack" | "plain",
+  ) => {
     const cleaner = domPurifyCleaner(place);
     drawFrame({
       held: { ...HELD, ...(signedAs === undefined ? {} : { signed_as: signedAs }) },
@@ -576,6 +579,14 @@ describe("whom it names", () => {
     expect(byId("signer").textContent).toBe("rgdevrnent");
     expect(byId("signer-verified").hidden).toBe(true);
     expect(byId("signer-note").hidden).toBe(false);
+    expect(byId("signer-note").classList.contains("is-warning")).toBe(true);
+  });
+
+  it("warns beneath the maker's name when its key was taken back", () => {
+    drawStanding("rgdevment", "takenBack");
+    expect(byId("signer").textContent).toBe("rgdevment");
+    expect(byId("signer-verified").hidden).toBe(true);
+    expect(byId("signer-note").textContent).toBe("Llave retirada: ya no habla por este nombre");
     expect(byId("signer-note").classList.contains("is-warning")).toBe(true);
   });
 

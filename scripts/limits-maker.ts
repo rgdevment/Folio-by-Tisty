@@ -2,6 +2,7 @@ import { Resolver } from "node:dns/promises";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Maker } from "../src/core/look-alike.ts";
 
 const ROOT = /^[A-Za-z0-9_-]{43}$/;
 const NAME = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
@@ -11,12 +12,6 @@ const RESOLVERS = ["1.1.1.1", "8.8.8.8"];
 const NO_RECORD = new Set(["ENOTFOUND", "ENODATA"]);
 const TRIES = 5;
 const BETWEEN_TRIES_MS = 60_000;
-
-export interface Maker {
-  root: string;
-  name?: string;
-  domain?: string;
-}
 
 export type Lookup = (resolver: string, name: string) => Promise<string[] | null>;
 

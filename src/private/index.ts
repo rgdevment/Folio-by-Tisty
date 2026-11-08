@@ -23,8 +23,10 @@ interface Env extends Bindings, SpendBindings, MailBindings {
   FOLIO_TAG?: string;
 }
 
-const makerRootOf = (limits: { maker?: { root?: unknown } }): string | null =>
-  typeof limits.maker?.root === "string" ? limits.maker.root : null;
+const makerRootOf = (limits: object): string | null => {
+  const { maker } = limits as { maker?: { root?: unknown } };
+  return typeof maker?.root === "string" ? maker.root : null;
+};
 const MAKER_ROOT = makerRootOf(SIGNED_LIMITS);
 
 const WEEKLY = "0 4 * * SUN";

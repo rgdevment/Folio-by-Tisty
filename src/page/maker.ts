@@ -1,4 +1,4 @@
-import { maker } from "../../docs/limits.json";
+import * as limits from "../../docs/limits.json";
 import type { Maker } from "../core/look-alike";
 
-export const MAKER: Maker | undefined = maker;
+export const MAKER = (limits as { maker?: Maker }).maker;

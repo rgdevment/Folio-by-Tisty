@@ -53,7 +53,8 @@ info:
     `_tisty.<domain>` reading `tisty-root=<root>`. The file is not signed unless two resolvers find it, and a check
     every six hours says when it stops holding. A client that shows the name does so, never the alias, on what that
     root signs while its signature holds, with the domain beneath it and no link. It marks an alias equal or close
-    to the name, signed by another root, as another key's.
+    to the name or the domain, signed by another root, as another key's, and an alias on that root whose signature
+    no longer holds as a key taken back.
 
     **The terms in force** are named there too. In `terms`, `es` and `en` are the SHA-256, in hex, of
     `docs/TERMINOS.md` and `docs/TERMS.md` as served from the same place, and `version`, a whole number written as a

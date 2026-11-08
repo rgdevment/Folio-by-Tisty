@@ -249,9 +249,15 @@ const drawName = (who: "signer" | "owner", alias: string | undefined, standing: 
   element(who).textContent = (verified ? MAKER?.name : alias) ?? said().noName;
   element(`${who}-verified`).hidden = !verified;
   const note = element(`${who}-note`);
-  note.textContent = verified ? (MAKER?.domain ?? "") : said().anotherKey;
-  note.hidden = standing === "plain" || note.textContent === "";
-  note.classList.toggle("is-warning", standing === "imitates");
+  const notes: Record<Standing, string> = {
+    verified: MAKER?.domain ?? "",
+    imitates: said().anotherKey,
+    takenBack: said().takenBack,
+    plain: "",
+  };
+  note.textContent = notes[standing];
+  note.hidden = note.textContent === "";
+  note.classList.toggle("is-warning", !verified);
 };
 
 const drawOwner = (held: Document, { ownerFingerprint, ownerStanding }: Seal): void => {
