@@ -26,6 +26,9 @@ describe("a key in the detail of a report", () => {
     ["after an equals sign", `key=${KEY}`],
     ["as the value of an address's query", `https://tisty.cl/?k=${KEY}`],
     ["as a later value of an address's query", `https://evil.example/login?a=1&k=${KEY}&x=1`],
+    ["after its document's id and a slash", `el documento AbCdEfGh/${KEY}`],
+    ["as the path of Folio's address", `https://tisty.cl/${KEY}`],
+    ["after an address with no scheme", `tisty.cl/${KEY}`],
     ["after a colon", `llave:${KEY}`],
     ["on its own line", `hola\n${KEY}\nadios`],
     ["with a tab around it", `\t${KEY}\t`],
@@ -58,6 +61,8 @@ describe("a key in the detail of a report", () => {
     ["a 44-character token", "A".repeat(44)],
     ["a url-safe token inside a long query", `https://example.com/?token=${"a".repeat(80)}`],
     ["a hyphenated sentence", "ya-lo-vi-en-el-sitio-y-pide-datos-de-la-tarjeta-bancaria"],
+    ["a long fragment of another site", `https://evil.example/#${"oferta-especial-".repeat(4)}`],
+    ["a 43-character fragment of another site", `https://evil.example/#${"c".repeat(44)}`],
   ])("lets through %s", (_what, detail) => {
     expect(said(`${detail} es un sitio de estafa`)).not.toBeNull();
   });

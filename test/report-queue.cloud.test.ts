@@ -325,6 +325,21 @@ describe("marking a report false", () => {
     expect(docs.results).toEqual([{ doc: "Stoppedd" }]);
   });
 
+  it("takes no report on a language its owner stopped days ago, though its anchor is still served", async () => {
+    await shared("Anchordc");
+    for (const id of ["Stopedlg", "Todaylng", "Livinglg"]) {
+      await shared(id);
+      await testEnv.DB.prepare("UPDATE docs SET anchor = 'Anchordc', dies_on = ? WHERE id = ?")
+        .bind(DAY - 3, id)
+        .run();
+    }
+    await store.stop("Stopedlg", DAY - 2);
+    await store.stop("Todaylng", DAY);
+    for (const id of ["Stopedlg", "Todaylng", "Livinglg"]) await reportBy(id, "late", "phishing", DAY);
+    const docs = await testEnv.DB.prepare("SELECT doc FROM reports WHERE net = 'late' ORDER BY doc").all();
+    expect(docs.results).toEqual([{ doc: "Livinglg" }, { doc: "Todaylng" }]);
+  });
+
   it("does not let an appeal lift itself over child abuse reported before", async () => {
     await shared("Victimdc");
     await testEnv.DB.prepare(

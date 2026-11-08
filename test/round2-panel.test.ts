@@ -327,13 +327,23 @@ describe("the panel in a session", () => {
       expect(page.querySelectorAll("#reports .card-steps")).toHaveLength(1);
     });
 
-    it("says it could not note the opening when the document is not there (404), and hands over no command", async () => {
+    it("says nothing changed when the document is not there (404), and hands over no command", async () => {
       const { writeText, extra } = clipboard();
       await start(server({ "/opened": () => new Response('{"refused":"missing"}', { status: 404 }) }), "motivo", extra);
       press("reports", "Abrir denuncia");
-      await vi.waitFor(() => expect(said()).toContain("No se pudo"));
+      await vi.waitFor(() => expect(said()).toContain("No cambió nada"));
       expect(writeText).not.toHaveBeenCalled();
       expect(page.querySelector("#reports .card-steps")).toBeNull();
+    });
+
+    it("says on the card that the queue could not be brought up to date after the opening", async () => {
+      const { extra } = clipboard();
+      await start(server(), "motivo", extra);
+      queueFails = true;
+      press("reports", "Abrir denuncia");
+      await vi.waitFor(() =>
+        expect(page.querySelector("#reports .card-steps")?.textContent).toContain("No se pudo traer el panel"),
+      );
     });
 
     it("hands over no command when the network fails while noting", async () => {

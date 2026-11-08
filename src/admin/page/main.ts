@@ -356,15 +356,21 @@ class Panel {
     reading: Reading,
   ): Promise<void> {
     this.#say("Trabajando…");
-    if (!(await sent(`docs/${id}/opened`, { note: reason, kind: reading }))?.ok) {
+    const answer = await sent(`docs/${id}/opened`, { note: reason, kind: reading });
+    if (answer?.status === MISSING) {
+      this.#say((await this.#reload()) ? UNCHANGED : `${UNCHANGED} ${STALE}`);
+      return;
+    }
+    if (!answer?.ok) {
       this.#say(COULD_NOT);
       return;
     }
     // Redrawn first, so what the opening unlocks shows, and the steps go on the card as it is now.
-    await this.#reload();
+    const fresh = await this.#reload();
+    const said = fresh ? READING_SAID[reading] : `${READING_SAID[reading]} ${STALE}`;
     const card = this.#page.querySelector<HTMLElement>(`#reports .card[data-doc="${id}"]`);
-    if (card) this.#handing(command, READING_SAID[reading], card);
-    else this.#copying(command, `Copiado. ${RUN_IT} ${READING_SAID[reading]}`);
+    if (card) this.#handing(command, said, card);
+    else this.#copying(command, `Copiado. ${RUN_IT} ${said}`);
   }
 
   async #acting(path: string, note?: string): Promise<boolean> {

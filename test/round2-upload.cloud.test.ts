@@ -1,6 +1,6 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
 import type { Bytes } from "../src/core/bytes";
@@ -247,6 +247,40 @@ describe("attachments of a key near its room", () => {
     expect(answers.filter((one) => "stored" in one)).toHaveLength(1);
     expect(answers.filter((one) => "refused" in one && one.refused === "room_full")).toHaveLength(1);
     expect((await rooms())?.held, "two attachments together overfilled the key").toBeLessThanOrEqual(room);
+  });
+
+  it("does not ask storage again for files the last version kept, and still counts them", async () => {
+    const owner = await newPerson();
+    const to = toolsWith();
+    const a = await withFiles(owner, 4000, to);
+    expect(await sendFiles(to, a.id, a.files, LATER)).toMatchObject({ stored: true });
+    const hash = await filesHashOf(a.id, a.files);
+    const asked = vi.spyOn(to.store, "filesBytes");
+    const next = await sealedEnvelope({ id: a.id, version: 3, owner });
+    expect(await send(to, a.id, next, LATER + DAY_MS, undefined, hash)).not.toHaveProperty("refused");
+    expect(asked, "only the answer's own check").toHaveBeenCalledTimes(1);
+    expect((await rooms())?.held).toBe(next.length + a.files.length);
+  });
+
+  it("keeps the files a version found in storage and counted, though the room filled meanwhile", async () => {
+    const owner = await newPerson();
+    const to = toolsWith();
+    const first = await started();
+    await send(to, first.id, await sealedEnvelope({ id: first.id, version: 1, owner }), NOW, first);
+    const files = await sealedEnvelope({ id: first.id, version: 2, owner, files: [4000] });
+    const hash = await filesHashOf(first.id, files);
+    await testEnv.ENVELOPES.put(`${first.id}/files.${hash}`, files);
+    const main = await sealedEnvelope({ id: first.id, version: 2, owner });
+    expect(await send(to, first.id, main, LATER, undefined, hash)).not.toHaveProperty("filesWanted");
+    const kept = await new Cloud(testEnv, LIMITS).keepFiles(
+      { id: first.id, hash, body: files, net: "a network", newKey: false, roomAtMost: 1 },
+      Math.floor(LATER / DAY_MS),
+    );
+    expect(kept).toBe("stored");
+    expect(
+      await testEnv.ENVELOPES.head(`${first.id}/files.${hash}`),
+      "the version's files were deleted",
+    ).not.toBeNull();
   });
 
   it("refuses the second one when they come one after the other", async () => {

@@ -9,6 +9,7 @@ export interface Version {
   machine: string;
   contract: string;
   files?: string;
+  filesKept?: number;
 }
 
 export interface NewDoc {

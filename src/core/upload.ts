@@ -271,8 +271,11 @@ const storeVersion = async (
   const correcting = held?.correctable && signature.root === held.owner;
   const fresh = correcting ? [] : await newRootsOf(read, now, tools);
   const newKey = fresh.length > 0;
-  // Asked of storage every time: a size kept in the row may predate files that arrived meanwhile.
-  const filesBytes = files === undefined ? 0 : ((await store.filesBytes(id, files)) ?? 0);
+  const previous = held?.versions.at(-1);
+  // The row's size is trusted only once the same files were kept on it; before that, storage may already hold more.
+  const keptBefore = files !== undefined && previous?.files === files && previous.filesKept === 1;
+  const filesBytes =
+    files === undefined ? 0 : keptBefore ? (held?.filesBytes ?? 0) : ((await store.filesBytes(id, files)) ?? 0);
   if (newKey && stage === "new_keys_off") return { refused: "uploads_off" };
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };

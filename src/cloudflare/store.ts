@@ -95,11 +95,15 @@ const AFTER_WHAT_WAS_ANSWERED =
 const REPORT_REPLACES = `((reports.cleared = 1 OR NOT EXISTS (SELECT 1 FROM false_reporters f WHERE f.net = excluded.net))
   AND CASE WHEN reports.cleared = 1 THEN reports.level = 'light' OR excluded.version > reports.version ELSE ${REPORT_RISES} OR (${AFTER_WHAT_WAS_ANSWERED}) END)`;
 // A document stopped today waits for the sweep, and what is reported until then still reaches it; one that expired does not.
+const STOPPED_BEFORE = (doc: string, today: string): string =>
+  `(${doc}.paused_at IS NOT NULL AND ${doc}.dies_on < ${today} - 1)`;
+const OWN_DAYS_LEFT = (doc: string, today: string): string =>
+  `(${doc}.dies_on >= ${today} OR (${doc}.paused_at IS NOT NULL AND ${doc}.dies_on >= ${today} - 1))`;
+// A language its owner stopped ends with its own days, though its anchor lives on, as SERVED says.
 const STILL_LIVES = (doc: string, today: string): string =>
-  `(${doc}.dies_on >= ${today} OR (${doc}.paused_at IS NOT NULL AND ${doc}.dies_on >= ${today} - 1)
-    OR EXISTS (SELECT 1 FROM holds h WHERE h.held = ${doc}.id)
-    OR EXISTS (SELECT 1 FROM docs a WHERE a.id = ${doc}.anchor
-      AND (a.dies_on >= ${today} OR (a.paused_at IS NOT NULL AND a.dies_on >= ${today} - 1))))`;
+  `(${OWN_DAYS_LEFT(doc, today)} OR EXISTS (SELECT 1 FROM holds h WHERE h.held = ${doc}.id)
+    OR (NOT ${STOPPED_BEFORE(doc, today)}
+      AND EXISTS (SELECT 1 FROM docs a WHERE a.id = ${doc}.anchor AND ${OWN_DAYS_LEFT("a", today)})))`;
 const REPORT_MOVES = `(${REPORT_REPLACES} OR (reports.cleared = 0 AND reports.sealed_link IS NULL AND excluded.sealed_link IS NOT NULL))`;
 
 // What keeps a document past its days, not served and not deleted (decision 42). Reports leave once their days pass.
@@ -703,12 +707,13 @@ export class Cloud implements Store {
       await this.#giveRoomBack(net, body.length, today, newKey, 0);
       throw error;
     }
+    // A version that found these files in storage already counted them in its own checked write, so they stay its own.
     const kept = await this.#db
       .prepare(
         `UPDATE docs SET files_bytes = ?1, versions = json_set(versions, '$[#-1].filesKept', 1)
          WHERE id = ?2 AND json_extract(versions, '$[#-1].files') = ?3 AND json_extract(versions, '$[#-1].filesKept') IS NULL
-           AND ?1 + COALESCE(json_extract(versions, '$[#-1].bytes'), 0) + (SELECT COALESCE(SUM(${HELD_BYTES}), 0)
-             FROM docs d WHERE d.owner = docs.owner AND d.id <> docs.id AND ${HOLDS_ROOM("?4")}) <= ?5`,
+           AND (files_bytes = ?1 OR ?1 + COALESCE(json_extract(versions, '$[#-1].bytes'), 0) + (SELECT COALESCE(SUM(${HELD_BYTES}), 0)
+             FROM docs d WHERE d.owner = docs.owner AND d.id <> docs.id AND ${HOLDS_ROOM("?4")}) <= ?5)`,
       )
       .bind(body.length, id, hash, today, roomAtMost)
       .run();

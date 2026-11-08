@@ -5,7 +5,7 @@ import { HELD_BYTES, SERVED } from "./room";
 import { seenOf } from "./seen";
 
 const LISTED = 50;
-const FLAGGED_SCANNED = 1000;
+const FLAGGED_PAGE = 500;
 
 const DAY_OF = (at: string): string => `${at} / 86400000`;
 // Without its first day, the oldest version kept and the first day it was read only bound how long it has lived.
@@ -120,9 +120,8 @@ export const topDocs = async (
 ): Promise<Top> => {
   const today = dayOf(now);
   const read = await readOfToday(db, today);
-  const rows = await db
-    .prepare(
-      `WITH read_today AS (${read.docs}), owner_rows AS (${read.owners}),
+  const statement = db.prepare(
+    `WITH read_today AS (${read.docs}), owner_rows AS (${read.owners}),
          uploaders AS (
            SELECT u.doc, MAX(q.keys) AS keys, MAX(q.docs) AS docs
            FROM net_doc u JOIN net_day q ON q.day = u.day AND q.net = u.net
@@ -148,14 +147,19 @@ export const topDocs = async (
          LEFT JOIN doc_day y ON y.doc = d.id AND y.day = ?1 - 1
          LEFT JOIN uploaders up ON up.doc = d.id
        WHERE d.latest > 0${flaggedOnly ? ` AND (${MAY_SIGNAL})` : ""}
-       ORDER BY ${ORDERS[order]} LIMIT ?2`,
-    )
-    .bind(today, flaggedOnly ? FLAGGED_SCANNED : LISTED, LONE_AFTER_DAYS)
-    .all<Row>();
-  const docs = rows.results.map((row) => topDocOf(row, today, limits));
-  return {
-    order,
-    flaggedOnly,
-    docs: (flaggedOnly ? docs.filter((one) => one.signals.length > 0) : docs).slice(0, LISTED),
-  };
+       ORDER BY ${ORDERS[order]} LIMIT ?2 OFFSET ?4`,
+  );
+  const pageOf = async (size: number, from: number): Promise<TopDoc[]> =>
+    (await statement.bind(today, size, LONE_AFTER_DAYS, from).all<Row>()).results.map((row) =>
+      topDocOf(row, today, limits),
+    );
+  if (!flaggedOnly) return { order, flaggedOnly, docs: await pageOf(LISTED, 0) };
+  const flagged: TopDoc[] = [];
+  // Page by page in the chosen order, so a flagged one far down is still found and the first page stays small.
+  for (let from = 0; flagged.length < LISTED; from += FLAGGED_PAGE) {
+    const page = await pageOf(FLAGGED_PAGE, from);
+    flagged.push(...page.filter((one) => one.signals.length > 0));
+    if (page.length < FLAGGED_PAGE) break;
+  }
+  return { order, flaggedOnly, docs: flagged.slice(0, LISTED) };
 };
