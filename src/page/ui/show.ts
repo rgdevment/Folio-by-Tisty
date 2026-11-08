@@ -1,13 +1,13 @@
 import type { Translation } from "@tisty/contracts";
 import { fromBase64Url, words } from "../../core/bytes";
 import { openRecords } from "../../core/case-records";
-import { type EnvelopeRefusal, EnvelopeRefused } from "../../rules/envelope";
+import { EnvelopeRefused } from "../../rules/envelope";
 import { preferredTranslation } from "../languages";
 import type { CaseLink } from "../link";
 import { OPERATOR_KEY } from "../operator-key";
 import type { Arrived, Opened } from "../read";
 import { openLink } from "../read";
-import { askFor, askForCase, asking, NOT_ARRIVED, type NotArrived } from "./ask";
+import { askFor, askForCase, asking, type NotArrived, notArrived } from "./ask";
 import { domPurifyCleaner } from "./clean";
 import { drawClosed } from "./closed";
 import { filePresser, saved } from "./files";
@@ -16,25 +16,9 @@ import { drawFrame, type Shown } from "./frame";
 import { offerLanguages } from "./language-switch";
 import { offerReport, type Reportable } from "./report";
 import { answeringProof } from "./solve";
+import { said } from "./speak";
 
-const DAY_MILLISECONDS = 86_400_000;
-
-const COULD_NOT_ARRIVE = "No se pudo traer el documento. Vuelve a intentarlo en un momento.";
-const CASE_GONE = "Este link de caso no existe o ya caducó. Pídele uno nuevo a quien te lo entregó.";
-const ASKING_THE_KEY = "Pega la llave del documento, o su link completo.";
 const KEY_IN_WHAT_WAS_PASTED = /[A-Za-z0-9_-]{43}/;
-
-const REFUSED: Record<EnvelopeRefusal, string> = {
-  newer:
-    "Este documento se escribió con una versión más nueva de la que esta página sabe leer. Vuelve a intentarlo más tarde.",
-  older: "Este documento es demasiado antiguo para esta página.",
-  damaged: "Este documento llegó dañado, así que no se muestra.",
-  unsigned: "La firma de este documento no vale, así que no se muestra.",
-  key: "Este link no abre el documento. Pídele el link completo a quien te lo mandó.",
-};
-
-const lastDay = (diesOn: number): string =>
-  new Date(diesOn * DAY_MILLISECONDS).toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "UTC" });
 
 interface Showing {
   id: string;
@@ -69,7 +53,7 @@ const shownOf = ({ id, linkKey, opened }: Showing, caseToken?: string): Shown =>
       verdict,
       fingerprint,
       ownerFingerprint,
-      diesOn: lastDay(diesOn),
+      diesOn,
     },
     pressFile: filePresser({ id, linkKey, held, ...(caseToken === undefined ? {} : { caseToken }) }),
   };
@@ -142,7 +126,7 @@ const opened = async (id: string, linkKey: string, arrived: Arrived, caseToken?:
     return true;
   } catch (error) {
     if (!(error instanceof EnvelopeRefused)) throw error;
-    drawClosed(REFUSED[error.refusal]);
+    drawClosed(said().refused[error.refusal]);
     return false;
   }
 };
@@ -151,7 +135,7 @@ const savedRecords = async (id: string, token: string, recordsKey: string): Prom
   const response = await asking(`/api/v1/cases/${id}/records`, undefined, token);
   const { sealed } = (await response.json()) as { sealed: string };
   const records = await openRecords(sealed, fromBase64Url(recordsKey));
-  saved({ name: `folio-${id}-registros.json` }, words(records));
+  saved({ name: `folio-${id}-${said().recordsFile}.json` }, words(records));
 };
 
 const offerCaseTools = (id: string, { token, recordsKey }: CaseLink): void => {
@@ -162,11 +146,11 @@ const offerCaseTools = (id: string, { token, recordsKey }: CaseLink): void => {
     button.remove();
     return;
   }
-  button.textContent = "Descargar registros";
+  button.textContent = said().downloadRecords;
   button.disabled = false;
   button.addEventListener("click", () => {
     savedRecords(id, token, recordsKey).catch(() => {
-      button.textContent = "No se pudieron traer los registros";
+      button.textContent = said().couldNotBringRecords;
     });
   });
 };
@@ -174,10 +158,10 @@ const offerCaseTools = (id: string, { token, recordsKey }: CaseLink): void => {
 export const showCase = async (id: string, link: CaseLink): Promise<void> => {
   const answer = await askForCase(id, link.token);
   if ("refused" in answer) {
-    drawClosed(answer.refused === "missing" ? CASE_GONE : (NOT_ARRIVED[answer.refused] ?? COULD_NOT_ARRIVE));
+    drawClosed(answer.refused === "missing" ? said().caseGone : (notArrived(answer.refused) ?? said().couldNotArrive));
     return;
   }
-  const linkKey = KEY_IN_WHAT_WAS_PASTED.exec(prompt(ASKING_THE_KEY) ?? "")?.[0] ?? "";
+  const linkKey = KEY_IN_WHAT_WAS_PASTED.exec(prompt(said().askingTheKey) ?? "")?.[0] ?? "";
   if (await opened(id, linkKey, answer, link.token)) offerCaseTools(id, link);
 };
 
@@ -191,7 +175,7 @@ export const showLink = async (
   const answer = await answeringProof(await asked, (proof) => askFor(id, proof));
   if ("refused" in answer) {
     if (answer.refused === "missing") location.replace(notFound);
-    else drawClosed(NOT_ARRIVED[answer.refused] ?? COULD_NOT_ARRIVE);
+    else drawClosed(notArrived(answer.refused) ?? said().couldNotArrive);
     return;
   }
   await opened(id, linkKey, answer);

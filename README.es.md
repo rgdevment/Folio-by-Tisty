@@ -16,8 +16,9 @@ sus promesas. Sus links viven en tisty.cl, y su sitio es
 
 ## Cómo funciona
 
-- **Se comparte desde Tisty,** con su botón *Compartir*, que todavía no está
-  encendido. No hay otra forma de compartir, y no hay cuentas: el link es el
+- **Se comparte desde Tisty,** con la fila *Compartido* del panel de un
+  documento, desde la versión 1.42.0. Mientras Folio no abre, Tisty lo dice y no
+  sube nada. No hay otra forma de compartir, y no hay cuentas: el link es el
   permiso.
 - **Cada documento tiene tres links:** uno para leer, uno para editar y uno
   para administrar.
@@ -28,8 +29,15 @@ sus promesas. Sus links viven en tisty.cl, y su sitio es
   viene de ti.
 - **Caduca sola** después del tiempo sin actividad que elijas, de un día a 15
   como mucho. Tu documento se queda en tu Tisty.
+- **Un link perdido no se puede recuperar,** porque el servidor nunca tuvo su
+  llave. Mientras el documento está compartido, Tisty guarda sus links: vuelve a
+  copiarlos desde su fila *Compartido*. Si ya caducó o lo dejaste de compartir,
+  compártelo otra vez para tener links nuevos.
 - **Un link se abre en cualquier navegador,** en tisty.cl, y se edita en otro
   Tisty con *Editar en Tisty*.
+
+Cómo funcionan el cifrado y las firmas, y qué no protegen, está en la
+[política de seguridad](docs/SEGURIDAD.md).
 
 ## Sus documentos
 

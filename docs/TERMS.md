@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 14, in force since November 8, 2026.**
+**Version 15, in force since November 8, 2026.**
 
 ## The short version
 
@@ -50,7 +50,13 @@ but what you do with what you read is your responsibility.
   cannot be taken back unless you stop sharing.
 - **What is shared is encrypted end to end.** The key travels in the link, after
   the `#`, and browsers do not send it to the server. The server keeps bytes it
-  cannot read. If you lose the link, nobody can recover it for you.
+  cannot read.
+- **If you lose a link, nobody can recover it for you,** because the server
+  never had its key. Your document stays in your Tisty, which keeps the links of
+  what you share while it is shared: the links to read and to edit are copied
+  again from the document's *Shared* row, where it is also paused, resumed and
+  stopped. Once a share expires or you stop it, its links are gone for good; if
+  you share the document again, it gets new ones.
 - **What is shared expires on its own** after the time without activity you
   choose when sharing, from one day to 15 at most: no reads, no visits of yours
   and no new versions. When it expires, the links stop working and the server's

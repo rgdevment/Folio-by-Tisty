@@ -1,5 +1,6 @@
 import type { Document, Page } from "@tisty/contracts";
 import { bareUrl } from "./clean";
+import { said } from "./speak";
 import { widgetDrawer } from "./widgets";
 
 const REFERENCE = /^tisty:(page|cited)\/(\d+)$/i;
@@ -18,7 +19,6 @@ const LEAF = [
 const PLAY = ["M8 5v14l11-7z"];
 const HUES = ["red", "orange", "amber", "green", "teal", "blue", "indigo", "purple", "pink", "brown", "gray"];
 const GLIMPSE_CHARACTERS = 160;
-const PRESS_TO_ASK = "Presiona para traerlo.";
 const SOUND = /^audio\/|\.(mp3|m4a|aac|ogg|oga|opus|wav|flac)$/i;
 const MOVING = /^video\/|\.(mp4|m4v|webm|mov)$/i;
 const TRAILING_SLASHES = /\/+$/;
@@ -81,15 +81,16 @@ const standsAlone = (link: Element, words: DocumentFragment): boolean => {
 };
 
 const looksOf = ({ name, kind = "" }: { name: string; kind?: string }) => {
-  if (SOUND.test(kind) || SOUND.test(name)) return { under: "Presiona para escucharlo.", paths: PLAY, chip: "Audio" };
-  if (MOVING.test(kind) || MOVING.test(name)) return { under: "Presiona para verlo.", paths: PLAY, chip: "Video" };
-  return { under: PRESS_TO_ASK, paths: LEAF, chip: "Adjunto" };
+  const { pressToListen, pressToWatch, pressToAsk, audio, video, attachment } = said();
+  if (SOUND.test(kind) || SOUND.test(name)) return { under: pressToListen, paths: PLAY, chip: audio };
+  if (MOVING.test(kind) || MOVING.test(name)) return { under: pressToWatch, paths: PLAY, chip: video };
+  return { under: pressToAsk, paths: LEAF, chip: attachment };
 };
 
 const drawFiles = (words: DocumentFragment, held: Document): void => {
   for (const link of words.querySelectorAll("a[data-file]")) {
     const file = held.files?.find((one) => one.at === Number(link.getAttribute("data-file")));
-    link.setAttribute("title", PRESS_TO_ASK);
+    link.setAttribute("title", said().pressToAsk);
     if (!file || !link.matches("p > a.card") || !standsAlone(link, words)) continue;
     const { under, paths, chip } = looksOf(file);
     fill(link, file.name, under, paths, chip);
@@ -172,17 +173,17 @@ export const cardsFor = (held: Document, wordsOf: (html: string) => DocumentFrag
     for (const link of words.querySelectorAll("p > a.card")) {
       if (!standsAlone(link, words)) continue;
       const reference = referenceOf(link.getAttribute("href") ?? "");
-      const said = link.textContent ?? "";
+      const shown = link.textContent ?? "";
       if (reference?.kind === "page") {
         const page = pages.find((one) => one.at === reference.at);
         if (!page) continue;
-        const chip = `Página ${pages.indexOf(page) + 1} de ${pages.length}`;
-        fill(link, page.title ?? said, glimpseOf(page), BOOK, chip);
+        const chip = said().pageChip(pages.indexOf(page) + 1, pages.length);
+        fill(link, page.title ?? shown, glimpseOf(page), BOOK, chip);
         link.classList.add("doc-card", "is-page");
       } else if (reference?.kind === "cited") {
         const cited = held.cited?.[reference.at];
         if (!cited) continue;
-        fill(link, cited.title ?? said, "", LEAF, "Abre otro documento");
+        fill(link, cited.title ?? shown, "", LEAF, said().opensAnother);
         link.classList.add("doc-card");
       }
     }

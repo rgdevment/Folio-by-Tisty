@@ -170,7 +170,7 @@ describe("a document in several languages", () => {
     await choose("fr");
     expect(place.document.title).toBe("Walks · Folio");
     expect(byId<HTMLSelectElement>("language").value).toBe("en");
-    expect(byId("language-said").textContent).toContain("sigues en este");
+    expect(byId("language-said").textContent).toContain("you stay in this one");
   });
 
   it.each([

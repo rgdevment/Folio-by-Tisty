@@ -16,6 +16,7 @@ const HEADERS = read("src/page/public/_headers");
 const SHEET = read("src/page/ui/sheet.css");
 const FRAME = read("src/page/ui/frame.ts");
 const HTML = read("src/page/index.html");
+const ROBOTS = read("src/page/public/robots.txt");
 
 describe("the sample", () => {
   it("is a document the contract takes, so the frame is built on what will really arrive", () => {
@@ -50,7 +51,45 @@ describe("the page's headers", () => {
 
   it("keep tisty.cl out of every search (decision 63)", () => {
     expect(HEADERS).toContain("X-Robots-Tag: noindex");
-    expect(read("src/page/public/robots.txt")).toContain("Disallow: /");
+    expect(HTML).toContain('<meta name="robots" content="noindex" />');
+    expect(ROBOTS.split("\n\n").at(-1)).toBe("User-agent: *\nDisallow: /\n");
+  });
+});
+
+describe("a link pasted where it shows a preview", () => {
+  const PREVIEWERS = [
+    "Twitterbot",
+    "Slackbot",
+    "facebookexternalhit",
+    "LinkedInBot",
+    "Discordbot",
+    "WhatsApp",
+    "TelegramBot",
+  ];
+  const meta = (property: string): string | undefined =>
+    new RegExp(`<meta (?:property|name)="${property}" content="([^"]*)"`).exec(HTML)?.[1];
+
+  it("lets only the preview bots read the page, and none of them the API", () => {
+    const group = ROBOTS.split("\n\n").find((one) => one.includes("User-agent: Twitterbot")) ?? "";
+    for (const bot of PREVIEWERS) expect(group).toContain(`User-agent: ${bot}\n`);
+    expect(group).toContain("Allow: /\n");
+    expect(group).toContain("Disallow: /api/");
+  });
+
+  it("shows a card that is the same for every document, in English, with a picture X takes", () => {
+    expect(meta("og:title")).toBe("A document shared with Folio by Tisty");
+    expect(meta("og:description")).toMatch(/^End-to-end encrypted, it expires on its own\./);
+    expect(meta("og:site_name")).toBe("Folio by Tisty");
+    expect(meta("og:image")).toBe("https://tisty.cl/preview.png");
+    expect(meta("twitter:card")).toBe("summary_large_image");
+    const png = readFileSync("src/page/public/preview.png");
+    expect(png.subarray(1, 4).toString()).toBe("PNG");
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
+  });
+
+  it("says nothing of the document, which only the reader's browser ever opens", () => {
+    expect(meta("og:url")).toBeUndefined();
+    expect(FRAME).not.toMatch(/og:|twitter:/);
   });
 });
 
@@ -143,7 +182,7 @@ describe("the panels", () => {
     const details = HTML.slice(HTML.indexOf('id="panel-details"'), HTML.indexOf('class="foot"'));
     expect(details).toContain('id="signer"');
     expect(details).toContain('id="fingerprint"');
-    expect(details).toContain("Cómo comprobarla");
+    expect(details).toContain('data-say="howToCheck"');
   });
 
   it("say in the details only what the sheet does not already say", () => {

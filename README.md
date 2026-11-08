@@ -14,9 +14,10 @@ live at tisty.cl, and its site is [www.tisty.app](https://www.tisty.app).
 
 ## How it works
 
-- **You share from Tisty,** with its *Share* button, which is not switched on
-  yet. Nothing is shared any other way, and there are no accounts: the link is
-  the permission.
+- **You share from Tisty,** from the *Shared* row of a document's panel, since
+  version 1.42.0. While Folio is not open yet, Tisty says so and uploads
+  nothing. Nothing is shared any other way, and there are no accounts: the link
+  is the permission.
 - **Each document gets three links:** one to read, one to edit and one to
   manage.
 - **What you share is encrypted in your Tisty before it leaves.** The key
@@ -26,8 +27,15 @@ live at tisty.cl, and its site is [www.tisty.app](https://www.tisty.app).
   came from you.
 - **It expires on its own** after the time without activity you choose, from one
   day to 15 at most. Your document stays in your Tisty.
+- **A lost link cannot be recovered,** because the server never had its key.
+  While the document is shared, Tisty keeps its links: copy them again from its
+  *Shared* row. Once it expires or you stop sharing it, share it again for new
+  ones.
 - **A link opens in any browser,** at tisty.cl, and is edited in another Tisty
   with *Edit in Tisty*.
+
+How the encryption and the signatures work, and what they do not protect, is in
+the [security policy](docs/SECURITY.md).
 
 ## Its documents
 

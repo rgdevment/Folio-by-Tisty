@@ -1,14 +1,10 @@
 import type { Revocation } from "@tisty/contracts";
 import type { Arrived } from "../read";
+import { said } from "./speak";
 
-const TOO_MANY_VISITS = "Hay demasiadas visitas desde tu red. Vuelve a intentarlo en un momento.";
-
-export const NOT_ARRIVED: Record<string, string> = {
-  paused: "Quien compartió este documento lo pausó.",
-  blocked: "Este documento fue bloqueado.",
-  slow: TOO_MANY_VISITS,
-  quota: "Hay demasiadas visitas desde tu red. Vuelve a intentarlo más tarde.",
-  proof: "Este documento tuvo muchas visitas hoy. Vuelve a intentarlo más tarde.",
+export const notArrived = (refused: string): string | undefined => {
+  const why: Record<string, string> = said().notArrived;
+  return why[refused];
 };
 
 export interface NotArrived {

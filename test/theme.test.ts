@@ -14,11 +14,13 @@ const toggle = () => place.document.getElementById("theme") as HTMLButtonElement
 const sheet = () => place.document.getElementById("sheet") as HTMLElement;
 
 beforeEach(() => {
-  place = new JSDOM('<!doctype html><button id="theme"></button><div id="sheet"></div>').window as never;
+  place = new JSDOM('<!doctype html><html lang="es"><button id="theme"></button><div id="sheet"></div>')
+    .window as never;
   kept = new Map();
   followers = [];
   systemIsDark = false;
   vi.stubGlobal("document", place.document);
+  vi.stubGlobal("MutationObserver", place.MutationObserver);
   vi.stubGlobal("localStorage", {
     getItem: (key: string) => kept.get(key) ?? null,
     setItem: (key: string, value: string) => kept.set(key, value),
@@ -52,6 +54,15 @@ describe("the theme", () => {
     expect(sheet().dataset.theme).toBe("dark");
     expect(kept.get(KEY)).toBe("dark");
     expect(toggle().title).toBe("Usar el modo claro");
+  });
+
+  it("names what the button does in the language the page speaks after a change", async () => {
+    offerThemes();
+    expect(toggle().title).toBe("Usar el modo oscuro");
+    place.document.documentElement.lang = "en";
+    await Promise.resolve();
+    expect(toggle().title).toBe("Use dark mode");
+    expect(toggle().getAttribute("aria-label")).toBe("Use dark mode");
   });
 
   it("forgets the choice on going back to the system's theme, and follows it again", () => {

@@ -1,8 +1,9 @@
 import { LEVEL_ONE, levelOfReport } from "../../core/limits";
 import { holdsALink } from "../../core/sealed-link";
-import { element } from "./frame";
+import { element } from "./element";
 import { sealContact, sealLink } from "./seal";
 import { solved } from "./solve";
+import { onSpeechChange, said } from "./speak";
 
 export interface Reportable {
   id: string;
@@ -16,17 +17,10 @@ interface Sending {
   body: string;
 }
 
-const REFUSALS: Record<string, string> = {
-  quota: "Tu red ya envió muchas denuncias en esta hora. Vuelve a intentarlo más tarde.",
-  slow: "Tu red envió muchas denuncias en poco tiempo. Vuelve a intentarlo en un momento.",
+const refusalSaid = (refused: string | undefined): string => {
+  const why: Record<string, string> = said().reportRefused;
+  return why[refused ?? ""] ?? said().reportCouldNotSend;
 };
-const COULD_NOT_SEND = "No se pudo enviar la denuncia. Vuelve a intentarlo en un momento.";
-const SEALED = "Lo cifras aquí, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar.";
-const ALWAYS_ON_GRAVE = `Una denuncia grave siempre entrega el link, porque sin él nadie podría revisarla. ${SEALED}`;
-const CHILD_ABUSE_REVIEW =
-  "Esta denuncia entrega el link cifrado, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar. El operador lo abre solo para verificarla y no puede guardar copia en su equipo. Si es falsa, la descarta; si no, bloquea el documento y lo denuncia a las autoridades pertinentes, las únicas que reciben la llave. No descargues, copies, reenvíes ni mandes por correo ese material.";
-const DETAIL_NEEDED = "Cuenta en una frase por qué lo denuncias: quien lo revisa necesita saber qué buscar.";
-const LINK_IN_DETAIL = "Quita el link de tu mensaje. Si quieres entregarlo, marca la casilla: así viaja cifrado.";
 
 const post = ({ id, body }: Sending, proof?: string): Promise<Response> =>
   fetch(`/api/v1/docs/${id}/report`, {
@@ -47,7 +41,7 @@ const sent = async (sending: Sending): Promise<string | null> => {
   const answer = salt !== undefined && bits !== undefined ? await post(sending, await solved(salt, bits)) : null;
   if (answer?.ok) return null;
   const lastRefusal = answer ? (await refusalIn(answer)).refused : refused;
-  return REFUSALS[lastRefusal ?? ""] ?? COULD_NOT_SEND;
+  return refusalSaid(lastRefusal);
 };
 
 export const offerReport = (shown: () => Reportable): void => {
@@ -59,7 +53,7 @@ export const offerReport = (shown: () => Reportable): void => {
   const detailOptional = element<HTMLElement>("report-detail-optional");
   const handOver = element<HTMLInputElement>("report-hand-over");
   const handingOverSaid = element<HTMLElement>("report-consent-said");
-  const said = element<HTMLElement>("report-said");
+  const told = element<HTMLElement>("report-said");
   const submit = element<HTMLButtonElement>("report-send");
 
   const categoryOf = (): string => new FormData(form).get("category")?.toString() ?? "";
@@ -83,9 +77,15 @@ export const offerReport = (shown: () => Reportable): void => {
   button.disabled = false;
   button.addEventListener("click", () => dialog.showModal());
   element<HTMLButtonElement>("report-cancel").addEventListener("click", () => dialog.close());
-  form.addEventListener("change", () => {
+  const sayHandingOver = (): void => {
     const category = categoryOf();
     const level = levelOfReport(category);
+    const { reportChildAbuse, reportAlwaysOnGrave, reportSealed } = said();
+    handingOverSaid.textContent =
+      category === "csam" ? reportChildAbuse : level === "grave" ? reportAlwaysOnGrave : reportSealed;
+  };
+  form.addEventListener("change", () => {
+    const level = levelOfReport(categoryOf());
     const wasRequired = handOver.disabled;
     consent.hidden = level === "light" || level === null;
     contactBox.hidden = consent.hidden;
@@ -93,8 +93,11 @@ export const offerReport = (shown: () => Reportable): void => {
     handOver.disabled = level === "grave";
     if (level === "grave") handOver.checked = true;
     else if (wasRequired || consent.hidden) handOver.checked = false;
-    handingOverSaid.textContent =
-      category === "csam" ? CHILD_ABUSE_REVIEW : level === "grave" ? ALWAYS_ON_GRAVE : SEALED;
+    sayHandingOver();
+  });
+  onSpeechChange(() => {
+    sayHandingOver();
+    told.textContent = "";
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -102,20 +105,20 @@ export const offerReport = (shown: () => Reportable): void => {
     const { linkKey } = reportable;
     const detail = detailOf();
     if (holdsALink(detail) || (linkKey !== "" && detail.includes(linkKey))) {
-      said.textContent = LINK_IN_DETAIL;
+      told.textContent = said().reportLinkInDetail;
       return;
     }
     const level = levelOfReport(categoryOf());
     if (level !== "light" && level !== null && detail.length < LEVEL_ONE.reportDetailAtLeast) {
-      said.textContent = DETAIL_NEEDED;
+      told.textContent = said().reportDetailNeeded;
       return;
     }
     submit.disabled = true;
-    said.textContent = "Enviando…";
+    told.textContent = said().reportSending;
     const failed = await bodyOf(reportable)
       .then((body) => sent({ id: reportable.id, body }))
-      .catch(() => COULD_NOT_SEND);
-    said.textContent = failed ?? "Recibimos tu denuncia. Gracias.";
+      .catch(() => said().reportCouldNotSend);
+    told.textContent = failed ?? said().reportReceived;
     submit.disabled = failed === null;
   });
 };

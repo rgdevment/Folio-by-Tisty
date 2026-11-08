@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { domPurifyCleaner } from "../src/page/ui/clean";
 import { finished } from "../src/page/ui/finish";
 import { drawFrame, type Seal } from "../src/page/ui/frame";
+import { desktopOf } from "../src/page/ui/offer-tisty";
 
-const SEAL = { verdict: "holds", fingerprint: "1", ownerFingerprint: null, diesOn: "mañana" } as const;
+const SEAL = { verdict: "holds", fingerprint: "1", ownerFingerprint: null, diesOn: 20_773 } as const;
 const ADDRESS = "https://tisty.cl/k7Qm2xPa#THEKEY";
 
 const ENERO: Page = {
@@ -82,7 +83,7 @@ beforeEach(() => {
   vi.stubGlobal("MutationObserver", place.MutationObserver);
   vi.stubGlobal("AbortController", place.AbortController);
   vi.stubGlobal("location", { href: ADDRESS, hash: "#THEKEY", assign });
-  vi.stubGlobal("navigator", {});
+  vi.stubGlobal("navigator", { languages: ["es-CL"] });
   vi.stubGlobal("scrollTo", vi.fn());
   vi.stubGlobal("addEventListener", vi.fn());
   vi.stubGlobal("requestAnimationFrame", vi.fn());
@@ -96,6 +97,27 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("the language around the sheet", () => {
+  it("is the document's when it is English, while the sheet keeps its own lang", () => {
+    draw({ ...HELD, lang: "en" });
+    expect(place.document.documentElement.lang).toBe("en");
+    expect(root.querySelector(".sheet")?.getAttribute("lang")).toBe("en");
+    expect(place.document.getElementById("seal-text")?.textContent).toBe("Valid signature");
+  });
+
+  it("is the reader's when the document is in another language, which the sheet still says", () => {
+    draw({ ...HELD, lang: "fr" });
+    expect(place.document.documentElement.lang).toBe("es");
+    expect(root.querySelector(".sheet")?.getAttribute("lang")).toBe("fr");
+    expect(place.document.getElementById("seal-text")?.textContent).toBe("Firma válida");
+  });
+
+  it("writes the last day in the language spoken", () => {
+    draw({ ...HELD, lang: "en" });
+    expect(place.document.getElementById("dies-on")?.textContent).toBe("November 16, 2026");
+  });
 });
 
 describe("a click on what the sheet links to", () => {
@@ -350,6 +372,7 @@ describe("a link that lets someone edit", () => {
     };
     vi.stubGlobal("window", place);
     vi.stubGlobal("document", place.document);
+    vi.stubGlobal("navigator", { languages: ["es-CL"] });
     vi.stubGlobal("location", place.location);
     draw(HELD);
   });
@@ -864,29 +887,107 @@ describe("editing in Tisty", () => {
   const button = () => place.document.getElementById("edit-in-tisty") as HTMLAnchorElement;
   let on: Record<string, () => void>;
 
+  const byId = (id: string) => place.document.getElementById(id) as HTMLElement;
+  const drawOn = (platform: string, maxTouchPoints = 0): void => {
+    vi.stubGlobal("navigator", { languages: ["es-CL"], platform, maxTouchPoints });
+    draw(HELD);
+    // jsdom cannot follow a link anyway.
+    button().addEventListener("click", (event) => event.preventDefault());
+  };
+
   beforeEach(() => {
     on = {};
     vi.stubGlobal("addEventListener", (name: string, run: () => void) => {
       on[name] = run;
     });
-    draw(HELD);
-    // jsdom cannot follow a link anyway.
-    button().addEventListener("click", (event) => event.preventDefault());
   });
 
   it("hands the whole link to Tisty, to edit it", () => {
+    drawOn("Win32");
     expect(button().getAttribute("href")).toBe(`tisty://edit?link=${encodeURIComponent(ADDRESS)}`);
     expect(button().textContent).toBe("Editar en Tisty");
   });
 
   it("offers Tisty on every click, since a browser never says whether it is installed", () => {
+    drawOn("Win32");
     expect(notice().hidden).toBe(true);
     button().click();
     expect(notice().hidden).toBe(false);
-    expect(notice().querySelector("a")?.getAttribute("href")).toBe("https://www.tisty.app/");
+    expect(byId("other-ways").getAttribute("href")).toBe("https://www.tisty.app/es/#install");
+  });
+
+  it("on Windows, offers the Microsoft Store without telling someone who has Tisty that they lack it", () => {
+    drawOn("Win32");
+    button().click();
+    expect(byId("get-tisty").hidden).toBe(false);
+    expect(byId("get-tisty").getAttribute("href")).toBe("https://apps.microsoft.com/detail/9PGVWXD8X93N");
+    expect(byId("get-tisty").textContent).toBe("Descargar de Microsoft Store");
+    expect(byId("not-opened").textContent).toBe("Si no se abrió, instálalo gratis y vuelve a este link.");
+    expect(notice().textContent).not.toContain("No lo tienes");
+    expect(byId("open-again").hidden).toBe(false);
+    expect(byId("opening-said").hidden).toBe(false);
+  });
+
+  it("on a Mac, offers the download Tisty publishes", () => {
+    drawOn("MacIntel");
+    button().click();
+    expect(byId("get-tisty").getAttribute("href")).toBe("https://github.com/rgdevment/Tisty/releases/latest");
+    expect(byId("get-tisty").textContent).toBe("Descargar para macOS (.dmg)");
+  });
+
+  it.each([
+    ["a phone", "iPhone", 5],
+    ["an iPad dressed as a Mac", "MacIntel", 5],
+    ["Linux", "Linux x86_64", 0],
+  ])("on %s, says Tisty is for a computer and does not follow a link that leads nowhere", (_, platform, touches) => {
+    drawOn(platform, touches);
+    const followed = new place.MouseEvent("click", { bubbles: true, cancelable: true });
+    button().dispatchEvent(followed);
+    expect(followed.defaultPrevented).toBe(true);
+    expect(byId("get-tisty").hidden).toBe(true);
+    expect(byId("open-again").hidden).toBe(true);
+    expect(byId("not-opened").textContent).toContain("Tisty es para Windows y macOS");
+    expect(byId("opening-said").hidden).toBe(true);
+  });
+
+  it("tells the computer from what the browser says of itself, and sends that nowhere", () => {
+    expect(desktopOf({ userAgentData: { platform: "Windows" } })).toBe("windows");
+    expect(desktopOf({ userAgentData: { platform: "macOS" }, platform: "MacIntel" })).toBe("mac");
+    expect(desktopOf({ platform: "Linux armv8l", userAgent: "Mozilla/5.0 (Linux; Android 15)" })).toBeNull();
+    expect(desktopOf({ userAgentData: { platform: "Chrome OS" } })).toBeNull();
+    expect(desktopOf({ platform: "Linux x86_64", userAgent: "Mozilla/5.0 (X11; CrOS x86_64 16002.44.0)" })).toBeNull();
+    expect(
+      desktopOf({
+        platform: "Win32",
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Microsoft Outlook 16.0.18129",
+      }),
+    ).toBe("windows");
+    expect(desktopOf({})).toBeNull();
+  });
+
+  it("says its ways again in the language the page changes to while it is open", async () => {
+    drawOn("Win32");
+    button().click();
+    place.document.documentElement.lang = "en";
+    await Promise.resolve();
+    expect(byId("get-tisty").textContent).toBe("Get it from the Microsoft Store");
+    expect(byId("not-opened").textContent).toBe("If nothing opened, install it for free and come back to this link.");
+  });
+
+  it("opens the same link again for whoever already has it", () => {
+    drawOn("Win32");
+    let asked = 0;
+    button().addEventListener("click", () => {
+      asked += 1;
+    });
+    button().click();
+    byId("open-again").click();
+    expect(asked).toBe(2);
+    expect(notice().hidden).toBe(false);
   });
 
   it("stays while the focus is away, and closes when the reader comes back from the app", () => {
+    drawOn("Win32");
     button().click();
     on.blur?.();
     expect(notice().hidden).toBe(false);
@@ -895,6 +996,7 @@ describe("editing in Tisty", () => {
   });
 
   it("stays if the focus never left, and closes when asked", () => {
+    drawOn("Win32");
     button().click();
     on.focus?.();
     expect(notice().hidden).toBe(false);
@@ -903,6 +1005,7 @@ describe("editing in Tisty", () => {
   });
 
   it("does not close by itself on a later visit to the window, once it was closed by hand", () => {
+    drawOn("Win32");
     button().click();
     place.document.getElementById("opening-tisty-close")?.click();
     on.blur?.();

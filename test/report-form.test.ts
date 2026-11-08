@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { REPORT_CATEGORIES } from "../src/core/limits";
 import { offerReport } from "../src/page/ui/report";
 import { solved } from "../src/page/ui/solve";
+import { speak } from "../src/page/ui/speak";
 
 vi.mock("../src/page/ui/solve", () => ({ solved: vi.fn(async () => "the proof") }));
 
@@ -41,6 +42,9 @@ beforeEach(async () => {
   place.HTMLDialogElement.prototype.showModal = vi.fn();
   place.HTMLDialogElement.prototype.close = vi.fn();
   vi.stubGlobal("document", place.document);
+  vi.stubGlobal("MutationObserver", place.MutationObserver);
+  vi.stubGlobal("navigator", { languages: ["es-CL"] });
+  speak();
   vi.stubGlobal("FormData", place.FormData);
   asked = vi.fn(async () => answer(202, { received: true }));
   vi.stubGlobal("fetch", asked);
@@ -80,6 +84,15 @@ describe("the report form", () => {
     choose("phishing");
     expect(element("report-consent").hidden).toBe(false);
     expect(element("report-consent-said").textContent).toContain("Lo cifras aquí");
+  });
+
+  it("says again what happens to the link when the page changes language, and drops what it said before", async () => {
+    choose("csam");
+    element("report-said").textContent = "Enviando…";
+    place.document.documentElement.lang = "en";
+    await Promise.resolve();
+    expect(element("report-consent-said").textContent).toContain("This report hands over the link encrypted");
+    expect(element("report-said").textContent).toBe("");
   });
 
   it("sends the link on a grave report whatever the box says, as after a browser restores the form", async () => {

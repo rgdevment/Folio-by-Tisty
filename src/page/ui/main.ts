@@ -3,11 +3,11 @@ import "./frame.css";
 import { type CaseLink, caseOfFragment, keyOfFragment } from "../link";
 import { askFor } from "./ask";
 import { drawClosed } from "./closed";
+import { said, speak } from "./speak";
 import { offerThemes } from "./theme";
 
 const ID_PATH = /^\/[A-Za-z0-9]{8}$/;
 const NOT_FOUND = "https://www.tisty.app/404";
-const COULD_NOT_OPEN = "No se pudo abrir el documento. Recarga la página para volver a intentarlo.";
 
 const showSample = async (): Promise<void> => {
   const [{ SAMPLE, SAMPLE_SEAL }, { drawFrame }, { domPurifyCleaner }] = await Promise.all([
@@ -36,6 +36,7 @@ const opening = (id: string): Promise<void> => {
   return caseLink ? showAskedCase(id, caseLink) : showAsked(id);
 };
 
+speak();
 offerThemes();
 
 if (import.meta.env.MODE !== "production") {
@@ -44,7 +45,7 @@ if (import.meta.env.MODE !== "production") {
   // Here and not further in: the code that failed may be the code that would have said so.
   await opening(location.pathname.slice(1)).catch((error: unknown) => {
     console.error(error);
-    drawClosed(COULD_NOT_OPEN);
+    drawClosed(said().couldNotOpen);
   });
 } else {
   location.replace(NOT_FOUND);
