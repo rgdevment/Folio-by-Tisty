@@ -1,8 +1,9 @@
 import type { Document, Revocation, Verdict } from "@tisty/contracts";
 import { type Bytes, fromBase64Url } from "../core/bytes";
-import { type Standing, standingOf } from "../core/look-alike";
+import { type Standing, standingOf, stillSpeaks } from "../core/look-alike";
 import { momentOf } from "../core/moment";
 import { refuse } from "../rules/envelope";
+import { isChecked, type ShardLoader } from "./checked";
 import { MAKER } from "./maker";
 import { documentIn, openEnvelope } from "./open";
 import { fingerprintOf, verdictOf, worseOf } from "./verdict";
@@ -37,7 +38,19 @@ export const keyIn = (said: string): Bytes | undefined => {
   }
 };
 
-export const openLink = async (id: string, linkKey: string, arrived: Arrived): Promise<Opened> => {
+export const standingFor = async (
+  root: string,
+  verdict: Verdict,
+  alias: string | undefined,
+  load?: ShardLoader,
+  shards?: ReadonlySet<string>,
+): Promise<Standing> => {
+  const standing = standingOf(root, verdict, alias, MAKER);
+  if (standing !== "plain" || !stillSpeaks(verdict)) return standing;
+  return (await isChecked(root, alias, load, shards)) ? "checked" : standing;
+};
+
+export const openLink = async (id: string, linkKey: string, arrived: Arrived, load?: ShardLoader): Promise<Opened> => {
   const open = await openEnvelope(arrived.bytes, { id, kind: "main" }, keyIn(linkKey));
   const held = await documentIn(open);
   const served = { received: momentOf(arrived.arrivedAt), revocations: arrived.revocations ?? [] };
@@ -45,14 +58,18 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived): P
   const signer = await verdictOf(signature, served);
   const owner = manifest.owner;
   const ownerVerdict = owner ? await verdictOf(owner, served) : signer;
+  const [signerStanding, ownerStanding] = await Promise.all([
+    standingFor(signature.root, signer, held.signed_as, load),
+    standingFor(owner?.root ?? signature.root, ownerVerdict, held.owner_name, load),
+  ]);
   return {
     held,
     pictures: open.opened.slice(FIRST_PICTURE_PART),
     verdict: worseOf(signer, ownerVerdict),
     fingerprint: await fingerprintOf(signature.root),
     ownerFingerprint: owner && owner.root !== signature.root ? await fingerprintOf(owner.root) : null,
-    signerStanding: standingOf(signature.root, signer, held.signed_as, MAKER),
-    ownerStanding: standingOf(owner?.root ?? signature.root, ownerVerdict, held.owner_name, MAKER),
+    signerStanding,
+    ownerStanding,
     diesOn: arrived.diesOn,
   };
 };

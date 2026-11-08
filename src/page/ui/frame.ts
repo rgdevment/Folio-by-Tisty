@@ -248,11 +248,13 @@ const drawName = (who: "signer" | "owner", alias: string | undefined, standing: 
   const verified = standing === "verified";
   element(who).textContent = (verified && MAKER ? shownNameOf(MAKER) : alias) ?? said().noName;
   element(`${who}-verified`).hidden = !verified;
+  element(`${who}-checked`).hidden = standing !== "checked";
   const note = element(`${who}-note`);
   const notes: Record<Standing, string> = {
     verified: MAKER?.name === undefined ? "" : (MAKER.domain ?? ""),
     imitates: said().anotherKey,
     takenBack: said().takenBack,
+    checked: "",
     plain: "",
   };
   note.textContent = notes[standing];

@@ -6,7 +6,7 @@ export interface Maker {
   domain?: string;
 }
 
-export type Standing = "verified" | "imitates" | "takenBack" | "plain";
+export type Standing = "verified" | "imitates" | "takenBack" | "checked" | "plain";
 
 const LOOKS_LATIN: Record<string, string> = {
   а: "a",
@@ -87,11 +87,13 @@ export const imitates = (alias: string, name: string): boolean => looksLike(skel
 
 const STILL_SPEAKS: Verdict[] = ["holds", "retired"];
 
+export const stillSpeaks = (verdict: Verdict): boolean => STILL_SPEAKS.includes(verdict);
+
 export const shownNameOf = (maker: Maker): string | undefined => maker.name ?? maker.domain;
 
 export const standingOf = (root: string, verdict: Verdict, alias: string | undefined, maker?: Maker): Standing => {
   if (maker === undefined || shownNameOf(maker) === undefined) return "plain";
-  if (root === maker.root) return STILL_SPEAKS.includes(verdict) ? "verified" : "takenBack";
+  if (root === maker.root) return stillSpeaks(verdict) ? "verified" : "takenBack";
   const names = [maker.name, maker.domain].filter((name) => name !== undefined);
   return alias !== undefined && names.some((name) => imitates(alias, name)) ? "imitates" : "plain";
 };

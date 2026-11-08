@@ -25,6 +25,8 @@
     "test/ask.test.ts",
     "test/frame.test.ts",
     "test/limits-file.test.ts",
+    "test/limits-maker.test.ts",
+    "test/domains.test.ts",
     "test/limits-published.test.ts",
     "test/files.test.ts",
     "test/report-form.test.ts",

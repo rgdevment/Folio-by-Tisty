@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { domainFaults, type Lookup, makerFaults, recordName } from "../scripts/limits-maker";
+import { type Lookup, recordName } from "../scripts/dns";
+import { domainFaults, makerFaults } from "../scripts/limits-maker";
 
 const ROOT = "A".repeat(43);
 const MAKER = { root: ROOT, name: "rgdevment", domain: "rgdevment.dev" };

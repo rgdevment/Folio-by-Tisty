@@ -554,7 +554,7 @@ describe("whom it names", () => {
   const byId = (id: string) => place.document.getElementById(id) as HTMLElement;
   const drawStanding = (
     signedAs: string | undefined,
-    signerStanding: "verified" | "imitates" | "takenBack" | "plain",
+    signerStanding: "verified" | "imitates" | "takenBack" | "checked" | "plain",
   ) => {
     const cleaner = domPurifyCleaner(place);
     drawFrame({
@@ -588,6 +588,14 @@ describe("whom it names", () => {
     expect(byId("signer-verified").hidden).toBe(true);
     expect(byId("signer-note").textContent).toBe("Llave retirada: ya no habla por este nombre");
     expect(byId("signer-note").classList.contains("is-warning")).toBe(true);
+  });
+
+  it("shows a checked domain as its own name, tagged apart from the maker's mark", () => {
+    drawStanding("ana.dev", "checked");
+    expect(byId("signer").textContent).toBe("ana.dev");
+    expect(byId("signer-checked").hidden).toBe(false);
+    expect(byId("signer-verified").hidden).toBe(true);
+    expect(byId("signer-note").hidden).toBe(true);
   });
 
   it("leaves any other name with nothing beside it", () => {

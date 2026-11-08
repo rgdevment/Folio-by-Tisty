@@ -13,3 +13,7 @@
 /assets/*
   ! Cache-Control
   Cache-Control: public, max-age=31536000, immutable
+
+/domains/*
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
