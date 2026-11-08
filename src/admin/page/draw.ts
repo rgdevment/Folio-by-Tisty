@@ -85,7 +85,62 @@ const ownerLine = (page: Document, owner: Owner | undefined, today: number): HTM
 const seeingKey = (page: Document, owner: Owner | undefined, doing: Doing): HTMLButtonElement[] =>
   owner ? [button(page, "Ver la llave", () => doing.showKey(owner.root))] : [];
 
-const reportCard = (page: Document, report: QueuedReport, doing: Doing, owner: Owner | undefined, today: number) => {
+interface Standing {
+  nets: number;
+  asns: Set<number>;
+  counting: number;
+  countingAsns: Set<number>;
+  blocked: boolean;
+}
+
+// As the server counts toward a block: not from a false or capped network, and a grave one only with its link.
+const counts = (report: QueuedReport): boolean =>
+  !report.fromFalseNet &&
+  !report.overCap &&
+  (report.level === "medium" || (report.level === "grave" && report.sealedLink !== null));
+
+const standingsOf = (queue: Queue): Map<string, Standing> => {
+  const blocked = new Set(queue.docs.map((one) => one.id));
+  const standings = new Map<string, Standing>();
+  for (const report of queue.reports) {
+    const standing = standings.get(report.doc) ?? {
+      nets: 0,
+      asns: new Set<number>(),
+      counting: 0,
+      countingAsns: new Set<number>(),
+      blocked: blocked.has(report.doc),
+    };
+    standing.nets += 1;
+    standing.asns.add(report.asn);
+    if (counts(report)) {
+      standing.counting += 1;
+      standing.countingAsns.add(report.asn);
+    }
+    standings.set(report.doc, standing);
+  }
+  return standings;
+};
+
+const standingText = (report: QueuedReport, standing: Standing | undefined): string => {
+  if (!standing) return "";
+  const { reportsToBlock, reportOperatorsToBlock } = LEVEL_ONE;
+  const reported = `${standing.nets} ${standing.nets === 1 ? "red" : "redes"} de ${standing.asns.size} ${standing.asns.size === 1 ? "proveedor" : "proveedores"}`;
+  const state = standing.blocked
+    ? "bloqueado"
+    : report.level === "light"
+      ? ""
+      : `${standing.counting} de ${reportsToBlock} redes y ${standing.countingAsns.size} de ${reportOperatorsToBlock} proveedores para bloquear`;
+  return [reported, state, report.sealedLink ? "trae link sellado" : ""].filter((one) => one).join(" · ");
+};
+
+const reportCard = (
+  page: Document,
+  report: QueuedReport,
+  doing: Doing,
+  owner: Owner | undefined,
+  today: number,
+  standing: Standing | undefined,
+) => {
   const card = page.createElement("article");
   card.className = report.level === "grave" ? "card is-grave" : report.level === "medium" ? "card is-medium" : "card";
   card.dataset.level = report.level;
@@ -97,7 +152,7 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing, owner: O
       piece(page, "code", "mono soft", report.doc),
       piece(page, "span", "soft", `· versión ${report.version} · operador ${report.asn} · ${dayText(report.at)}`),
       piece(page, "span", "grow", ""),
-      piece(page, "span", "soft", report.sealedLink ? "trae link sellado" : ""),
+      piece(page, "span", "soft", standingText(report, standing)),
     ),
   );
   if (report.detail) card.append(piece(page, "p", "card-detail", report.detail));
@@ -268,6 +323,7 @@ export const drawQueue = (page: Document, queue: Queue, doing: Doing, owners: Ow
   place("state").textContent = `Servicio ${STAGES[queue.stage] ?? queue.stage}`;
   place("state").className = `stage-chip is-${queue.stage}`;
   const appeals = queue.docs.filter((one) => one.waitsForOperator);
+  const standings = standingsOf(queue);
   filled(
     place("appeals"),
     page,
@@ -278,7 +334,7 @@ export const drawQueue = (page: Document, queue: Queue, doing: Doing, owners: Ow
     place("reports"),
     page,
     [
-      ...queue.reports.map((one) => reportCard(page, one, doing, owners[one.doc], today)),
+      ...queue.reports.map((one) => reportCard(page, one, doing, owners[one.doc], today, standings.get(one.doc))),
       ...pagesOfReports(page, queue, doing),
     ],
     "Ninguna.",

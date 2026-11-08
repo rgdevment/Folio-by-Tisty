@@ -521,6 +521,29 @@ describe("the panel", () => {
     expect(second?.textContent).not.toContain("Abrir denuncia");
   });
 
+  it("says how many networks and providers reported each document, and how far it is from a block", () => {
+    const [first, second] = (page.getElementById("reports") as Element).querySelectorAll(".card");
+    expect(first?.textContent).toContain("1 red de 1 proveedor · bloqueado · trae link sellado");
+    expect(second?.textContent).toContain("1 red de 1 proveedor · 0 de 3 redes y 0 de 2 proveedores para bloquear");
+    const [grave, medium] = QUEUE.reports as [(typeof QUEUE.reports)[number], (typeof QUEUE.reports)[number]];
+    drawQueue(
+      page,
+      {
+        ...QUEUE,
+        docs: [],
+        reports: [
+          { ...medium, fromFalseNet: false, net: "a", asn: 1 },
+          { ...medium, fromFalseNet: false, net: "b", asn: 2 },
+          { ...medium, fromFalseNet: false, net: "c", asn: 2, overCap: true },
+          { ...grave, doc: "IjKlMnOp", sealedLink: null, net: "d", asn: 9 },
+        ],
+      },
+      doing as unknown as Doing,
+    );
+    const counted = (page.getElementById("reports") as Element).querySelector(".card")?.textContent;
+    expect(counted).toContain("4 redes de 3 proveedores · 2 de 3 redes y 2 de 2 proveedores para bloquear");
+  });
+
   it("says which reports come from a network already marked false", () => {
     const [first, second] = (page.getElementById("reports") as Element).querySelectorAll(".card");
     expect(first?.textContent).not.toContain("denuncia falsa");
