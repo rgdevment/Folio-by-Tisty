@@ -109,6 +109,14 @@
 
         <section class="panel" id="panel-details" aria-labelledby="title-details">
           <h2 id="title-details" data-say="details">Details</h2>
+          <p class="trust">
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7.5" rx="1.5" /><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" /></svg>
+            <span><span data-say="encrypted">End-to-end encrypted (AES-256-GCM): the server keeps bytes it cannot read.</span> <a data-say="howItWorks" href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/SECURITY.md" data-say-href="howItWorksAt" rel="noopener noreferrer">How it works</a></span>
+          </p>
+          <dl class="facts facts-first">
+            <div><dt data-say="expires">Deletes itself on</dt><dd><span class="dies-on" id="dies-on"></span> <span class="fact-note" data-say="expiresNote">Every read pushes it back.</span></dd></div>
+            <div><dt data-say="access">Access</dt><dd data-say="onlyWithTheLink">Only with the link</dd></div>
+          </dl>
           <dl class="facts">
             <div><dt data-say="signedAs">Whoever signed it goes by</dt><dd><bdi id="signer"></bdi></dd></div>
             <div><dt data-say="fingerprint">Fingerprint</dt><dd class="fingerprint" id="fingerprint"></dd></div>
@@ -122,10 +130,6 @@
             <p data-say="howToCheckSaid">Ask whoever sent it for the fingerprint, through another channel, and compare them. The signature says who wrote it, not that the content is safe. If that key was taken back, this page says so, as the server reports it.</p>
           </details>
           <dl class="facts" id="details"></dl>
-          <dl class="facts facts-next">
-            <div><dt data-say="access">Access</dt><dd data-say="onlyWithTheLink">Only with the link</dd></div>
-            <div><dt data-say="expires">Expires</dt><dd id="dies-on"></dd></div>
-          </dl>
         </section>
 
         <section class="foot">

@@ -80,6 +80,18 @@ describe("the page's words", () => {
     expect(linkSaying("Security")?.href).toContain("/docs/SECURITY.md");
   });
 
+  it("say in the details how the document is kept, and where to read how it works", () => {
+    speak("es");
+    expect(page.querySelector(".trust")?.textContent).toContain(
+      "Cifrado de extremo a extremo (AES-256-GCM): el servidor guarda bytes que no puede leer.",
+    );
+    expect(linkSaying("Cómo funciona")?.href).toContain("/docs/SEGURIDAD.md");
+    expect(page.querySelector("#panel-details .facts")?.textContent).toContain("Se borra solo el");
+    speak("en");
+    expect(page.querySelector(".trust")?.textContent).toContain("End-to-end encrypted (AES-256-GCM)");
+    expect(linkSaying("How it works")?.href).toContain("/docs/SECURITY.md");
+  });
+
   it("invite to install Tisty from the site in the language spoken", () => {
     speak("es");
     expect(linkSaying("Descargar Tisty")?.href).toBe("https://www.tisty.app/es/#install");
