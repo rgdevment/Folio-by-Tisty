@@ -1333,7 +1333,7 @@ body::before {
     position: fixed;
     inset: auto 0 0;
     z-index: 5;
-    max-height: 72dvh;
+    max-height: 72vh;
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-padding-bottom: var(--dock-room);
@@ -1342,6 +1342,12 @@ body::before {
     border: 0;
     border-radius: 18px 18px 0 0;
     box-shadow: 0 -12px 40px var(--shade-far);
+  }
+
+  @supports (height: 1dvh) {
+    .panel:not(.panel-actions) {
+      max-height: 72dvh;
+    }
   }
 
   .panel[data-open] {

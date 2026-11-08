@@ -28,7 +28,7 @@ afterEach(() => {
 describe("the page's words", () => {
   it("are, before anything speaks, the English ones it falls back to", () => {
     for (const one of page.querySelectorAll<HTMLElement>("[data-say]")) {
-      expect(one.textContent, one.dataset.say).toBe(WORDS.en[one.dataset.say as "print"]);
+      expect(one.textContent, `${one.dataset.say}: run npm run words`).toBe(WORDS.en[one.dataset.say as "print"]);
     }
     expect(page.documentElement.lang).toBe("en");
   });

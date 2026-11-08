@@ -12,10 +12,14 @@ const fill = (words: Words, attribute: string, put: (one: HTMLElement, word: str
   }
 };
 
+export const onSpeechChange = (run: () => void): void => {
+  new MutationObserver(run).observe(document.documentElement, { attributeFilter: ["lang"] });
+};
+
 export const speak = (documentLang?: string): void => {
   const speech = readerSpeech(documentLang, navigator.languages ?? []);
   const words = WORDS[speech];
-  document.documentElement.lang = speech;
+  if (document.documentElement.lang !== speech) document.documentElement.lang = speech;
   fill(words, "", (one, word) => {
     one.textContent = word;
   });

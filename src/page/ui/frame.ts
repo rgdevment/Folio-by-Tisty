@@ -1,16 +1,11 @@
 import type { Document, Orientation, Page, Paper, Verdict } from "@tisty/contracts";
 import { cardsFor, referenceOf } from "./cards";
 import { bareUrl } from "./clean";
+import { element } from "./element";
 import { desktopOf, offerTisty, type Platform } from "./offer-tisty";
 import { offerPrinting } from "./print";
 import sheetStyles from "./sheet.css?url";
 import { said, speak } from "./speak";
-
-export const element = <T extends HTMLElement>(id: string): T => {
-  const found = document.getElementById(id);
-  if (!found) throw new Error(`the page has no #${id}`);
-  return found as T;
-};
 
 // From the sheet contract: what paper measures, in millimetres, and how it is worked out on screen.
 const PAPER_MILLIMETRES: Record<Paper, [number, number]> = {

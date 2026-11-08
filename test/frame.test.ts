@@ -955,7 +955,23 @@ describe("editing in Tisty", () => {
     expect(desktopOf({ userAgentData: { platform: "macOS" }, platform: "MacIntel" })).toBe("mac");
     expect(desktopOf({ platform: "Linux armv8l", userAgent: "Mozilla/5.0 (Linux; Android 15)" })).toBeNull();
     expect(desktopOf({ userAgentData: { platform: "Chrome OS" } })).toBeNull();
+    expect(desktopOf({ platform: "Linux x86_64", userAgent: "Mozilla/5.0 (X11; CrOS x86_64 16002.44.0)" })).toBeNull();
+    expect(
+      desktopOf({
+        platform: "Win32",
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Microsoft Outlook 16.0.18129",
+      }),
+    ).toBe("windows");
     expect(desktopOf({})).toBeNull();
+  });
+
+  it("says its ways again in the language the page changes to while it is open", async () => {
+    drawOn("Win32");
+    button().click();
+    place.document.documentElement.lang = "en";
+    await Promise.resolve();
+    expect(byId("get-tisty").textContent).toBe("Get it from the Microsoft Store");
+    expect(byId("not-opened").textContent).toBe("If nothing opened, install it for free and come back to this link.");
   });
 
   it("opens the same link again for whoever already has it", () => {

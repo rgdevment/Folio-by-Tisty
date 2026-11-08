@@ -1,5 +1,5 @@
-import { element } from "./frame";
-import { said } from "./speak";
+import { element } from "./element";
+import { onSpeechChange, said } from "./speak";
 
 export type Desktop = "windows" | "mac";
 
@@ -14,7 +14,7 @@ const DOWNLOADS: Record<Desktop, string> = {
   windows: "https://apps.microsoft.com/detail/9PGVWXD8X93N",
   mac: "https://github.com/rgdevment/Tisty/releases/latest",
 };
-const HANDHELD = /android|iphone|ipad|ipod|cros/i;
+const HANDHELD = /\b(android|iphone|ipad|ipod|cros)\b/i;
 
 export const desktopOf = ({
   userAgentData,
@@ -65,4 +65,7 @@ export const offerTisty = (edit: HTMLAnchorElement, desktop: Desktop | null): vo
     leftForTheApp = !notice.hidden;
   });
   addEventListener("focus", closeOnComingBackFromTheApp);
+  onSpeechChange(() => {
+    if (!notice.hidden) drawWays(desktop);
+  });
 };

@@ -1,9 +1,9 @@
 import { LEVEL_ONE, levelOfReport } from "../../core/limits";
 import { holdsALink } from "../../core/sealed-link";
-import { element } from "./frame";
+import { element } from "./element";
 import { sealContact, sealLink } from "./seal";
 import { solved } from "./solve";
-import { said } from "./speak";
+import { onSpeechChange, said } from "./speak";
 
 export interface Reportable {
   id: string;
@@ -78,9 +78,15 @@ export const offerReport = (shown: () => Reportable): void => {
   button.disabled = false;
   button.addEventListener("click", () => dialog.showModal());
   element<HTMLButtonElement>("report-cancel").addEventListener("click", () => dialog.close());
-  form.addEventListener("change", () => {
+  const sayHandingOver = (): void => {
     const category = categoryOf();
     const level = levelOfReport(category);
+    const { reportChildAbuse, reportAlwaysOnGrave, reportSealed } = said();
+    handingOverSaid.textContent =
+      category === "csam" ? reportChildAbuse : level === "grave" ? reportAlwaysOnGrave : reportSealed;
+  };
+  form.addEventListener("change", () => {
+    const level = levelOfReport(categoryOf());
     const wasRequired = handOver.disabled;
     consent.hidden = level === "light" || level === null;
     contactBox.hidden = consent.hidden;
@@ -88,9 +94,11 @@ export const offerReport = (shown: () => Reportable): void => {
     handOver.disabled = level === "grave";
     if (level === "grave") handOver.checked = true;
     else if (wasRequired || consent.hidden) handOver.checked = false;
-    const { reportChildAbuse, reportAlwaysOnGrave, reportSealed } = said();
-    handingOverSaid.textContent =
-      category === "csam" ? reportChildAbuse : level === "grave" ? reportAlwaysOnGrave : reportSealed;
+    sayHandingOver();
+  });
+  onSpeechChange(() => {
+    sayHandingOver();
+    told.textContent = "";
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

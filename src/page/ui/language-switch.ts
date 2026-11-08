@@ -1,4 +1,4 @@
-import { element } from "./frame";
+import { element } from "./element";
 import { said } from "./speak";
 
 export interface LanguageSwitch {

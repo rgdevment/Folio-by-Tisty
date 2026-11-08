@@ -29,6 +29,5 @@ export const preferredTranslation = (
 
 const speechOf = (lang: string | undefined): Speech | undefined => SPOKEN.find((one) => one === primaryOf(lang ?? ""));
 
-// The document's own language first, since whoever shared it wrote around it; then the reader's; then English.
 export const readerSpeech = (documentLang: string | undefined, wanted: readonly string[]): Speech =>
   speechOf(documentLang) ?? wanted.map(speechOf).find((one) => one !== undefined) ?? "en";

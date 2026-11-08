@@ -42,6 +42,7 @@ beforeEach(async () => {
   place.HTMLDialogElement.prototype.showModal = vi.fn();
   place.HTMLDialogElement.prototype.close = vi.fn();
   vi.stubGlobal("document", place.document);
+  vi.stubGlobal("MutationObserver", place.MutationObserver);
   vi.stubGlobal("navigator", { languages: ["es-CL"] });
   speak();
   vi.stubGlobal("FormData", place.FormData);
@@ -83,6 +84,15 @@ describe("the report form", () => {
     choose("phishing");
     expect(element("report-consent").hidden).toBe(false);
     expect(element("report-consent-said").textContent).toContain("Lo cifras aquí");
+  });
+
+  it("says again what happens to the link when the page changes language, and drops what it said before", async () => {
+    choose("csam");
+    element("report-said").textContent = "Enviando…";
+    place.document.documentElement.lang = "en";
+    await Promise.resolve();
+    expect(element("report-consent-said").textContent).toContain("This report hands over the link encrypted");
+    expect(element("report-said").textContent).toBe("");
   });
 
   it("sends the link on a grave report whatever the box says, as after a browser restores the form", async () => {

@@ -1,4 +1,4 @@
-import { said } from "./speak";
+import { onSpeechChange, said } from "./speak";
 
 type Theme = "light" | "dark";
 
@@ -50,6 +50,6 @@ export const offerThemes = (): void => {
     else change();
   });
   system.addEventListener("change", draw);
-  new MutationObserver(draw).observe(root, { attributeFilter: ["lang"] });
+  onSpeechChange(draw);
   draw();
 };
