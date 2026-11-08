@@ -11,7 +11,7 @@ import type {
 } from "../../core/dashboard";
 import { drawAbout, drawDays, drawHealth, drawLog, drawNets, drawTiles, type Overlook } from "./board";
 import { madeCase } from "./case";
-import { type Doing, drawQueue } from "./draw";
+import { type Doing, drawQueue, sayWhenEmpty } from "./draw";
 import { drawKey } from "./key";
 import { count, isoDay, megabytes, piece, shortKey, todayOf } from "./say";
 import { asked, fetched, fetchedAt, sent } from "./talk";
@@ -150,10 +150,18 @@ class Panel {
     );
   }
 
+  // Asked from a card far below, so the key's box comes into sight instead of changing out of view.
+  async #seeingKey(root: string): Promise<void> {
+    const where = this.#place("key");
+    where.replaceChildren(piece(this.#page, "p", "card-line", "Trayendo la llave…"));
+    where.closest("section")?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    await this.#showKey(root);
+  }
+
   #loadTop(): Promise<void> {
     const where = this.#place("top");
     return this.#shown<Top>(`top?by=${this.#topOrder}${this.#topFlagged ? "&flagged=1" : ""}`, where, (top) =>
-      drawTop(this.#page, where, top, Date.now(), { showKey: (root) => void this.#showKey(root) }),
+      drawTop(this.#page, where, top, Date.now(), { showKey: (root) => void this.#seeingKey(root) }),
     );
   }
 
@@ -289,7 +297,7 @@ class Panel {
           `docs/${id}/handed_over`,
         ),
       copy: (command, then, where) => this.#handing(command, then, where),
-      showKey: (root) => void this.#showKey(root),
+      showKey: (root) => void this.#seeingKey(root),
     };
   }
 
@@ -364,6 +372,7 @@ class Panel {
       if (!pressed) return;
       place("queue").dataset.filter = pressed.dataset.filter ?? "all";
       pressedIn(place("queue-filters"), pressed, "data-filter");
+      sayWhenEmpty(this.#page);
     });
     place("top-order").addEventListener("click", (event) => {
       const pressed = (event.target as HTMLElement).closest<HTMLElement>("button");

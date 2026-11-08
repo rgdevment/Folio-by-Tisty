@@ -378,7 +378,9 @@ describe("the top documents", () => {
   });
 
   it("tells one no longer served from one served until today", async () => {
-    await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'Llllllll'").bind(TODAY - 1).run();
+    await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'Llllllll'")
+      .bind(TODAY - 1)
+      .run();
     await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'Bbbbbbbb'").bind(TODAY).run();
     const top = await dashboard.top(NOW, "oldest", false);
     expect(ofTop(top, "Llllllll")?.stopped).toBe(true);

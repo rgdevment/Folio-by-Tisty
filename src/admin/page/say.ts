@@ -21,11 +21,24 @@ export const button = (page: Document, said: string, press: () => void, danger =
   return one;
 };
 
-export const actions = (page: Document, ...buttons: HTMLButtonElement[]): HTMLElement => {
+export const actions = (page: Document, ...buttons: HTMLElement[]): HTMLElement => {
   const row = page.createElement("div");
   row.className = "actions";
   row.append(...buttons);
   return row;
+};
+
+export const more = (page: Document, ...buttons: HTMLButtonElement[]): HTMLElement[] => {
+  if (buttons.length === 0) return [];
+  const folded = page.createElement("details");
+  folded.className = "more";
+  const said = page.createElement("summary");
+  said.textContent = "Más";
+  const list = page.createElement("div");
+  list.className = "more-list";
+  list.append(...buttons);
+  folded.append(said, list);
+  return [folded];
 };
 
 export const bar = (page: Document, share: number, tone: Tone, marks: number[] = []): HTMLElement => {
@@ -99,8 +112,4 @@ export const cell = (page: Document, said: string, className = ""): HTMLTableCel
   if (className) one.className = className;
   one.textContent = said;
   return one;
-};
-
-export const filled = (place: Element, page: Document, cards: HTMLElement[], none: string): void => {
-  place.replaceChildren(...(cards.length > 0 ? cards : [piece(page, "p", "card-line", none)]));
 };

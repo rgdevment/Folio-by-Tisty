@@ -1,7 +1,7 @@
 import type { Owner } from "../../core/dashboard";
 import { LEVEL_ONE } from "../../core/limits";
 import type { Queue, QueuedDoc, QueuedReport, QueuedWarning } from "../../core/queue";
-import { actions, button, daysText, dayText, filled, megabytes, piece, shortKey } from "./say";
+import { actions, button, daysText, dayText, megabytes, more, piece, shortKey } from "./say";
 
 export interface Doing {
   accept: (id: string) => void;
@@ -61,6 +61,9 @@ const signersText = ({ signers }: QueuedDoc): string => {
 };
 
 const REPORTS_KEY = "~/folio-reports.key";
+const CHECKING =
+  "Cambia <link para verificar> por uno del panel, entre las comillas. Dice si la llave abre ese documento, sin leer nada.";
+const CONTACT = "Imprime el correo que dejó quien denunció.";
 
 const openCommand = (doc: string, sealed: string): string =>
   `node scripts/report-key.mjs open ${REPORTS_KEY} ${doc} ${sealed}`;
@@ -71,21 +74,27 @@ const checkCommand = (doc: string, sealed: string): string =>
 const keyAge = (owner: Owner, today: number): string =>
   owner.firstDay === null ? "llave sin registro" : `llave de ${daysText(today - owner.firstDay)}`;
 
-const ownerLine = (page: Document, owner: Owner | undefined, today: number): HTMLElement[] => {
+const ownerLine = (page: Document, owner: Owner | undefined, today: number, doing: Doing): HTMLElement[] => {
   if (!owner) return [];
   const line = page.createElement("p");
   line.className = "card-line owner-line";
+  const seeing = button(page, "Ver la llave", () => doing.showKey(owner.root));
+  seeing.classList.add("is-link");
   line.append(
     "Dueño ",
     piece(page, "code", "mono", shortKey(owner.root)),
     ` · ${keyAge(owner, today)} · guarda ${megabytes(owner.holds)} de ${megabytes(LEVEL_ONE.keyBytesAtMost)}`,
     ...(owner.blockedAt === null ? [] : [" · bloqueada"]),
+    " · ",
+    seeing,
   );
   return [line];
 };
 
-const seeingKey = (page: Document, owner: Owner | undefined, doing: Doing): HTMLButtonElement[] =>
-  owner ? [button(page, "Ver la llave", () => doing.showKey(owner.root))] : [];
+const againstOwner = (page: Document, doc: string, ownerToBlock: string | null, doing: Doing): HTMLButtonElement[] => [
+  ...(ownerToBlock ? [button(page, "Bloquear llave del dueño", () => doing.blockKey(ownerToBlock), true)] : []),
+  button(page, "Borrar todo de esta llave", () => doing.purgeOwner(doc), true),
+];
 
 interface Standing {
   nets: number;
@@ -164,30 +173,9 @@ const reportCard = (
     );
   if (report.fromFalseNet)
     card.append(piece(page, "p", "card-line", "Esta red ya tuvo una denuncia falsa: no cuenta para bloquear."));
-  const buttons = [
-    button(page, "Link para verificar", () => doing.verifyLink(report.doc, report.version)),
-    button(page, "Era falsa", () => doing.reportWasFalse(report.doc, report.net)),
-    button(page, "Botón de pánico", () => doing.panic(report.doc, report.version), true),
-    button(page, "Borrar todo de esta llave", () => doing.purgeOwner(report.doc), true),
-  ];
-  if (report.fromFalseNet) {
-    buttons.push(
-      button(page, "Descartar todas las de esta red", () => doing.networkWasFalse(report.doc, report.net), true),
-    );
-  }
-  const { ownerToBlock } = report;
-  if (ownerToBlock) buttons.push(button(page, "Bloquear llave del dueño", () => doing.blockKey(ownerToBlock), true));
-  if (report.sealedLink) {
-    const sealed = report.sealedLink;
-    buttons.unshift(
-      button(page, "Abrir denuncia", () => doing.openReport(report.doc, openCommand(report.doc, sealed), card)),
-      button(page, "Comprobar sin abrir", () =>
-        doing.copy(checkCommand(report.doc, sealed), "Cambia <link para verificar> por uno del panel, entre las comillas. Dice si la llave abre ese documento, sin leer nada.", card),
-      ),
-    );
-  }
-  if (report.sealedContact) {
-    const contact = report.sealedContact;
+  const sealed = report.sealedLink;
+  const contact = report.sealedContact;
+  if (contact)
     card.append(
       piece(
         page,
@@ -196,14 +184,33 @@ const reportCard = (
         "Trae un correo sin comprobar: al escribir, no nombres el documento ni lo denunciado.",
       ),
     );
-    buttons.unshift(
-      button(page, "Copiar para leer su correo", () =>
-        doing.copy(openCommand(report.doc, contact), "Imprime el correo que dejó quien denunció.", card),
-      ),
-      button(page, "Borrar su correo", () => doing.forgetContact(report.doc, report.net)),
-    );
-  }
-  card.append(...ownerLine(page, owner, today), actions(page, ...buttons, ...seeingKey(page, owner, doing)));
+  const verifying = button(page, "Link para verificar", () => doing.verifyLink(report.doc, report.version));
+  const main = [
+    sealed
+      ? button(page, "Abrir denuncia", () => doing.openReport(report.doc, openCommand(report.doc, sealed), card))
+      : verifying,
+    button(page, "Era falsa", () => doing.reportWasFalse(report.doc, report.net)),
+    button(page, "Bloquear documento", () => doing.panic(report.doc, report.version), true),
+  ];
+  const rest = [
+    ...(sealed
+      ? [
+          button(page, "Comprobar sin abrir", () => doing.copy(checkCommand(report.doc, sealed), CHECKING, card)),
+          verifying,
+        ]
+      : []),
+    ...(contact
+      ? [
+          button(page, "Copiar para leer su correo", () => doing.copy(openCommand(report.doc, contact), CONTACT, card)),
+          button(page, "Borrar su correo", () => doing.forgetContact(report.doc, report.net)),
+        ]
+      : []),
+    ...(report.fromFalseNet
+      ? [button(page, "Descartar todas las de esta red", () => doing.networkWasFalse(report.doc, report.net), true)]
+      : []),
+    ...againstOwner(page, report.doc, report.ownerToBlock, doing),
+  ];
+  card.append(...ownerLine(page, owner, today, doing), actions(page, ...main, ...more(page, ...rest)));
   return card;
 };
 
@@ -229,35 +236,28 @@ const docCard = (
   );
   if (doc.mayCorrect)
     card.append(piece(page, "p", "card-line", "Reclamo aceptado solo: espera una versión de su dueño."));
-  const { ownerToBlock } = doc;
-  card.append(
-    ...ownerLine(page, owner, today),
-    actions(
-      page,
-      button(page, "Link para verificar", () => doing.verifyLink(doc.id, doc.versionToOpen)),
-      button(page, "Botón de pánico", () => doing.panic(doc.id, doc.versionToOpen), true),
-      button(page, "Borrar todo de esta llave", () => doing.purgeOwner(doc.id), true),
-      ...(ownerToBlock ? [button(page, "Bloquear llave del dueño", () => doing.blockKey(ownerToBlock), true)] : []),
-      ...(doc.mayHandOver ? [button(page, "Ya lo entregué", () => doing.handedOver(doc.id))] : []),
-      ...seeingKey(page, owner, doing),
-    ),
-  );
-  if (waiting) {
-    card.append(
-      actions(
-        page,
+  const main = waiting
+    ? [
         button(page, "Aceptar y desbloquear", () => doing.accept(doc.id)),
         button(page, "Rechazar", () => doing.reject(doc.id), true),
-      ),
-    );
-  } else if (!doc.mayCorrect) {
-    card.append(
-      actions(
-        page,
-        button(page, "Desbloquear", () => doing.accept(doc.id)),
-      ),
-    );
-  }
+      ]
+    : doc.mayCorrect
+      ? []
+      : [button(page, "Desbloquear", () => doing.accept(doc.id))];
+  const rest = [
+    button(page, "Link para verificar", () => doing.verifyLink(doc.id, doc.versionToOpen)),
+    button(page, "Preparar entrega a la autoridad", () => doing.panic(doc.id, doc.versionToOpen), true),
+    ...againstOwner(page, doc.id, doc.ownerToBlock, doing),
+  ];
+  card.append(
+    ...ownerLine(page, owner, today, doing),
+    actions(
+      page,
+      ...main,
+      ...(doc.mayHandOver ? [button(page, "Ya lo entregué", () => doing.handedOver(doc.id))] : []),
+      ...more(page, ...rest),
+    ),
+  );
   return card;
 };
 
@@ -330,40 +330,46 @@ export const drawQueue = (page: Document, queue: Queue, doing: Doing, owners: Ow
   place("state").className = `stage-chip is-${queue.stage}`;
   const appeals = queue.docs.filter((one) => one.waitsForOperator);
   const standings = standingsOf(queue);
-  filled(
-    place("appeals"),
-    page,
+  const part = (id: string, cards: HTMLElement[]) => {
+    place(id).replaceChildren(...cards);
+    (place(id).closest(".queue-part") as HTMLElement).hidden = cards.length === 0;
+  };
+  part(
+    "appeals",
     appeals.map((one) => docCard(page, one, doing, true, owners[one.id], today)),
-    "Ninguno.",
   );
-  filled(
-    place("reports"),
-    page,
-    [
-      ...queue.reports.map((one) => reportCard(page, one, doing, owners[one.doc], today, standings.get(one.doc))),
-      ...pagesOfReports(page, queue, doing),
-    ],
-    "Ninguna.",
+  part(
+    "reports",
+    queue.reports.length === 0
+      ? []
+      : [
+          ...queue.reports.map((one) => reportCard(page, one, doing, owners[one.doc], today, standings.get(one.doc))),
+          ...pagesOfReports(page, queue, doing),
+        ],
   );
-  filled(
-    place("warned"),
-    page,
+  part(
+    "warned",
     queue.warned.map((one) => warningCard(page, one, doing)),
-    "Ninguno.",
   );
-  filled(
-    place("blocked"),
-    page,
+  part(
+    "blocked",
     queue.docs
       .filter((one) => !one.waitsForOperator)
       .map((one) => docCard(page, one, doing, false, owners[one.id], today)),
-    "Ninguno.",
   );
-  filled(
-    place("blocked-keys"),
-    page,
+  part(
+    "blocked-keys",
     queue.blockedKeys.map((one) => keyCard(page, one, doing)),
-    "Ninguna.",
   );
   countFilters(page, queue, appeals.length);
+  sayWhenEmpty(page);
+};
+
+// Each part hides when it has nothing, so a filter with nothing in it says so once.
+export const sayWhenEmpty = (page: Document): void => {
+  const filter = (page.getElementById("queue") as HTMLElement).dataset.filter ?? "all";
+  const counted = Number(page.querySelector(`[data-count="${filter}"]`)?.textContent ?? 0);
+  const empty = page.getElementById("queue-empty") as HTMLElement;
+  empty.textContent = filter === "all" ? "Nada por revisar." : "Nada en este filtro.";
+  empty.hidden = counted > 0;
 };
