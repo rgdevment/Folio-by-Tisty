@@ -7,6 +7,7 @@ const LINK_ADDRESS = /^https:\/\/([a-z0-9.-]+)(?:[/?#][^\s\\()]*)?$/;
 const FORMATTED =
   /\*\*|__|~~|`|\*[^*\n]+\*|(?:^|\s)_[^_\n]+_(?:\s|$)|<\/?[a-z]|^#{1,6}\s|^\s*>\s|^\s*(?:[-*+]|\d+\.)\s/im;
 const ROOT = /^[A-Za-z0-9_-]{43}$/;
+const NAME = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
 const LINE_TISTY_ADDS = /(?:conoce más en|learn more at) folio\.tisty\.app/i;
 
 const isLinkHost = (host: string): boolean =>
@@ -51,8 +52,11 @@ export const sharingFaults = ({
   sharing_open: open,
   sharing_closed_note: note,
   maker_root: maker,
+  maker_name: name,
 }: Record<string, unknown>): string[] => [
   ...(typeof open === "boolean" ? [] : ["sharing_open is not true or false"]),
   ...(maker === undefined || (typeof maker === "string" && ROOT.test(maker)) ? [] : ["maker_root is not a root"]),
+  ...(name === undefined || (typeof name === "string" && NAME.test(name)) ? [] : ["maker_name is not a name"]),
+  ...(name !== undefined && maker === undefined ? ["maker_name names no maker_root"] : []),
   ...(note === undefined ? [] : noteFaults(note).map((fault) => `sharing_closed_note ${fault}`)),
 ];

@@ -45,7 +45,10 @@ info:
     as an envelope carries it. While sharing is not open, the server still takes a new document whose owner and
     signer are both that root, checked like anyone else's, and answers `uploads_off` to everyone else. A client
     whose own root is that one may offer to share while the others do not. The server reads it from the file it
-    was deployed with, so a new one takes a deploy as well as a signature.
+    was deployed with, so a new one takes a deploy as well as a signature. `maker_name`, only beside `maker_root`,
+    is the name readers are shown as verified for that root: lowercase letters, digits and inner hyphens, up to 32.
+    A client shows it, never the alias, on what that root signs while its signature holds, and marks an alias equal
+    or close to it, signed by another root, as another key's.
 
     **The terms in force** are named there too. In `terms`, `es` and `en` are the SHA-256, in hex, of
     `docs/TERMINOS.md` and `docs/TERMS.md` as served from the same place, and `version`, a whole number written as a

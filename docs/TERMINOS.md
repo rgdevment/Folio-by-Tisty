@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 15, vigente desde el 8 de noviembre de 2026.**
+**Versión 16, vigente desde el 8 de noviembre de 2026.**
 
 ## En corto
 
@@ -88,6 +88,14 @@ con lo que lees es tu responsabilidad.
   aunque tus documentos ya no estén, salvo que pidas borrarla como dice la
   [política de privacidad](PRIVACIDAD.md). No dice quién eres. El nombre que
   eliges mostrar viaja cifrado, y solo lo lee quien tiene el link.
+- **«Verificado» dice quién firmó, no qué dice el documento.** Por ahora solo
+  lo lleva la llave del operador, que firma como rgdevment: su parte pública y
+  ese nombre están publicados en los límites de Folio. No dice que el contenido
+  sea seguro, y una versión que otra llave sube con un link de editar no lo
+  lleva. Un nombre igual o parecido a uno verificado, firmado con otra llave, se
+  muestra como de otra llave.
+- **El operador puede compartir aunque compartir esté cerrado,** solo con su
+  propia llave, para publicar las guías de Tisty y probar el servicio.
 - **Tu reputación es de esa llave.** Los topes parten bajos, y la reputación es
   lo que dará acceso a más. Todavía no está decidido cómo se gana, y estos
   términos lo dirán cuando lo esté. Las denuncias por sí solas nunca la quitan:

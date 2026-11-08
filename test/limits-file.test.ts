@@ -61,6 +61,14 @@ describe("what the file may say", () => {
     expect(pastTheServer({ ...SERVER, ttl_days: [1] }, SERVER)).toEqual([]);
   });
 
+  it("names the maker without counting it as a limit", () => {
+    expect(pastTheServer({ ...SERVER, maker_root: "A".repeat(43), maker_name: "rgdevment" }, SERVER)).toEqual([]);
+  });
+
+  it("names a field it does not know", () => {
+    expect(pastTheServer({ ...SERVER, made_up: 1 }, SERVER)).toEqual(["made_up"]);
+  });
+
   it("may not ask for more than the server takes", () => {
     const more = { ...SERVER, files_bytes_at_most: SERVER.files_bytes_at_most + 1 };
     expect(pastTheServer(more, SERVER)).toEqual(["files_bytes_at_most"]);
@@ -91,6 +99,23 @@ describe("the sharing fields", () => {
 
   it("take a maker's root, or none", () => {
     expect(sharingFaults({ sharing_open: false, maker_root: "A".repeat(43) })).toEqual([]);
+  });
+
+  it("take the maker's name beside its root", () => {
+    expect(sharingFaults({ sharing_open: false, maker_root: "A".repeat(43), maker_name: "rgdevment" })).toEqual([]);
+  });
+
+  it.each([["RGdevment"], ["rg devment"], ["-rgdevment"], ["rgdevment-"], ["a".repeat(33)], [""], [1]])(
+    "refuse %j as the maker's name",
+    (name) => {
+      expect(sharingFaults({ sharing_open: false, maker_root: "A".repeat(43), maker_name: name })).toEqual([
+        "maker_name is not a name",
+      ]);
+    },
+  );
+
+  it("refuse a maker's name with no maker's root", () => {
+    expect(sharingFaults({ sharing_open: false, maker_name: "rgdevment" })).toEqual(["maker_name names no maker_root"]);
   });
 
   it.each([["A".repeat(42)], ["A".repeat(44)], [`${"A".repeat(42)}=`], [""], [null], [1]])(
@@ -248,9 +273,9 @@ describe("signing the limits", () => {
   it("keeps the maker's root it was given, and refuses one that is not a root", () => {
     signing();
     const maker = "A".repeat(43);
-    writeFileSync(files.limits, JSON.stringify({ ...read(), maker_root: maker }));
+    writeFileSync(files.limits, JSON.stringify({ ...read(), maker_root: maker, maker_name: "rgdevment" }));
     signing();
-    expect(read().maker_root).toBe(maker);
+    expect(read()).toMatchObject({ maker_root: maker, maker_name: "rgdevment" });
     writeFileSync(files.limits, JSON.stringify({ ...read(), maker_root: "not a root" }));
     expect(() => signing()).toThrow("maker_root is not a root");
   });

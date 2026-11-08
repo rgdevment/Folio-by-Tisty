@@ -110,19 +110,19 @@ const holdsTo = (name: string, said: unknown, server: unknown): boolean => {
   return said === server;
 };
 
+const PASSED_ALONG = ["sharing_closed_note", "maker_root", "maker_name"];
+const NOT_LIMITS = new Set(["serial", "uploads_halted_until", "terms", "sharing_open", ...PASSED_ALONG]);
+
+const limitsIn = (said: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(said).filter(([name]) => !NOT_LIMITS.has(name)));
+
+const passedAlong = (said: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(PASSED_ALONG.flatMap((name) => (said[name] === undefined ? [] : [[name, said[name]]])));
+
 // The file may ask for less than the server takes, never for more: a number there that it would refuse fails its reader.
 export const pastTheServer = (said: Record<string, unknown>, server: Published): string[] => {
   const held = server as Record<string, unknown>;
-  const {
-    serial: _serial,
-    uploads_halted_until: _halted,
-    terms: _terms,
-    sharing_open: _open,
-    sharing_closed_note: _note,
-    maker_root: _maker,
-    ...numbers
-  } = said;
-  const unknown = Object.keys(numbers).filter((name) => !Object.hasOwn(held, name));
+  const unknown = Object.keys(limitsIn(said)).filter((name) => !Object.hasOwn(held, name));
   const wrong = Object.keys(held).filter((name) => !holdsTo(name, said[name], held[name]));
   return [...unknown, ...wrong];
 };
@@ -167,24 +167,15 @@ export const signLimits = (
   const current = existsSync(files.limits)
     ? (JSON.parse(readFileSync(files.limits, "utf8")) as Record<string, unknown>)
     : {};
-  const {
-    serial = 0,
-    uploads_halted_until: kept,
-    terms,
-    sharing_open: sharingOpen = false,
-    sharing_closed_note: note,
-    maker_root: maker,
-    ...numbers
-  } = current;
+  const { serial = 0, uploads_halted_until: kept, terms, sharing_open: sharingOpen = false } = current;
   const until = haltedUntil(haltedDays, kept, Math.floor(now / 1000));
   const next = {
     serial: (serial as number) + 1,
     ...server,
-    ...numbers,
+    ...limitsIn(current),
     terms: termsOf(files, terms as Terms | undefined),
     sharing_open: sharingOpen,
-    ...(note === undefined ? {} : { sharing_closed_note: note }),
-    ...(maker === undefined ? {} : { maker_root: maker }),
+    ...passedAlong(current),
     ...(until === null ? {} : { uploads_halted_until: until }),
   };
   const past = pastTheServer(next, server);
