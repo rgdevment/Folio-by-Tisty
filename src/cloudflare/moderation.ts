@@ -436,7 +436,7 @@ export class CloudModeration {
     const logging = this.#db
       .prepare(
         `INSERT OR IGNORE INTO moderation (at, doc, action, note)
-         SELECT DISTINCT ?2, doc, 'false_network', ?3 FROM reports WHERE net = ?1 AND cleared = 0 AND doc <> ?3`,
+         SELECT DISTINCT ?2, doc, 'false_network', NULL FROM reports WHERE net = ?1 AND cleared = 0 AND doc <> ?3`,
       )
       .bind(net, now, id);
     const clearing = this.#db.prepare("UPDATE reports SET cleared = 1 WHERE net = ? AND cleared = 0").bind(net);

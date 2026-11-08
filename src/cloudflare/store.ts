@@ -91,11 +91,15 @@ const REPORT_RISES = `${WEIGHT_OF("excluded.level")} > ${WEIGHT_OF("reports.leve
 // Cleared stays cleared for what it was about, so the same networks cannot undo an accepted appeal; a newer version is news.
 const AFTER_WHAT_WAS_ANSWERED =
   "excluded.version >= (SELECT d.counts_from FROM docs d WHERE d.id = excluded.doc) AND reports.version < (SELECT d.counts_from FROM docs d WHERE d.id = excluded.doc)";
-const REPORT_REPLACES = `(CASE WHEN reports.cleared = 1 THEN reports.level = 'light' OR excluded.version > reports.version ELSE ${REPORT_RISES} OR (${AFTER_WHAT_WAS_ANSWERED}) END)`;
-// A document stopped today waits for the sweep, and what is reported until then still reaches it.
+// A network found false keeps what it said before, and saying more cannot raise it into evidence it never was.
+const REPORT_REPLACES = `((reports.cleared = 1 OR NOT EXISTS (SELECT 1 FROM false_reporters f WHERE f.net = excluded.net))
+  AND CASE WHEN reports.cleared = 1 THEN reports.level = 'light' OR excluded.version > reports.version ELSE ${REPORT_RISES} OR (${AFTER_WHAT_WAS_ANSWERED}) END)`;
+// A document stopped today waits for the sweep, and what is reported until then still reaches it; one that expired does not.
 const STILL_LIVES = (doc: string, today: string): string =>
-  `(${doc}.dies_on >= ${today} - 1 OR EXISTS (SELECT 1 FROM holds h WHERE h.held = ${doc}.id)
-    OR EXISTS (SELECT 1 FROM docs a WHERE a.id = ${doc}.anchor AND a.dies_on >= ${today} - 1))`;
+  `(${doc}.dies_on >= ${today} OR (${doc}.paused_at IS NOT NULL AND ${doc}.dies_on >= ${today} - 1)
+    OR EXISTS (SELECT 1 FROM holds h WHERE h.held = ${doc}.id)
+    OR EXISTS (SELECT 1 FROM docs a WHERE a.id = ${doc}.anchor
+      AND (a.dies_on >= ${today} OR (a.paused_at IS NOT NULL AND a.dies_on >= ${today} - 1))))`;
 const REPORT_MOVES = `(${REPORT_REPLACES} OR (reports.cleared = 0 AND reports.sealed_link IS NULL AND excluded.sealed_link IS NOT NULL))`;
 
 // What keeps a document past its days, not served and not deleted (decision 42). Reports leave once their days pass.

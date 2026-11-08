@@ -301,6 +301,30 @@ describe("marking a report false", () => {
     expect(await testEnv.DB.prepare("SELECT id FROM docs WHERE id = 'Beforedc'").first()).not.toBeNull();
   });
 
+  it("does not let a network found false raise what it said before into a graver report", async () => {
+    await shared("Falsedoc");
+    await shared("Olderdoc");
+    await store.report({ doc: "Olderdoc", net: "shared", asn: 1, category: "phishing", version: 1 }, DAY, HOUR);
+    await reportBy("Falsedoc", "shared", "phishing", DAY + 1);
+    await moderation.reportWasFalse("Falsedoc", "shared", (DAY + 2) * DAY_MS);
+    await reportBy("Olderdoc", "shared", "csam", DAY + 3);
+    const row = await testEnv.DB.prepare("SELECT category, level FROM reports WHERE doc = 'Olderdoc'").first();
+    expect(row).toEqual({ category: "phishing", level: "medium" });
+  });
+
+  it("takes no report on a document that expired and was not swept yet, but still on one stopped today", async () => {
+    await shared("Expiredc");
+    await shared("Stoppedd");
+    await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'Expiredc'")
+      .bind(DAY - 1)
+      .run();
+    await store.stop("Stoppedd", DAY);
+    await reportBy("Expiredc", "late", "phishing", DAY);
+    await reportBy("Stoppedd", "late", "phishing", DAY);
+    const docs = await testEnv.DB.prepare("SELECT doc FROM reports WHERE net = 'late' ORDER BY doc").all();
+    expect(docs.results).toEqual([{ doc: "Stoppedd" }]);
+  });
+
   it("does not let an appeal lift itself over child abuse reported before", async () => {
     await shared("Victimdc");
     await testEnv.DB.prepare(

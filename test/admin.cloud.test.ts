@@ -468,7 +468,7 @@ describe("what it can do", () => {
     ).all<{ doc: string; note: string | null }>();
     expect(rows.results).toEqual([
       { doc: ID, note: null },
-      { doc: "OtherDoc", note: ID },
+      { doc: "OtherDoc", note: null },
     ]);
     expect((await acting(`/api/docs/${ID}/reports/n1/false_network`)).status).toBe(404);
   });
