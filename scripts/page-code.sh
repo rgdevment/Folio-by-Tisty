@@ -50,8 +50,9 @@ served() {
 
   asset=$(code_files | grep -m1 '^assets/')
   if [ -n "$asset" ] && [ "$challenged" = 0 ]; then
-    curl -s --max-time 10 -D "$headers" -o /dev/null "$address/$asset"
+    curl -s --max-time 10 -H "Accept-Encoding: br, gzip" -D "$headers" -o /dev/null "$address/$asset"
     grep -qi '^cache-control:.*immutable' "$headers" || differs+=("the cache of $asset")
+    grep -qi '^content-encoding:' "$headers" || differs+=("the compression of $asset")
   fi
   rm -f "$received" "$headers"
 
