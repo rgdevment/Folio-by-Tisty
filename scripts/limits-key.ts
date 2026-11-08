@@ -11,6 +11,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEVEL_ONE, publishedLimits } from "../src/core/limits.ts";
+import { dohLookup, domainFaults, makerFaults, makerIn } from "./limits-maker.ts";
 import { sharingFaults } from "./limits-sharing.ts";
 
 type Published = ReturnType<typeof publishedLimits>;
@@ -110,7 +111,7 @@ const holdsTo = (name: string, said: unknown, server: unknown): boolean => {
   return said === server;
 };
 
-const PASSED_ALONG = ["sharing_closed_note", "maker_root", "maker_name"];
+const PASSED_ALONG = ["sharing_closed_note", "maker"];
 const NOT_LIMITS = new Set(["serial", "uploads_halted_until", "terms", "sharing_open", ...PASSED_ALONG]);
 
 const limitsIn = (said: Record<string, unknown>): Record<string, unknown> =>
@@ -180,7 +181,7 @@ export const signLimits = (
   };
   const past = pastTheServer(next, server);
   if (past.length > 0) throw new Error(`the server would not hold to these: ${past.join(", ")}`);
-  const faults = sharingFaults(next);
+  const faults = [...sharingFaults(next), ...makerFaults(current.maker)];
   if (faults.length > 0) throw new Error(`Tisty would not take this: ${faults.join("; ")}`);
 
   const said = Buffer.from(`${JSON.stringify(next, null, 2)}\n`);
@@ -198,8 +199,14 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (what === "new" && keyFile) {
     console.log(createKeys(keyFile));
   } else if (what === "sign" && keyFile) {
-    signLimits(keyFile, haltedDays, Date.now());
-    console.log(`signed ${PUBLISHED.limits}`);
+    const unpublished = await domainFaults(makerIn(PUBLISHED.limits) ?? { root: "" }, dohLookup);
+    if (unpublished.length > 0) {
+      console.error(`the maker's domain does not hold, so nothing was signed: ${unpublished.join("; ")}`);
+      process.exitCode = 1;
+    } else {
+      signLimits(keyFile, haltedDays, Date.now());
+      console.log(`signed ${PUBLISHED.limits}`);
+    }
   } else {
     console.error(USAGE);
     process.exitCode = 1;

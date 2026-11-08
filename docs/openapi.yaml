@@ -41,15 +41,19 @@ info:
     client's own message. Both are signals for clients: what is already shared does not depend on them, and the
     server does not read them.
 
-    **The maker's root** may be named there too. `maker_root` is the root of whoever makes Tisty and Folio, base64url
-    as an envelope carries it. While sharing is not open, the server still takes a new document whose owner and
-    signer are both that root, checked like anyone else's, and answers `uploads_off` to everyone else. A version of
-    one of the maker's documents is taken only from that root too, so not through its edit link. A client
-    whose own root is that one may offer to share while the others do not. The server reads it from the file it
-    was deployed with, so a new one takes a deploy as well as a signature. `maker_name`, only beside `maker_root`,
-    is the name readers are shown as verified for that root: lowercase letters, digits and inner hyphens, up to 32.
-    A client that shows it does so, never the alias, on what that root signs while its signature holds, and marks an
-    alias equal or close to it, signed by another root, as another key's.
+    **The maker** may be named there too, as `maker`. Its `root` is the root of whoever makes Tisty and Folio,
+    base64url as an envelope carries it. While sharing is not open, the server still takes a new document whose
+    owner and signer are both that root, checked like anyone else's, and answers `uploads_off` to everyone else. A
+    version of one of the maker's documents is taken only from that root too, so not through its edit link. A
+    client whose own root is that one may offer to share while the others do not. The server reads it from the
+    file it was deployed with, so a new one takes a deploy as well as a signature.
+
+    Its `name` is the name readers are shown as verified for that root: lowercase letters, digits and inner
+    hyphens, up to 32. Its `domain`, lowercase ASCII, proves it: the domain's DNS holds a single TXT record at
+    `_tisty.<domain>` reading `tisty-root=<root>`. The file is not signed unless two resolvers find it, and a check
+    every six hours says when it stops holding. A client that shows the name does so, never the alias, on what that
+    root signs while its signature holds, with the domain beneath it and no link. It marks an alias equal or close
+    to the name, signed by another root, as another key's.
 
     **The terms in force** are named there too. In `terms`, `es` and `en` are the SHA-256, in hex, of
     `docs/TERMINOS.md` and `docs/TERMS.md` as served from the same place, and `version`, a whole number written as a

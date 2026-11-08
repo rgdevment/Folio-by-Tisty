@@ -65,7 +65,7 @@ describe("what the file may say", () => {
   });
 
   it("names the maker without counting it as a limit", () => {
-    expect(pastTheServer({ ...SERVER, maker_root: "A".repeat(43), maker_name: "rgdevment" }, SERVER)).toEqual([]);
+    expect(pastTheServer({ ...SERVER, maker: { root: "A".repeat(43), name: "rgdevment" } }, SERVER)).toEqual([]);
   });
 
   it("names a field it does not know", () => {
@@ -99,34 +99,6 @@ describe("the sharing fields", () => {
     expect(sharingFaults({ sharing_open: true })).toEqual([]);
     expect(sharingFaults({ sharing_open: false })).toEqual([]);
   });
-
-  it("take a maker's root, or none", () => {
-    expect(sharingFaults({ sharing_open: false, maker_root: "A".repeat(43) })).toEqual([]);
-  });
-
-  it("take the maker's name beside its root", () => {
-    expect(sharingFaults({ sharing_open: false, maker_root: "A".repeat(43), maker_name: "rgdevment" })).toEqual([]);
-  });
-
-  it.each([["RGdevment"], ["rg devment"], ["-rgdevment"], ["rgdevment-"], ["a".repeat(33)], [""], [1]])(
-    "refuse %j as the maker's name",
-    (name) => {
-      expect(sharingFaults({ sharing_open: false, maker_root: "A".repeat(43), maker_name: name })).toEqual([
-        "maker_name is not a name",
-      ]);
-    },
-  );
-
-  it("refuse a maker's name with no maker's root", () => {
-    expect(sharingFaults({ sharing_open: false, maker_name: "rgdevment" })).toEqual(["maker_name names no maker_root"]);
-  });
-
-  it.each([["A".repeat(42)], ["A".repeat(44)], [`${"A".repeat(42)}=`], [""], [null], [1]])(
-    "refuse %j as a maker's root",
-    (maker) => {
-      expect(sharingFaults({ sharing_open: false, maker_root: maker })).toEqual(["maker_root is not a root"]);
-    },
-  );
 
   it.each([[undefined], ["true"], [1], [null]])("refuse %j as whether it is open", (open) => {
     expect(sharingFaults({ sharing_open: open })).toEqual(["sharing_open is not true or false"]);
@@ -273,14 +245,14 @@ describe("signing the limits", () => {
     ).toBe(true);
   });
 
-  it("keeps the maker's root it was given, and refuses one that is not a root", () => {
+  it("keeps the maker it was given, and refuses one that is not a maker", () => {
     signing();
-    const maker = "A".repeat(43);
-    writeFileSync(files.limits, JSON.stringify({ ...read(), maker_root: maker, maker_name: "rgdevment" }));
+    const maker = { root: "A".repeat(43), name: "rgdevment", domain: "rgdevment.dev" };
+    writeFileSync(files.limits, JSON.stringify({ ...read(), maker }));
     signing();
-    expect(read()).toMatchObject({ maker_root: maker, maker_name: "rgdevment" });
-    writeFileSync(files.limits, JSON.stringify({ ...read(), maker_root: "not a root" }));
-    expect(() => signing()).toThrow("maker_root is not a root");
+    expect(read().maker).toEqual(maker);
+    writeFileSync(files.limits, JSON.stringify({ ...read(), maker: { root: "not a root" } }));
+    expect(() => signing()).toThrow("maker.root is not a root");
   });
 
   it("names the terms by the hash of their exact bytes", () => {
