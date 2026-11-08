@@ -17,6 +17,7 @@
     "src/page/ui.d.ts",
     "src/admin/page",
     "test/admin-page.test.ts",
+    "test/admin-board.test.ts",
     "test/clean.test.ts",
     "test/ask.test.ts",
     "test/frame.test.ts",

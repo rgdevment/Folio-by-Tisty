@@ -32,8 +32,9 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 | Your public key on its own, the day Folio first saw it, which version of the terms it accepted and in what hour the server heard it, and whether the operator blocked it, tied to no network and no document | So limits and reputation stay with it, and a new key starts from the lowest | For good, even after your documents are gone |
 | How many times it was read, counted once a day per visitor | To show you the reads in Tisty | As long as the document |
 | A line for each read served: the link's id (without its key, so it opens nothing), the country and the Cloudflare data center, never your IP | To know how much each document is read and where from, and size the service | Up to 7 days, in Cloudflare's Workers Logs |
-| A digest of your IP (an HMAC with a key that changes) | Per-IP limits and blocks against abuse | As long as the quota or the block lasts, and up to a day more |
-| A daily copy of the database, encrypted with a key kept offline, without the day's read digests or quotas, and without the documents | To recover from a failure | 30 days, on GitHub |
+| A digest of your IP (an HMAC with a key that changes), also beside the document you uploaded that day | Per-IP limits and blocks against abuse, and so the operator sees when one network makes many keys or documents | As long as the quota or the block lasts, and up to a day more |
+| For each document and day: how many networks read it, how many with a proof of work, in how many hours and how many in its busiest hour, and whether the only one was the network that uploaded it, never which | So the operator can tell a group of readers from a farm of bots, or a document only its owner keeps alive | 31 days, or less if the document goes first |
+| A daily copy of the database, encrypted with a key kept offline, without the day's read digests, the quotas or the network that uploaded each document, and without the documents | To recover from a failure | 30 days, on GitHub |
 | What the operator did to a document or a key and why, opening it included: its id, the action and the reason | To answer for it later | 180 days, or while the document is held |
 | A case link, to verify a report or to hand to an authority: a digest of its token, the document and version it opens, each opening and, when it is for an authority, the document's records, encrypted with a key Folio does not keep and without the network or the email of whoever reported | So whoever verifies or investigates can read that version even once the document is blocked | 30 days; the openings, as above |
 | A summary by mail to the operator, up to four times a day: the id of the links reported, blocked or appealed, the category and how many networks reported, never a key, an IP or the content | To tell them what to review | Up to 180 days, or more if an order asks, in their Migadu mailbox |
@@ -45,10 +46,11 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 the same person, though not who you are.
 
 **About reads:** they are counted without keeping who read. Not to count the
-same person twice on one day, a short-lived digest is used and thrown away when
-the day ends. Its key changes every day and is not kept. The database keeps its
-own copy for up to 30 days, to recover from a failure, and the digest stays
-there until then; it never goes into the backups.
+same person twice on one day, a short-lived digest is used, which notes whether
+it came with a proof of work and is thrown away when the day ends. Its key
+changes every day and is not kept. The database keeps its own copy for up to 30
+days, to recover from a failure, and the digest stays there until then; it never
+goes into the backups.
 
 ## Cloudflare and other providers
 

@@ -307,13 +307,13 @@ describe("the history of each day", () => {
     expect(JSON.parse(kept?.hours ?? "{}")).toEqual({ 9: 1, 14: 2 });
   });
 
-  it("writes one row for the document and one for the service, however many read it", async () => {
+  it("writes one row for the document, its day, the service and the sweep's beat, however many read it", async () => {
     await store.create(newDoc("d1", { ttlDays: 3 }), DAY);
     await store.sweep(DAY + 1);
     await readers(5, 9);
     const { spent, cloud } = counting();
     await cloud.sweep(DAY + 1);
-    expect(spent.written).toBe(2);
+    expect(spent.written).toBe(4);
   });
 
   it("adds nothing to the service on a day nobody read", async () => {
@@ -576,7 +576,7 @@ describe("expiring", () => {
       ENVELOPES: testEnv.ENVELOPES,
     });
     expect((await counted.sweep(DAY + 2)).forgotten).toBe(40);
-    expect(queries).toBeLessThan(20);
+    expect(queries).toBeLessThan(30);
   });
 
   it("forgets a language with its anchor, and lets go of what they held", async () => {
@@ -706,7 +706,7 @@ describe("readers", () => {
   const fill = async (count: number, doc = "d1") => {
     await noted(store, reading("first", doc), DAY);
     await testEnv.DB.prepare(
-      `INSERT OR IGNORE INTO seen_${DAY} WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
+      `INSERT OR IGNORE INTO seen_${DAY} (owner, reader, doc, hour) WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
        SELECT 'o1', 'r' || i, '${doc}', 9 FROM n`,
     )
       .bind(count - 1)
@@ -771,7 +771,9 @@ describe("readers", () => {
 
   it("reads at most its ceiling and its free readers however many there are", async () => {
     await fill(LEVEL_ONE.rowsPerOwnerADay);
-    await testEnv.DB.prepare(`INSERT INTO seen_${DAY} VALUES ('o1', 'extra', 'd1', 9)`).run();
+    await testEnv.DB.prepare(
+      `INSERT INTO seen_${DAY} (owner, reader, doc, hour) VALUES ('o1', 'extra', 'd1', 9)`,
+    ).run();
     const { spent, cloud } = counting();
     await noted(cloud, reading("new", "d1", { proved: true }), DAY);
     expect(spent.read).toBeLessThanOrEqual(LEVEL_ONE.rowsPerOwnerADay + LEVEL_ONE.newReadersFree + 5);

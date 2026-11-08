@@ -8,51 +8,152 @@
     <script type="module" src="./main.ts"></script>
   </head>
   <body>
+    <header class="top">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">F</div>
+        <strong>Folio · Panel</strong>
+      </div>
+      <span id="state" class="stage-chip">Cargando…</span>
+      <span id="about" class="soft small"></span>
+      <div class="grow"></div>
+      <search>
+        <form id="find-form" class="find">
+          <label>
+            Buscar
+            <input id="find" type="search" placeholder="Llave, id de documento o red" autocomplete="off" />
+          </label>
+        </form>
+      </search>
+      <span id="operator" class="soft small"></span>
+    </header>
+
     <main id="panel" class="panel">
-      <h1>Panel de Folio</h1>
       <p id="said" class="said" role="status">Cargando…</p>
-      <section id="case-link" hidden>
+      <p id="found" class="said" role="status"></p>
+      <section id="case-link" class="box" hidden>
         <p id="case-link-said"></p>
         <code id="case-link-code" class="sealed"></code>
         <button type="button" id="case-link-copy">Copiar el link</button>
       </section>
-      <section aria-labelledby="state-title">
-        <h2 id="state-title">Estado</h2>
-        <p id="state"></p>
+
+      <section aria-labelledby="tiles-title">
+        <h2 id="tiles-title" class="unseen">Resumen</h2>
+        <div id="tiles" class="tiles"></div>
       </section>
-      <section aria-labelledby="appeals-title">
-        <h2 id="appeals-title">Reclamos que esperan</h2>
-        <div id="appeals"></div>
+
+      <div class="split">
+        <section id="queue" class="queue" data-filter="all" aria-labelledby="queue-title">
+          <div class="section-head">
+            <h2 id="queue-title">Por revisar</h2>
+            <nav id="queue-filters" class="pills" aria-label="Filtros">
+              <button type="button" data-filter="all" aria-pressed="true">Todo <span data-count="all"></span></button>
+              <button type="button" data-filter="grave" aria-pressed="false">Graves <span data-count="grave"></span></button>
+              <button type="button" data-filter="medium" aria-pressed="false">Engaño <span data-count="medium"></span></button>
+              <button type="button" data-filter="appeals" aria-pressed="false">
+                Reclamos <span data-count="appeals"></span>
+              </button>
+              <button type="button" data-filter="warned" aria-pressed="false">
+                Avisos leves <span data-count="warned"></span>
+              </button>
+              <button type="button" data-filter="blocked" aria-pressed="false">
+                Bloqueados <span data-count="blocked"></span>
+              </button>
+              <button type="button" data-filter="keys" aria-pressed="false">Llaves <span data-count="keys"></span></button>
+            </nav>
+          </div>
+          <div class="queue-part" data-part="appeals">
+            <h3>Reclamos que esperan</h3>
+            <div id="appeals"></div>
+          </div>
+          <div class="queue-part" data-part="reports">
+            <h3>Denuncias</h3>
+            <div id="reports"></div>
+          </div>
+          <div class="queue-part" data-part="warned">
+            <h3>Avisos por denuncias leves</h3>
+            <div id="warned"></div>
+          </div>
+          <div class="queue-part" data-part="blocked">
+            <h3>Bloqueados</h3>
+            <div id="blocked"></div>
+          </div>
+          <div class="queue-part" data-part="keys">
+            <h3>Llaves bloqueadas</h3>
+            <div id="blocked-keys"></div>
+          </div>
+        </section>
+
+        <aside class="side">
+          <section class="box" aria-labelledby="health-title">
+            <h2 id="health-title">Estado del servicio</h2>
+            <div id="health" class="stack"></div>
+          </section>
+          <section class="box" aria-labelledby="key-title">
+            <h2 id="key-title">Llave</h2>
+            <div id="key" class="stack">
+              <p class="card-line">Elige «Ver la llave» en una denuncia o una llave del top, o búscala arriba.</p>
+            </div>
+          </section>
+          <section class="box" aria-labelledby="by-hand-title">
+            <h2 id="by-hand-title">Bloquear a mano</h2>
+            <form id="block-form" class="block-form">
+              <label>Id <input id="block-id" required pattern="[A-Za-z0-9]{8}" autocomplete="off" /></label>
+              <label>Motivo <input id="block-note" required maxlength="500" autocomplete="off" /></label>
+              <button type="submit" class="is-danger">Bloquear documento</button>
+            </form>
+            <form id="key-form" class="block-form">
+              <label>Llave <input id="key-root" required pattern="[A-Za-z0-9_\-]{43}" autocomplete="off" /></label>
+              <label>Motivo <input id="key-note" required maxlength="500" autocomplete="off" /></label>
+              <button type="submit" class="is-danger">Bloquear llave</button>
+            </form>
+          </section>
+        </aside>
+      </div>
+
+      <section aria-labelledby="days-title">
+        <h2 id="days-title" class="unseen">Uso</h2>
+        <div id="days" class="charts"></div>
       </section>
-      <section aria-labelledby="reports-title">
-        <h2 id="reports-title">Denuncias</h2>
-        <div id="reports"></div>
+
+      <section class="box" aria-labelledby="top-title">
+        <div class="section-head">
+          <h2 id="top-title">Top 50 documentos privados</h2>
+          <span class="soft small"
+            >Un link entre amigos o un equipo se lee decenas o cientos de veces. Lo que se sale de eso queda
+            marcado.</span
+          >
+          <span class="grow"></span>
+          <nav id="top-order" class="pills" aria-label="Ordenar">
+            <button type="button" data-by="readers" aria-pressed="true">Lectores hoy</button>
+            <button type="button" data-by="weight" aria-pressed="false">Peso</button>
+            <button type="button" data-by="edits" aria-pressed="false">Ediciones</button>
+            <button type="button" data-by="oldest" aria-pressed="false">Más antiguo</button>
+            <button type="button" id="top-flagged" aria-pressed="false">Solo marcados</button>
+          </nav>
+        </div>
+        <div id="top"></div>
+        <p class="soft small">
+          Un lector es una red del día, no una persona. Las primeras 250 redes de cada llave entran libres, las
+          siguientes con prueba de trabajo, y sobre 5.000 ya no se anotan. Marca: el tope alcanzado, la mayoría con
+          prueba, lecturas parejas las 24 horas, una sola red que la mantiene viva más de 30 días, muchas llaves
+          nuevas desde la misma red, más de 20 ediciones en un día o una denuncia abierta.
+        </p>
       </section>
-      <section aria-labelledby="warned-title">
-        <h2 id="warned-title">Avisos por denuncias leves</h2>
-        <div id="warned"></div>
-      </section>
-      <section aria-labelledby="blocked-title">
-        <h2 id="blocked-title">Bloqueados</h2>
-        <div id="blocked"></div>
-      </section>
-      <section aria-labelledby="block-title">
-        <h2 id="block-title">Bloquear un documento</h2>
-        <form id="block-form" class="block-form">
-          <label>Id <input id="block-id" required pattern="[A-Za-z0-9]{8}" autocomplete="off" /></label>
-          <label>Motivo <input id="block-note" required maxlength="500" autocomplete="off" /></label>
-          <button type="submit">Bloquear</button>
-        </form>
-      </section>
-      <section aria-labelledby="keys-title">
-        <h2 id="keys-title">Llaves bloqueadas</h2>
-        <div id="blocked-keys"></div>
-        <form id="key-form" class="block-form">
-          <label>Llave <input id="key-root" required pattern="[A-Za-z0-9_\-]{43}" autocomplete="off" /></label>
-          <label>Motivo <input id="key-note" required maxlength="500" autocomplete="off" /></label>
-          <button type="submit">Bloquear llave</button>
-        </form>
-      </section>
+
+      <div class="split">
+        <section class="box wide" aria-labelledby="log-title">
+          <h2 id="log-title">Registro del operador</h2>
+          <div id="log" class="scroll"></div>
+        </section>
+        <section class="box side" aria-labelledby="nets-title">
+          <h2 id="nets-title">Redes cerca de su cupo hoy</h2>
+          <p class="soft small">
+            Un resumen anónimo por red, que cambia cada día. Delata una universidad o una compañía móvil llegando
+            al límite.
+          </p>
+          <div id="nets" class="stack"></div>
+        </section>
+      </div>
     </main>
   </body>
 </html>
