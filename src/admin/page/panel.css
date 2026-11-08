@@ -658,3 +658,61 @@ td.note {
 .card-steps p {
   margin: 0;
 }
+
+button.is-link {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font-size: inherit;
+}
+
+.more {
+  position: relative;
+}
+
+.more > summary {
+  padding: 8px 12px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  color: var(--soft);
+  cursor: pointer;
+  list-style: none;
+}
+
+.more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.more > summary::after {
+  content: " ▾";
+}
+
+.more[open] > summary::after {
+  content: " ▴";
+}
+
+.more-list {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 6px;
+  min-width: 240px;
+  padding: 8px;
+  background: var(--sheet);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+}
+
+.more-list button {
+  text-align: left;
+}
+
+.empty {
+  padding: 14px 16px;
+  border: 1px dashed var(--edge);
+  border-radius: 12px;
+}
