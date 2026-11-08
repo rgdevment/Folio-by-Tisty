@@ -1,8 +1,9 @@
 import type { Document, Revocation, Verdict } from "@tisty/contracts";
 import { type Bytes, fromBase64Url } from "../core/bytes";
-import { type Standing, standingOf } from "../core/look-alike";
+import { type Standing, standingOf, stillSpeaks } from "../core/look-alike";
 import { momentOf } from "../core/moment";
 import { refuse } from "../rules/envelope";
+import { isChecked, type ShardLoader } from "./checked";
 import { MAKER } from "./maker";
 import { documentIn, openEnvelope } from "./open";
 import { fingerprintOf, verdictOf, worseOf } from "./verdict";
@@ -37,7 +38,18 @@ export const keyIn = (said: string): Bytes | undefined => {
   }
 };
 
-export const openLink = async (id: string, linkKey: string, arrived: Arrived): Promise<Opened> => {
+const standingFor = async (
+  root: string,
+  verdict: Verdict,
+  alias: string | undefined,
+  load?: ShardLoader,
+): Promise<Standing> => {
+  const standing = standingOf(root, verdict, alias, MAKER);
+  if (standing !== "plain" || !stillSpeaks(verdict)) return standing;
+  return (await isChecked(root, alias, load)) ? "checked" : standing;
+};
+
+export const openLink = async (id: string, linkKey: string, arrived: Arrived, load?: ShardLoader): Promise<Opened> => {
   const open = await openEnvelope(arrived.bytes, { id, kind: "main" }, keyIn(linkKey));
   const held = await documentIn(open);
   const served = { received: momentOf(arrived.arrivedAt), revocations: arrived.revocations ?? [] };
@@ -51,8 +63,8 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived): P
     verdict: worseOf(signer, ownerVerdict),
     fingerprint: await fingerprintOf(signature.root),
     ownerFingerprint: owner && owner.root !== signature.root ? await fingerprintOf(owner.root) : null,
-    signerStanding: standingOf(signature.root, signer, held.signed_as, MAKER),
-    ownerStanding: standingOf(owner?.root ?? signature.root, ownerVerdict, held.owner_name, MAKER),
+    signerStanding: await standingFor(signature.root, signer, held.signed_as, load),
+    ownerStanding: await standingFor(owner?.root ?? signature.root, ownerVerdict, held.owner_name, load),
     diesOn: arrived.diesOn,
   };
 };

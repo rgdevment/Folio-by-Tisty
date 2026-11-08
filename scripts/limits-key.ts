@@ -11,7 +11,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEVEL_ONE, publishedLimits } from "../src/core/limits.ts";
-import { dnsLookup, domainFaults, makerFaults, makerIn } from "./limits-maker.ts";
+import { dnsLookup } from "./doh.ts";
+import { domainFaults, makerFaults, makerIn } from "./limits-maker.ts";
 import { sharingFaults } from "./limits-sharing.ts";
 
 type Published = ReturnType<typeof publishedLimits>;

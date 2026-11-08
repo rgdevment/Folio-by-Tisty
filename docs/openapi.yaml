@@ -56,6 +56,16 @@ info:
     to the name or the domain, signed by another root, as another key's, and an alias on that root whose signature
     no longer holds as a key taken back.
 
+    **Checked domains** are anyone else's domain the operator approved by hand. Whoever asks publishes the same TXT
+    record and goes by that domain as their alias. `docs/domains/<xx>.json` lists, for each one, the first 32 hex
+    characters of the SHA-256 of the root followed by the domain, in the shard named by its first two characters.
+    Each shard is a JSON list of up to 70 KB, signed with the same key as `limits.json` in `<xx>.json.minisig`, with
+    `file:domains/<xx>.json` in its trusted comment, and holds no domain or root. A client whose signer's alias is a
+    lowercase ASCII domain works out that proof, fetches only its shard, and shows `<domain> · checked domain` while
+    the signature holds. The page fetches the shard from `/domains/<xx>.json` on its own site, cached for a day, and
+    a missing or unreadable shard holds nothing. A check every six hours tells the operator when a record stops
+    holding.
+
     **The terms in force** are named there too. In `terms`, `es` and `en` are the SHA-256, in hex, of
     `docs/TERMINOS.md` and `docs/TERMS.md` as served from the same place, and `version`, a whole number written as a
     string, grows with every change to either text. A text and the signed file that names it reach `main` together.

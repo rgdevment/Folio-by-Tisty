@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { CONTRACTS } from "@tisty/contracts";
 import { defineConfig, type Plugin } from "vite";
 
@@ -42,9 +42,21 @@ const licenses = (): Plugin => ({
   },
 });
 
+const SHARDS = "docs/domains";
+
+const domains = (): Plugin => ({
+  name: "folio-domains",
+  generateBundle() {
+    if (!existsSync(SHARDS)) return;
+    for (const name of readdirSync(SHARDS).filter((one) => /^[0-9a-f]{2}\.json$/.test(one))) {
+      this.emitFile({ type: "asset", fileName: `domains/${name}`, source: readFileSync(`${SHARDS}/${name}`, "utf8") });
+    }
+  },
+});
+
 export default defineConfig({
   root: "src/page",
-  plugins: [tokens(), licenses()],
+  plugins: [tokens(), licenses(), domains()],
   build: {
     outDir: "../../dist/page",
     emptyOutDir: true,
