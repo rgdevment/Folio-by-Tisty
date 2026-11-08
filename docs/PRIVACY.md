@@ -1,6 +1,6 @@
 # Folio by Tisty privacy policy
 
-**Version 3, in force since November 8, 2026.**
+**Version 4, in force since November 8, 2026.**
 
 ## The short version
 
@@ -25,22 +25,22 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 
 | What | Why | For how long |
 |---|---|---|
-| The encrypted document and its attached files, with its latest version and those replaced in the last 3 days | To serve it to whoever has the link, and so a report can reach what someone replaced | Until the time without activity you choose, 15 days at most, or until you stop sharing it. If you pause it, it is not served and stays up to 30 days unless you resume it. With a serious report, an operator's block or an order, it is no longer served and stays for up to 180 days, or for as long as an order or an authority asks |
+| The encrypted document and its attached files, with its latest version and those replaced in the last 3 days | To serve it to whoever has the link, and so a report can reach what someone replaced | Until the time without activity you choose, 15 days at most, or until you stop sharing it. If you pause it, it is not served and stays up to 30 days unless you resume it. If a report of deceit or a grave one holds it, the operator blocks it or an order holds it, it is not served once it expires, you stop sharing it or it is blocked, and it stays with its other languages for up to 180 days from the last report or the block, or for as long as an order or an authority asks. During a spending block or a failure, what was replaced can take longer to be deleted |
 | The manifest in the clear: how many parts, what each weighs, their kind and the version | To hold the limits without reading the content | As long as the document |
 | The manage link, kept as a digest (hash), and the public key of the edit link's token, which never reaches the server | To check who may change or delete it | As long as the document |
-| Your public key and its certificate, in what you share | So readers know it is yours | As long as the document |
+| Your public key and its certificate, in what you share, with the exact time each version arrived | So readers know it is yours and since when | As long as the document |
 | Your public key on its own, the day Folio first saw it, which version of the terms it accepted and in what hour the server heard it, and whether the operator blocked it, tied to no network and no document | So limits and reputation stay with it, and a new key starts from the lowest | For good, even after your documents are gone |
 | How many times it was read, counted once a day per visitor, and in which hours on a day with 5 or more | To show you the reads in Tisty | As long as the document |
 | A line for each read served: the link's id (without its key, so it opens nothing), the country and the Cloudflare data center, never your IP | To know how much each document is read and where from, and size the service | Up to 7 days, in Cloudflare's Workers Logs |
 | A digest of your IP (an HMAC with a key that changes), also beside the document you uploaded that day | Per-IP limits and blocks against abuse, and so the operator sees when one network makes many keys or documents | As long as the quota or the block lasts, and up to a day more |
 | For each document and day: how many networks read it, how many with a proof of work, in how many hours and how many in its busiest hour, and whether the only one was the network that uploaded it, never which | So the operator can tell a group of readers from a farm of bots, or a document only its owner keeps alive | 31 days, or less if the document goes first |
-| A daily copy of the database, encrypted with a key kept offline, without the day's read digests, the quotas or the network that uploaded each document, and without the documents | To recover from a failure | 30 days, on GitHub. While it is there anyone can download it, always encrypted with a post-quantum key kept offline |
+| A daily copy of the database, encrypted with a key kept offline, without the day's read digests, the quotas or the network that uploaded each document, and without the documents | To recover from a failure | 30 days, on GitHub. While it is there anyone with a GitHub account can download it, always encrypted with a post-quantum key kept offline |
 | What the operator did to a document or a key and why, opening it included: its id, the action and the reason | To answer for it later | 180 days, or while an order holds the document |
 | A case link, to verify a report or to hand to an authority: a digest of its token, the document and version it opens, each opening and, when it is for an authority, the document's records, encrypted with a key Folio does not keep and without the network or the email of whoever reported | So whoever verifies or investigates can read that version even once the document is blocked | 30 days; the openings, as above |
 | A summary by mail to the operator, up to four times a day: the id of the links reported, blocked or appealed, the category and how many networks reported, never a key, an IP or the content | To tell them what to review | Up to 180 days, or more if an order asks, in their Migadu mailbox |
 | What you write to the operator by mail, with your address | To answer you | Up to 180 days from the last message, or more if an order asks, in their Migadu mailbox |
 | Keys you took back, up to 64, as your root signed them: the key's public part and your root's | So readers learn that a stolen or retired key no longer speaks for you | For good, since a reader must always be able to tell |
-| Reports: category, detail and the version reported, in the clear; the link and an email if given, sealed so only the operator can open them; and a digest of the reporter's network (an HMAC with a key that changes every 180 days), so each network reports only once, with the number of its provider (ASN), so a block needs reports from different providers | To moderate and pass them where they belong | 180 days, or longer if an order or an authority asks for it. If the operator finds it false, that network's digest stays 180 days from then, so it stops counting |
+| Reports: category, detail and the version reported, in the clear; the link and an email if given, sealed so only the operator can open them; and a digest of the reporter's network (an HMAC with a key that changes every 180 days), so each network reports only once, with the number of its provider (ASN), so a block needs reports from different providers | To moderate and pass them where they belong | 180 days, or longer if an order or an authority asks for it. If the operator finds it false, that network's digest stays, with the day and hour it was first found false, for up to 180 days from the last time it was, so it stops counting |
 
 **About signing:** your public key lets anyone tell that two documents come from
 the same person, though not who you are.
@@ -179,6 +179,6 @@ Folio is not meant for children under 14.
 ## Changes
 
 Every change to this policy is committed to the public repository, with its
-date.
+date. If the two versions differ, the Spanish one governs.
 
 [Español](PRIVACIDAD.md)

@@ -1,6 +1,6 @@
 # Privacidad de Folio by Tisty
 
-**Versión 3, vigente desde el 8 de noviembre de 2026.**
+**Versión 4, vigente desde el 8 de noviembre de 2026.**
 
 ## En corto
 
@@ -24,22 +24,22 @@ Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 
 | Qué | Para qué | Por cuánto tiempo |
 |---|---|---|
-| El documento cifrado y sus adjuntos, con su última versión y las reemplazadas en los últimos 3 días | Servirlo a quien tiene el link, y que una denuncia alcance lo que alguien reemplazó | Hasta el plazo sin actividad que elijas, de 15 días como mucho, o hasta que dejes de compartirlo. Si lo pausas, no se sirve y queda hasta 30 días, salvo que lo reanudes. Con una denuncia seria, un bloqueo del operador o una orden, deja de servirse y queda hasta 180 días, o lo que pida una orden o una autoridad |
+| El documento cifrado y sus adjuntos, con su última versión y las reemplazadas en los últimos 3 días | Servirlo a quien tiene el link, y que una denuncia alcance lo que alguien reemplazó | Hasta el plazo sin actividad que elijas, de 15 días como mucho, o hasta que dejes de compartirlo. Si lo pausas, no se sirve y queda hasta 30 días, salvo que lo reanudes. Si una denuncia de engaño o grave lo retiene, el operador lo bloquea o una orden lo retiene, no se sirve una vez que caduca, dejas de compartirlo o se bloquea, y queda junto con sus otros idiomas hasta 180 días desde la última denuncia o el bloqueo, o lo que pida una orden o una autoridad. Durante un corte por gasto o una falla, lo reemplazado puede tardar más en borrarse |
 | El manifiesto en claro: cuántas partes tiene, cuánto pesa cada una, de qué tipo son y su versión | Aplicar los topes sin leer el contenido | Lo mismo que el documento |
 | El link de administrar, guardado como resumen (hash), y la llave pública del token del link de editar, que nunca llega al servidor | Comprobar quién puede cambiar o borrar | Lo mismo que el documento |
-| Tu llave pública y su certificado, en lo que compartes | Que quien lee sepa que es tuyo | Lo mismo que el documento |
+| Tu llave pública y su certificado, en lo que compartes, con la hora exacta en que llegó cada versión | Que quien lee sepa que es tuyo y desde cuándo | Lo mismo que el documento |
 | Tu llave pública sola, el día en que Folio la vio por primera vez, qué versión de los términos aceptó y en qué hora lo supo el servidor, y si el operador la bloqueó, sin relación con ninguna red ni documento | Que los topes y la reputación sigan con ella, y que una llave nueva parta con los más bajos | Para siempre, aunque tus documentos ya no estén |
 | Cuántas veces se leyó, contando una vez por día y por visitante, y en qué horas en un día con 5 o más | Mostrarte las lecturas en Tisty | Lo mismo que el documento |
 | Una línea por cada lectura servida: el id del link (sin su llave, así que no abre nada), el país y el centro de datos de Cloudflare, nunca tu IP | Saber cuánto se lee cada documento y desde dónde, y dimensionar el servicio | Hasta 7 días, en los registros de Workers de Cloudflare |
 | Un resumen de tu IP (un HMAC con una llave que cambia), también junto al documento que subiste ese día | Topes por IP y bloqueos ante abuso, y que el operador vea cuándo una misma red crea muchas llaves o documentos | Lo que dura la cuota o el bloqueo, y hasta un día más |
 | Por cada documento y día: cuántas redes lo leyeron, cuántas con prueba de trabajo, en cuántas horas y cuántas en la hora de más lecturas, y si la única fue la que lo subió, nunca cuáles | Que el operador distinga un grupo de lectores de una granja de bots, o un documento que solo su dueño mantiene vivo | 31 días, o menos si el documento se va antes |
-| Una copia diaria de la base de datos, cifrada con una llave guardada fuera de línea, sin los resúmenes de lectura del día, los cupos ni la red que subió cada documento, y sin los documentos | Recuperarse de una falla | 30 días, en GitHub. Mientras está ahí cualquiera puede descargarla, siempre cifrada con una llave poscuántica guardada fuera de línea |
+| Una copia diaria de la base de datos, cifrada con una llave guardada fuera de línea, sin los resúmenes de lectura del día, los cupos ni la red que subió cada documento, y sin los documentos | Recuperarse de una falla | 30 días, en GitHub. Mientras está ahí cualquiera con una cuenta de GitHub puede descargarla, siempre cifrada con una llave poscuántica guardada fuera de línea |
 | Lo que el operador hizo con un documento o una llave y por qué, también abrirlo: su id, la acción y el motivo | Poder responder por ello después | 180 días, o mientras una orden retenga el documento |
 | Un link de caso, para verificar una denuncia o entregarlo a una autoridad: un resumen de su token, el documento y la versión que abre, cada apertura y, si es para una autoridad, los registros del documento, cifrados con una clave que Folio no guarda y sin la red ni el correo de quien denunció | Que quien verifica o investiga lea esa versión aunque el documento esté bloqueado | 30 días; las aperturas, como lo anterior |
 | Un resumen por correo al operador, hasta cuatro veces al día: el id de los links denunciados, bloqueados o reclamados, la categoría y cuántas redes denunciaron, nunca una llave, una IP o el contenido | Avisarle qué revisar | Hasta 180 días, o más si una orden lo pide, en su buzón de Migadu |
 | Lo que le escribes al operador por correo, con tu dirección | Responderte | Hasta 180 días desde el último mensaje, o más si una orden lo pide, en su buzón de Migadu |
 | Las llaves que retiraste, hasta 64, como las firmó tu raíz: la parte pública de la llave y la de tu raíz | Para que quien lea sepa que una llave robada o retirada ya no habla por ti | Para siempre, porque quien lea siempre tiene que poder saberlo |
-| Las denuncias: categoría, detalle y versión denunciada, en claro; si lo dejaron el link y un correo, sellados para que solo el operador los abra; y un resumen de la red de quien denuncia (un HMAC con una llave que cambia cada 180 días), para que cada red denuncie una sola vez, junto al número de su proveedor (ASN), para que un bloqueo necesite denuncias de proveedores distintos | Moderar y enviarlas a quien corresponde | 180 días, o más si una orden o una autoridad lo pide. Si el operador comprueba que era falsa, el resumen de esa red queda 180 días desde entonces, para que deje de contar |
+| Las denuncias: categoría, detalle y versión denunciada, en claro; si lo dejaron el link y un correo, sellados para que solo el operador los abra; y un resumen de la red de quien denuncia (un HMAC con una llave que cambia cada 180 días), para que cada red denuncie una sola vez, junto al número de su proveedor (ASN), para que un bloqueo necesite denuncias de proveedores distintos | Moderar y enviarlas a quien corresponde | 180 días, o más si una orden o una autoridad lo pide. Si el operador comprueba que era falsa, el resumen de esa red queda, con el día y la hora en que se marcó falsa por primera vez, hasta 180 días desde la última vez que se marcó, para que deje de contar |
 
 **Sobre la firma:** tu llave pública permite saber que dos documentos son de la
 misma persona, aunque no quién eres.
@@ -180,6 +180,7 @@ Folio no está pensado para menores de 14 años.
 
 ## Cambios
 
-Cada cambio a esta política queda en el repositorio público, con su fecha.
+Cada cambio a esta política queda en el repositorio público, con su fecha. Si
+las dos versiones difieren, rige la versión en español.
 
 [English](PRIVACY.md)
