@@ -20,7 +20,7 @@ import { drawTop } from "./top";
 const COULD_NOT = "No se pudo. Recarga la página para ver cómo quedó.";
 const PART_FAILED = "No se pudo traer esta parte. Recarga la página.";
 const RUN_IT =
-  "Córrelo en una terminal, en la carpeta de Folio, con la ruta de tu llave de denuncias en vez de <llave>. Tu llave nunca pasa por el panel.";
+  "Córrelo en una terminal, en la carpeta de Folio. Usa tu llave de denuncias en ~/folio-reports.key: si está en otro lugar, cambia esa ruta. Tu llave nunca pasa por el panel.";
 const DOWNLOAD_KEPT_MS = 60_000;
 
 const foundText = (answer: Found): string => {
@@ -319,7 +319,7 @@ class Panel {
     }
     this.#handing(
       command,
-      "Anotado el motivo. Imprime el link de la denuncia: ábrelo en el navegador para leer la versión denunciada.",
+      "Anotado el motivo. Imprime el link de la denuncia, listo para abrir en el navegador y leer la versión denunciada.",
       where,
     );
     void this.#loadBoard();

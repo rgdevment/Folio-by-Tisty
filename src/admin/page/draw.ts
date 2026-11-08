@@ -60,11 +60,13 @@ const signersText = ({ signers }: QueuedDoc): string => {
   return others.length === 0 ? "Su dueño firmó todas las versiones." : `No las firmó su dueño: ${others.join(", ")}.`;
 };
 
+const REPORTS_KEY = "~/folio-reports.key";
+
 const openCommand = (doc: string, sealed: string): string =>
-  `node scripts/report-key.mjs open <llave> ${doc} ${sealed}`;
+  `node scripts/report-key.mjs open ${REPORTS_KEY} ${doc} ${sealed}`;
 
 const checkCommand = (doc: string, sealed: string): string =>
-  `node scripts/report-key.mjs check <llave> ${doc} ${sealed} "<link para verificar>"`;
+  `node scripts/report-key.mjs check ${REPORTS_KEY} ${doc} ${sealed} "<link para verificar>"`;
 
 const keyAge = (owner: Owner, today: number): string =>
   owner.firstDay === null ? "llave sin registro" : `llave de ${daysText(today - owner.firstDay)}`;
@@ -180,7 +182,7 @@ const reportCard = (
     buttons.unshift(
       button(page, "Abrir denuncia", () => doing.openReport(report.doc, openCommand(report.doc, sealed), card)),
       button(page, "Comprobar sin abrir", () =>
-        doing.copy(checkCommand(report.doc, sealed), "Dice si la llave abre ese documento, sin leer nada.", card),
+        doing.copy(checkCommand(report.doc, sealed), "Cambia <link para verificar> por uno del panel, entre las comillas. Dice si la llave abre ese documento, sin leer nada.", card),
       ),
     );
   }

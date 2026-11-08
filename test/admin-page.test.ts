@@ -280,8 +280,8 @@ describe("checking a key", () => {
   it("copies a command that opens nothing, only where a link came", () => {
     pressing("reports", "Comprobar sin abrir");
     expect(doing.copy).toHaveBeenCalledWith(
-      'node scripts/report-key.mjs check <llave> AbCdEfGh sealed1.opaque "<link para verificar>"',
-      "Dice si la llave abre ese documento, sin leer nada.",
+      'node scripts/report-key.mjs check ~/folio-reports.key AbCdEfGh sealed1.opaque "<link para verificar>"',
+      "Cambia <link para verificar> por uno del panel, entre las comillas. Dice si la llave abre ese documento, sin leer nada.",
       expect.anything(),
     );
     const buttons = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
@@ -407,14 +407,14 @@ describe("a case in the panel", () => {
     await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
     const noted = fetching.mock.calls.find(([path]) => path === "/api/docs/AbCdEfGh/opened");
     expect(JSON.parse(String(noted?.[1]?.body))).toEqual({ note: "verificar la denuncia" });
-    expect(writeText).toHaveBeenCalledWith("node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque");
+    expect(writeText).toHaveBeenCalledWith("node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.opaque");
     const card = (page.getElementById("reports") as Element).querySelector(".card") as Element;
     await vi.waitFor(() => expect(card.querySelector(".card-steps")).not.toBeNull());
     const steps = card.querySelector(".card-steps") as Element;
     expect(steps.textContent).toContain("Copiado.");
     expect(steps.textContent).toContain("Imprime el link de la denuncia");
     expect(steps.querySelector("code")?.textContent).toBe(
-      "node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque",
+      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.opaque",
     );
     expect(page.getElementById("said")?.textContent).toBe("");
   });
@@ -534,7 +534,7 @@ describe("the panel", () => {
     pressing("reports", "Abrir denuncia");
     expect(doing.openReport).toHaveBeenCalledWith(
       "AbCdEfGh",
-      "node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque",
+      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.opaque",
       expect.anything(),
     );
     expect(page.getElementById("reports")?.textContent).not.toContain("sealed1.opaque");
@@ -593,7 +593,7 @@ describe("the panel", () => {
   it("hands over a sealed email only as a command, on the report that brought one", () => {
     pressing("reports", "Copiar para leer su correo");
     expect(doing.copy).toHaveBeenCalledWith(
-      expect.stringContaining("report-key.mjs open <llave> AbCdEfGh contact1.opaque"),
+      expect.stringContaining("report-key.mjs open ~/folio-reports.key AbCdEfGh contact1.opaque"),
       "Imprime el correo que dejó quien denunció.",
       expect.anything(),
     );

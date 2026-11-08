@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 const NONCE_BYTES = 12;
 const NOT_OPENED = 3;
@@ -9,6 +11,9 @@ const MANIFEST_SIZE_AT = 4;
 const MANIFEST_AT = 8;
 const MANIFEST_BYTES_AT_MOST = 16384;
 const CASE_TOKEN = /#caso\.([A-Za-z0-9_-]{43})/;
+const OWN_LINK = /^([A-Za-z0-9]{8})#([A-Za-z0-9_-]{43})$/;
+// PowerShell hands ~ over as it is, and the panel's command must work there too.
+const fileAt = (path) => (path.startsWith("~/") ? join(homedir(), path.slice(2)) : path);
 const LABELS = { "sealed1.": "folio.report-link.v1", "contact1.": "folio.report-contact.v1" };
 
 const text = (bytes) => Buffer.from(bytes).toString("base64url");
@@ -17,12 +22,12 @@ const shown = (said) => said.replace(/\p{C}/gu, (one) => `\\u{${one.codePointAt(
 const create = async (file) => {
   const pair = await crypto.subtle.generateKey("X25519", true, ["deriveBits"]);
   const secret = text(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
-  writeFileSync(file, `${secret}\n`, { flag: "wx", mode: 0o600 });
+  writeFileSync(fileAt(file), `${secret}\n`, { flag: "wx", mode: 0o600 });
   console.log(text(await crypto.subtle.exportKey("raw", pair.publicKey)));
 };
 
 const opened = async (file, id, sealedLink) => {
-  const secret = Buffer.from(readFileSync(file, "utf8").trim(), "base64url");
+  const secret = Buffer.from(readFileSync(fileAt(file), "utf8").trim(), "base64url");
   const own = await crypto.subtle.importKey("pkcs8", secret, "X25519", true, ["deriveBits"]);
   const { x } = await crypto.subtle.exportKey("jwk", own);
   const prefix = Object.keys(LABELS).find((one) => sealedLink.startsWith(one));
@@ -59,8 +64,14 @@ const opened = async (file, id, sealedLink) => {
 };
 
 const open = async (file, id, sealedLink) => {
+  const said = await opened(file, id, sealedLink);
+  if (OWN_LINK.exec(said)?.[1] === id) {
+    console.error("The link the report brought, to open in a browser:");
+    console.log(`${ORIGIN}/${said}`);
+    return;
+  }
   console.error("What the seal brings, written by whoever reported and not checked:");
-  console.log(shown(await opened(file, id, sealedLink)));
+  console.log(shown(said));
 };
 
 const manifestOf = async (id, caseLink) => {

@@ -29,11 +29,33 @@ describe("a link sealed for the operator", () => {
     const sealed = await sealLink(ID, LINK_KEY, operatorKey);
     expect(isSealedLink(sealed)).toBe(true);
     expect(sealed).not.toContain(LINK_KEY);
-    expect(keyScript("open", file, ID, sealed)).toBe(`${ID}#${LINK_KEY}`);
+    expect(keyScript("open", file, ID, sealed)).toBe(`https://tisty.cl/${ID}#${LINK_KEY}`);
     expect(() => keyScript("open", file, "another1", sealed)).toThrow();
     const other = join(folder, "other.key");
     keyScript("new", other);
     expect(() => keyScript("open", other, ID, sealed)).toThrow();
+  });
+
+  it("gives a link to open only for its own document, and anything else as text", async () => {
+    const elsewhere = await sealContact(ID, `another1#${LINK_KEY}`, operatorKey);
+    expect(keyScript("open", file, ID, elsewhere)).toBe(`another1#${LINK_KEY}`);
+  });
+
+  it("finds the key under the home folder when its path starts with ~, as PowerShell hands it over", () => {
+    const home = mkdtempSync(join(tmpdir(), "folio-home-"));
+    const inHome = (...args: string[]) =>
+      execFileSync(process.execPath, ["scripts/report-key.mjs", ...args], {
+        encoding: "utf8",
+        stdio: "pipe",
+        env: { ...process.env, HOME: home, USERPROFILE: home },
+      }).trim();
+    try {
+      const made = inHome("new", "~/folio-reports.key");
+      expect(made).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect(() => inHome("new", join(home, "folio-reports.key"))).toThrow();
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 
   it("is sealed by the page under a key that holds, and the private part is never here", async () => {
