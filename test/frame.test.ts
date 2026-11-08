@@ -833,6 +833,12 @@ describe("widgets and files", () => {
     expect(sheet.indexOf("a.doc-card {")).toBeGreaterThan(sheet.indexOf("a.card {"));
   });
 
+  it("does not underline a card, a web link's included, which carries no a.card to clear it", () => {
+    const sheet = readFileSync("src/page/ui/sheet.css", "utf8");
+    const from = sheet.indexOf("a.doc-card {");
+    expect(sheet.slice(from, sheet.indexOf("}", from))).toContain("text-decoration: none;");
+  });
+
   it("writes a file's name as words, never as HTML", () => {
     draw({ ...WITH_FILES, files: [{ at: 0, name: "<img src=x onerror=alert(1)>", kind: "text/html" }] });
     expect(root.querySelector(".card-name img")).toBeNull();
