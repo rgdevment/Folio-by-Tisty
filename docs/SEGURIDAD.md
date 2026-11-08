@@ -46,9 +46,9 @@ amenazas legales.
   compartido y leer tienen un freno de velocidad por red, y subir tiene un cupo
   por red y una espera por persona. Denunciar tiene su propio freno de velocidad
   por red. Una red trae solo unas pocas llaves nuevas al día, y una llave nueva
-  parte con los topes más bajos. Las llaves de menos de 30 días comparten un tope
-  diario de almacenamiento, cada una guarda hasta 25 MB, y cerca del tope total
-  solo suben las más antiguas.
+  parte con los topes más bajos. Cada llave guarda hasta 25 MB, las de menos de
+  30 días comparten un tope diario de almacenamiento, y cerca del tope total solo
+  suben las más antiguas.
   Un documento admite hasta 20 idiomas.
 - **El panel del operador va aparte.** Es otro Worker, en panel.tisty.cl, sin
   acceso al almacenamiento de los documentos ni a sus llaves, así que no puede

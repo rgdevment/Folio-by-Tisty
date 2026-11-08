@@ -45,8 +45,8 @@ be met with legal threats.
   have a speed limit per network, and uploading has a quota per network and a
   wait per person. Reporting has its own speed limit per network. A network
   brings only a few new keys a day, and a new key starts from the lowest limits.
-  Keys under 30 days old share a daily storage limit, each holds up to 25 MB,
-  and as storage nears its ceiling only older keys can upload. A document takes
+  Each key holds up to 25 MB, keys under 30 days old share a daily storage
+  limit, and as storage nears its ceiling only older keys can upload. A document takes
   up to 20 languages.
 - **The operator's panel stands apart.** It is another Worker, at panel.tisty.cl,
   with no access to where documents are stored or to their keys, so it cannot open

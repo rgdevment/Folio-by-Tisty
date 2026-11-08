@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 13, vigente desde el 7 de noviembre de 2026.**
+**Versión 14, vigente desde el 8 de noviembre de 2026.**
 
 ## En corto
 
@@ -90,11 +90,15 @@ con lo que lees es tu responsabilidad.
   llaves nuevas suben hasta 5 GB al día, y desde una red que ya subió 50 MB ese
   día no sube ninguna más. Cuenta la llave del dueño y la de quien firma la
   versión: si una es nueva, la versión también.
-- **Mientras tu llave es nueva, tus documentos guardan juntos hasta 25 MB,**
-  contando las versiones que conservan. Cada grupo distinto de adjuntos cuenta
-  como 5 MB, lo más que puede pesar. Para subir más, espera a que alguno caduque
-  o deja de compartirlo. No cuentan los documentos bloqueados ni la versión que
-  espera un documento cuyo reclamo se aceptó solo.
+- **Tu llave guarda hasta 25 MB entre sus documentos abiertos.** De cada uno
+  cuenta su última versión con sus adjuntos, por lo que pesan: tú decides si son
+  muchos documentos de texto o uno con imágenes y video. Lo que caducó, dejaste
+  de compartir o está bloqueado no cuenta. Para subir más, espera a que alguno
+  caduque o deja de compartirlo. No cuenta la versión que espera un documento
+  cuyo reclamo se aceptó solo.
+- **Folio guarda la última versión de cada documento.** Una versión reemplazada
+  queda hasta 3 días, por si llega una denuncia, y una denunciada o retenida por
+  una orden queda lo que diga su denuncia o su orden.
 - **Cuando Folio guarda 80 GB,** solo acepta versiones de llaves que no son
   nuevas, salvo la del dueño que espera un documento cuyo reclamo se aceptó
   solo. Con 100 GB no acepta ninguna hasta que se libere espacio.

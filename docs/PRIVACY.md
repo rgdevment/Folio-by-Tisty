@@ -1,6 +1,6 @@
 # Folio by Tisty privacy policy
 
-**In force since November 7, 2026.**
+**In force since November 8, 2026.**
 
 ## The short version
 
@@ -25,7 +25,7 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 
 | What | Why | For how long |
 |---|---|---|
-| The encrypted document and its attached files, with its last 3 versions and those replaced in the last 7 days | To serve it to whoever has the link, and so a report can reach what someone replaced | Until the time without activity you choose, 15 days at most, or until you stop sharing it. With a serious report or an order, it is no longer served and stays for up to 180 days, or for as long as an order or an authority asks |
+| The encrypted document and its attached files, with its latest version and those replaced in the last 3 days | To serve it to whoever has the link, and so a report can reach what someone replaced | Until the time without activity you choose, 15 days at most, or until you stop sharing it. With a serious report or an order, it is no longer served and stays for up to 180 days, or for as long as an order or an authority asks |
 | The manifest in the clear: how many parts, what each weighs, their kind and the version | To hold the limits without reading the content | As long as the document |
 | The manage link, kept as a digest (hash), and the public key of the edit link's token, which never reaches the server | To check who may change or delete it | As long as the document |
 | Your public key and its certificate, in what you share | So readers know it is yours | As long as the document |
