@@ -261,6 +261,14 @@ describe("the files a version names", () => {
       expect(await sendFiles(id, bytes)).toEqual({ stored: true, hash });
     });
 
+    it("are refused once the owner's key is blocked, as a blocked key uploads nothing more", async () => {
+      const { id, bytes, hash } = await named();
+      await sendNaming(id, 2, hash, LATER);
+      await testEnv.DB.prepare("UPDATE keys SET blocked_at = 1").run();
+      expect(await sendFiles(id, bytes)).toEqual({ refused: "key_blocked" });
+      expect(await objects(id)).toEqual([]);
+    });
+
     it("are not taken when no version names them", async () => {
       const { id, bytes } = await named();
       await store.setStage("new_keys_off");
@@ -873,6 +881,18 @@ describe("what stops a version", () => {
       expect(await another(LATER + DAY_MS)).toEqual({ stored: true, version: 1 });
     });
 
+    it("lets only what fits through when versions arrive at once, as each one is checked in its own write", async () => {
+      const fresh = await newPerson();
+      const { one, two, first, second } = await twoOf(fresh);
+      const room = roomOf(first.length + second.length - 1);
+      const answers = await Promise.all([
+        sendTo(room, one.id, first, NOW, one),
+        sendTo(room, two.id, second, NOW, two),
+      ]);
+      expect(answers.filter((one) => "stored" in one)).toHaveLength(1);
+      expect(answers.filter((one) => "refused" in one && one.refused === "room_full")).toHaveLength(1);
+    });
+
     it("frees what stopped being shared", async () => {
       const fresh = await newPerson();
       const { one, two, first, second } = await twoOf(fresh);
@@ -1178,7 +1198,7 @@ describe("what stops a version", () => {
       expect((await newKeysBytes())?.bytes).toBe(before);
     });
 
-    it("does not count the files of a version already kept, so it never stays without them", async () => {
+    it("takes the files of a version already kept past the ceiling, so it never stays without them, and counts them", async () => {
       const first = await started();
       const main = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
       expect(await send(first.id, main, NOW, first)).toEqual({ stored: true, version: 1 });
@@ -1193,7 +1213,7 @@ describe("what stops a version", () => {
         limited(1),
       );
       expect(answer).toEqual({ stored: true, hash });
-      expect((await newKeysBytes())?.bytes).toBe(before);
+      expect((await newKeysBytes())?.bytes).toBe((before ?? 0) + files.length);
     });
 
     it("leaves no share behind when a first version is refused, so it holds nothing the next day", async () => {

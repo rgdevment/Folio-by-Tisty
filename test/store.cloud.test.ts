@@ -446,6 +446,19 @@ describe("expiring", () => {
     expect(await store.create(language("afterclaim"), DAY + 2)).toBe("created");
   });
 
+  it("charges a key for a language its anchor keeps alive, past the language's own days", async () => {
+    await store.create(newDoc("anchor", { ttlDays: 15 }), DAY);
+    await store.create(newDoc("lang1", { anchor: "anchor", ttlDays: 1 }), DAY);
+    await testEnv.DB.prepare("UPDATE docs SET latest = 1, versions = ?, files_bytes = 50 WHERE owner = ?")
+      .bind(JSON.stringify([{ n: 1, hash: "h", bytes: 100 }]), "o1")
+      .run();
+    expect(await store.heldByOwner("o1", DAY + 5, "")).toBe(300);
+    await testEnv.DB.prepare("UPDATE docs SET paused_at = ?1 WHERE id = 'anchor'")
+      .bind(DAY + 1)
+      .run();
+    expect(await store.heldByOwner("o1", DAY + 5, "")).toBe(150);
+  });
+
   it("does not count a language that never got a version once its days pass", async () => {
     await store.create(newDoc("anchor", { ttlDays: 15 }), DAY);
     const language = (id: string) => newDoc(id, { anchor: "anchor", ttlDays: 1 });

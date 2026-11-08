@@ -1,14 +1,12 @@
 import type { KeyDoc, KeyView, Owner } from "../core/dashboard";
 import type { Limits, ReportLevel } from "../core/limits";
-import { HELD_BYTES, HOLDS_ROOM } from "./room";
+import { HELD_BYTES, HOLDS_ROOM, SERVED } from "./room";
 
 const LISTED_AT_MOST = 200;
 const RECORDS_AT_MOST = 1000;
 
 const HOLDS = (today: string): string => `COALESCE(SUM(CASE WHEN ${HOLDS_ROOM(today)} THEN ${HELD_BYTES} END), 0)`;
-// A language lives by its anchor, so its own days passing does not make it expire.
-const ALIVE = `(d.dies_on >= ?2 OR (d.anchor IS NOT NULL AND d.paused_at IS NULL
-  AND EXISTS (SELECT 1 FROM docs a WHERE a.id = d.anchor AND a.latest >= 0 AND a.dies_on >= ?2)))`;
+const ALIVE = SERVED("?2");
 
 export const levelsOf = (rows: { level: string; n: number }[]): Record<ReportLevel, number> => {
   const levels: Record<ReportLevel, number> = { grave: 0, medium: 0, light: 0 };

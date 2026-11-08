@@ -1,7 +1,7 @@
 import type { Top, TopDoc, TopOrder } from "../core/dashboard";
 import { dayOf, type Limits, type ReportLevel } from "../core/limits";
 import { type DayReading, LONE_AFTER_DAYS, signalsOf } from "../core/signals";
-import { HELD_BYTES } from "./room";
+import { HELD_BYTES, SERVED } from "./room";
 import { seenOf } from "./seen";
 
 const LISTED = 50;
@@ -37,6 +37,7 @@ interface Row {
   known_since: number;
   blocked_at: number | null;
   paused_at: number | null;
+  served: number;
   key_day: number | null;
   languages: number;
   nets: number;
@@ -100,7 +101,7 @@ const topDocOf = (row: Row, today: number, limits: Limits): TopDoc => {
     diesOn: row.dies_on,
     blocked: row.blocked_at !== null,
     paused: row.paused_at !== null,
-    stopped: row.dies_on < today,
+    stopped: row.served === 0,
     signals,
   };
 };
@@ -122,7 +123,7 @@ export const topDocs = async (
            FROM net_doc u JOIN net_day q ON q.day = u.day AND q.net = u.net
            WHERE u.day >= ?1 - 1 GROUP BY u.doc
          )
-       SELECT d.id, d.owner, d.latest, d.ttl_days, d.dies_on, d.blocked_at, d.paused_at,
+       SELECT d.id, d.owner, d.latest, d.ttl_days, d.dies_on, d.blocked_at, d.paused_at, ${SERVED("?1")} AS served,
          json_extract(d.versions, '$[#-1].at') AS latest_at, ${EDITS_A_DAY} AS edits_a_day,
          ${HELD_BYTES} AS bytes, d.first_day AS first_shared, ${KNOWN_SINCE} AS known_since,
          k.first_day AS key_day,

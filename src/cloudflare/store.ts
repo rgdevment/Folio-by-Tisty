@@ -247,7 +247,9 @@ export class Cloud implements Store {
              active_day = MAX(active_day, ?1),
              blocked_at = NULL, blocked_hour = NULL, appealed_at = NULL, appealed_hour = NULL
            WHERE id = ?5 AND latest = ?6 AND permit IS ?9
-             AND ((blocked_at IS NULL AND paused_at IS NULL) OR (?7 AND blocked_at IS NOT NULL AND blocked_by_operator = 0 AND counts_from = ?2))`,
+             AND ((blocked_at IS NULL AND paused_at IS NULL) OR (?7 AND blocked_at IS NOT NULL AND blocked_by_operator = 0 AND counts_from = ?2))
+             AND (?12 IS NULL OR ?13 + (SELECT COALESCE(SUM(${HELD_BYTES}), 0) FROM docs d
+               WHERE d.owner = docs.owner AND d.id <> docs.id AND ${HOLDS_ROOM("?1")}) <= ?12)`,
         )
         .bind(
           today,
@@ -261,6 +263,8 @@ export class Cloud implements Store {
           upload.permit,
           this.#limits.pausedDays,
           upload.filesBytes ?? 0,
+          upload.roomAtMost ?? null,
+          bytes + (upload.filesBytes ?? 0),
         ),
       // A new version of a language is activity of the whole group (decisions 50 and 69 bis).
       ...(held.anchor
@@ -299,7 +303,7 @@ export class Cloud implements Store {
     ]);
     if ((moved?.meta.changes ?? 0) === 0) {
       await this.#giveRoomBack(upload.net, bytes, today, upload.newKey);
-      return this.#lostTheRace(upload, key);
+      return this.#lostTheRace(upload, key, today);
     }
 
     const dropped = versions.filter((one) => !kept.includes(one));
@@ -380,13 +384,17 @@ export class Cloud implements Store {
     return found?.n === asked.length;
   }
 
-  async #lostTheRace(upload: Upload, key: string): Promise<Uploaded> {
+  async #lostTheRace(upload: Upload, key: string, today: number): Promise<Uploaded> {
     const now = await this.#row(upload.id);
     const versions = now ? (JSON.parse(now.versions) as Version[]) : [];
     // Two sends of the same bytes share one object, so the one that lost must not delete what the other kept.
     if (versions.some((one) => one.n === upload.n && one.hash === upload.hash)) return "same";
     await this.#envelopes.delete(key);
     if (!now || now.latest === CLAIMED) return "missing";
+    if (now.latest === upload.n - 1 && upload.roomAtMost !== undefined) {
+      const held = await this.heldByOwner(now.owner, today, upload.id);
+      if (held + sizeOf(upload.body) + (upload.filesBytes ?? 0) > upload.roomAtMost) return "room_full";
+    }
     return now.blocked_at === null ? "behind" : "blocked";
   }
 
@@ -666,13 +674,23 @@ export class Cloud implements Store {
     return (await this.#envelopes.head(filesKey(id, hash)))?.size ?? null;
   }
 
-  async keepFiles({ id, hash, body, net, latest }: KeptFiles, today: number): Promise<"stored" | "quota"> {
+  // A version already kept is never left without its files, but a new key's still count against new keys' bytes.
+  async keepFiles({ id, hash, body, net, latest, newKey }: KeptFiles, today: number): Promise<"stored" | "quota"> {
     if (!(await this.#takeQuota(net, 0, body.length, today))) return "quota";
     try {
       await this.#envelopes.put(filesKey(id, hash), body);
     } catch (error) {
       await this.#giveQuotaBack(net, 0, body.length, today);
       throw error;
+    }
+    if (newKey) {
+      await this.#db
+        .prepare(
+          `INSERT INTO net_day (day, net, docs, bytes) VALUES (?1, ?2, 0, ?3)
+           ON CONFLICT (day, net) DO UPDATE SET bytes = bytes + excluded.bytes`,
+        )
+        .bind(today, NEW_KEYS_NET, body.length)
+        .run();
     }
     await this.#db
       .prepare("UPDATE docs SET files_bytes = ?1 WHERE id = ?2 AND latest = ?3")
