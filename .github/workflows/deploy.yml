@@ -450,11 +450,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           package-manager-cache: false
       - run: npm ci --ignore-scripts
+      # A version carries the limits it was built with, so going back must not bring back another maker.
+      - name: It names the same maker
+        run: |
+          set -euo pipefail
+          said=$(npx --no-install wrangler versions view "$BACK_TO" --json | jq -r '.annotations["workers/message"] // empty')
+          commit=$(printf '%s' "$said" | awk '{print $2}')
+          [[ "$commit" =~ ^[0-9a-f]{8}$ ]]             || { echo "::error::$BACK_TO was not deployed by a tag, so its maker cannot be told: put it back by hand"; exit 1; }
+          then_maker=$(git show "$commit:docs/limits.json" | jq -c '.maker // null')
+          now_maker=$(jq -c '.maker // null' docs/limits.json)
+          [ "$then_maker" = "$now_maker" ]             || { echo "::error::$BACK_TO was built with another maker; sign and deploy a fix instead"; exit 1; }
       # Migrations stay as they are: the tables only ever grow, so an older version still reads them.
       - name: Put it back
         run: npx --no-install wrangler rollback "$BACK_TO" --yes --message "put back by hand"

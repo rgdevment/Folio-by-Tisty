@@ -33,7 +33,7 @@ export interface UploadTools extends ReadTools {
 }
 
 const madeByMaker = ({ manifest, signature }: ReadEnvelope, makerRoot: string | null): boolean =>
-  makerRoot !== null && (manifest.owner as Owner).root === makerRoot && signature.root === makerRoot;
+  makerRoot !== null && (manifest.owner as Owner | undefined)?.root === makerRoot && signature.root === makerRoot;
 
 // While sharing is closed the maker's documents take only the maker's versions, edit links included.
 const closedTo = (read: ReadEnvelope, sharing: boolean, owner: string | undefined, tools: UploadTools): boolean =>
