@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 13, in force since November 7, 2026.**
+**Version 14, in force since November 8, 2026.**
 
 ## The short version
 
@@ -89,11 +89,15 @@ but what you do with what you read is your responsibility.
   5 GB a day, and from a network that already uploaded 50 MB that day none
   uploads more. Both the owner's key and the signer's count: if either is new,
   so is the version.
-- **While your key is new, your documents hold up to 25 MB together,**
-  counting the versions they keep. Each distinct set of attachments counts as
-  5 MB, the most it may weigh. To upload more, wait for one to expire or stop
-  sharing it. Blocked documents do not count, nor the version a document awaits
-  after its appeal was accepted on its own.
+- **Your key holds up to 25 MB among its open documents.** For each one, its
+  latest version counts with its attachments, by what they weigh: you choose
+  whether that is many text documents or one with pictures and video. What
+  expired, what you stopped sharing and what is blocked does not count. To
+  upload more, wait for one to expire or stop sharing it. The version a document
+  awaits after its appeal was accepted on its own does not count.
+- **Folio keeps the latest version of each document.** A replaced version stays
+  up to 3 days, in case a report comes, and one reported or held by an order
+  stays as long as its report or its order says.
 - **Once Folio holds 80 GB,** it only takes versions from keys that are not new,
   except the owner's version that a document awaits after its appeal was
   accepted on its own. At 100 GB it takes none until space frees up.

@@ -58,6 +58,7 @@ interface DocRow {
   anchor: string | null;
   latest: number;
   versions: string;
+  files_bytes: number;
   blocked_at: number | null;
   paused_at: number | null;
   counts_from: number;
@@ -242,7 +243,7 @@ export class Cloud implements Store {
     const [moved] = await this.#db.batch([
       this.#db
         .prepare(
-          `UPDATE docs SET latest = ?2, versions = ?3, bytes = ?4,
+          `UPDATE docs SET latest = ?2, versions = ?3, bytes = ?4, files_bytes = ?11,
              owner_mark = CASE WHEN ?7 THEN ?8 ELSE owner_mark END, fix_by = NULL,
              dies_on = CASE WHEN blocked_at IS NULL THEN ${LIVES_ON} WHEN paused_at IS NULL THEN ?1 + ttl_days ELSE paused_at + ?10 END,
              active_day = MAX(active_day, ?1),
@@ -261,6 +262,7 @@ export class Cloud implements Store {
           upload.ownerMark,
           upload.permit,
           this.#limits.pausedDays,
+          upload.filesBytes ?? 0,
         ),
       // A new version of a language is activity of the whole group (decisions 50 and 69 bis).
       ...(held.anchor
@@ -315,6 +317,7 @@ export class Cloud implements Store {
       anchor: row.anchor,
       latest: row.latest,
       versions: JSON.parse(row.versions) as Version[],
+      filesBytes: row.files_bytes,
       blocked: row.blocked_at !== null,
       paused: row.paused_at !== null,
       correctable: mayCorrect(row),
@@ -401,7 +404,7 @@ export class Cloud implements Store {
   #row(id: string): Promise<DocRow | null> {
     return this.#db
       .prepare(
-        "SELECT owner, admin_hash, permit, owner_mark, anchor, latest, versions, blocked_at, paused_at, counts_from, blocked_by_operator FROM docs WHERE id = ?",
+        "SELECT owner, admin_hash, permit, owner_mark, anchor, latest, versions, files_bytes, blocked_at, paused_at, counts_from, blocked_by_operator FROM docs WHERE id = ?",
       )
       .bind(id)
       .first<DocRow>();
@@ -420,17 +423,15 @@ export class Cloud implements Store {
     return taken.meta.changes > 0;
   }
 
-  // Each distinct set of attachments counts at the most it may weigh: its real size is never written down.
-  async heldByOwner(owner: string, today: number, except: string, filesBytes: number): Promise<number> {
+  // The latest version and its attachments: older ones are kept for reports, which the owner does not choose.
+  async heldByOwner(owner: string, today: number, except: string): Promise<number> {
     const held = await this.#db
       .prepare(
-        `SELECT COALESCE(SUM(d.bytes + ?4 * (
-           SELECT COUNT(DISTINCT json_extract(v.value, '$.files')) FROM json_each(d.versions) v
-         )), 0) AS n
+        `SELECT COALESCE(SUM(json_extract(d.versions, '$[#-1].bytes') + d.files_bytes), 0) AS n
          FROM docs d
          WHERE d.owner = ?1 AND d.latest >= 0 AND d.dies_on >= ?2 AND d.blocked_at IS NULL AND d.id <> ?3`,
       )
-      .bind(owner, today, except, filesBytes)
+      .bind(owner, today, except)
       .first<{ n: number }>();
     return held?.n ?? 0;
   }
@@ -647,11 +648,11 @@ export class Cloud implements Store {
     return (await this.#envelopes.get(objectKey(id, version)))?.body ?? null;
   }
 
-  async hasFiles(id: string, hash: string): Promise<boolean> {
-    return (await this.#envelopes.head(filesKey(id, hash))) !== null;
+  async filesBytes(id: string, hash: string): Promise<number | null> {
+    return (await this.#envelopes.head(filesKey(id, hash)))?.size ?? null;
   }
 
-  async keepFiles({ id, hash, body, net }: KeptFiles, today: number): Promise<"stored" | "quota"> {
+  async keepFiles({ id, hash, body, net, latest }: KeptFiles, today: number): Promise<"stored" | "quota"> {
     if (!(await this.#takeQuota(net, 0, body.length, today))) return "quota";
     try {
       await this.#envelopes.put(filesKey(id, hash), body);
@@ -659,6 +660,10 @@ export class Cloud implements Store {
       await this.#giveQuotaBack(net, 0, body.length, today);
       throw error;
     }
+    await this.#db
+      .prepare("UPDATE docs SET files_bytes = ?1 WHERE id = ?2 AND latest = ?3")
+      .bind(body.length, id, latest)
+      .run();
     return "stored";
   }
 

@@ -1,5 +1,5 @@
 {
-  "serial": 24,
+  "serial": 25,
   "ttl_days": [
     1,
     3,
@@ -9,15 +9,15 @@
   "shares_at_most": 2,
   "languages_at_most": 20,
   "days_a_key_is_new": 30,
-  "new_key_bytes_at_most": 25000000,
+  "key_bytes_at_most": 25000000,
   "envelope_bytes_at_most": 24000000,
   "first_bytes_at_most": 2512000,
   "rest_bytes_at_most": 15572000,
-  "pictures_at_most": 10,
+  "pictures_at_most": 64,
   "picture_bytes_at_most": 1000000,
-  "pictures_bytes_at_most": 5000000,
-  "files_at_most": 2,
-  "files_bytes_at_most": 5000000,
+  "pictures_bytes_at_most": 24000000,
+  "files_at_most": 64,
+  "files_bytes_at_most": 24000000,
   "uploads_of_a_root_an_hour": 10,
   "upload_waits_minutes": [
     1,
@@ -31,9 +31,9 @@
   "oldest_contract_taken": null,
   "oldest_contract_served": null,
   "terms": {
-    "version": "13",
-    "es": "9f81aa6c6cd568022186502d548b9de60048d52f53f4f8ac8394cc46d44c58dc",
-    "en": "894409bb5a69256388985aaae8094d8b6bd41828ad44db2cd45e286075bca4b6"
+    "version": "14",
+    "es": "45b494b7a9496173898e0f973dc8ddaf824148d3952a96946138d2f9fe4a223e",
+    "en": "dbb8d93c4729bae225db09839d0b9a4e0cd8f384876bf00f94f3a307300fc61c"
   },
   "sharing_open": true
 }

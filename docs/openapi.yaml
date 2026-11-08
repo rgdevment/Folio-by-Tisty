@@ -339,7 +339,7 @@ paths:
                   - $ref: "#/components/schemas/Revoked"
         "404": { $ref: "#/components/responses/Missing" }
         "409":
-          description: The latest version does not name this envelope.
+          description: The latest version does not name this envelope, or the key that owns the document already holds as much as it may.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/FilesBehind" }
@@ -777,7 +777,7 @@ components:
       type: object
       required: [refused]
       properties:
-        refused: { const: behind }
+        refused: { enum: [behind, room_full] }
     Stored:
       type: object
       required: [stored, version]

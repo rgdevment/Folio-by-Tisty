@@ -446,13 +446,19 @@ describe("reading by a case link", () => {
   });
 
   it("serves the files of that version alone", async () => {
-    await store.keepFiles({ id: ID, hash: FILES, body: new TextEncoder().encode("the files"), net: "n" }, TODAY);
+    await store.keepFiles(
+      { id: ID, hash: FILES, body: new TextEncoder().encode("the files"), net: "n", latest: 2 },
+      TODAY,
+    );
     await testEnv.DB.prepare("UPDATE docs SET versions = json_set(versions, '$[0].files', ?) WHERE id = ?")
       .bind(FILES, ID)
       .run();
     await madeCase(1);
     expect(await (await send(`cases/${ID}/files/${FILES}`, TOKEN)).text()).toBe("the files");
-    await store.keepFiles({ id: ID, hash: "G".repeat(43), body: new TextEncoder().encode("others"), net: "n" }, TODAY);
+    await store.keepFiles(
+      { id: ID, hash: "G".repeat(43), body: new TextEncoder().encode("others"), net: "n", latest: 2 },
+      TODAY,
+    );
     expect((await send(`cases/${ID}/files/${"G".repeat(43)}`, TOKEN)).status).toBe(404);
     expect((await send(`cases/${ID}/files/${FILES}`)).status).toBe(404);
   });

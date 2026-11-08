@@ -298,10 +298,18 @@ describe("the files a version names", () => {
     expect(said).toEqual({ refused: "bad_upload" });
   });
 
+  it("takes many small files, since their weight is what counts", async () => {
+    const id = await shared();
+    const thirty = await sealedEnvelope({ id, version: 2, owner: mario, files: Array(30).fill(16) });
+    const hash = await filesHashOf(id, thirty);
+    await sendNaming(id, 2, hash, LATER);
+    expect(await sendFiles(id, thirty)).toEqual({ stored: true, hash });
+  });
+
   it("refuses more files, or more bytes, than a document may have", async () => {
     const id = await shared();
-    const three = await sealedEnvelope({ id, version: 2, owner: mario, files: [16, 16, 16] });
-    expect(await sendFiles(id, three)).toEqual({ refused: "too_big" });
+    const many = await sealedEnvelope({ id, version: 2, owner: mario, files: Array(LIMITS.filesAtMost + 1).fill(16) });
+    expect(await sendFiles(id, many)).toEqual({ refused: "too_big" });
     const heavy = await sealedEnvelope({ id, version: 2, owner: mario, files: [LIMITS.filesBytesAtMost + 1] });
     expect(await sendFiles(id, heavy)).toEqual({ refused: "too_big" });
   });
@@ -349,15 +357,14 @@ describe("the files a version names", () => {
     expect(await listed()).not.toContain(2);
     expect(await objects(id)).toHaveLength(1);
 
-    for (const version of [6, 7]) {
-      const next = await sealedEnvelope({ id, version, owner: mario });
-      await uploadDoc({ id, now: dayOfVersion(version), ip: "203.0.113.9", bytes: async () => next }, tools);
-      expect(await objects(id)).toHaveLength(1);
-    }
+    const without = await sealedEnvelope({ id, version: 6, owner: mario });
+    await uploadDoc({ id, now: dayOfVersion(6), ip: "203.0.113.9", bytes: async () => without }, tools);
+    expect(await listed()).toEqual([5, 6]);
+    expect(await objects(id)).toHaveLength(1);
 
-    const last = await sealedEnvelope({ id, version: 8, owner: mario });
-    await uploadDoc({ id, now: dayOfVersion(8), ip: "203.0.113.9", bytes: async () => last }, tools);
-    expect(await listed()).toEqual([6, 7, 8]);
+    const last = await sealedEnvelope({ id, version: 7, owner: mario });
+    await uploadDoc({ id, now: dayOfVersion(7), ip: "203.0.113.9", bytes: async () => last }, tools);
+    expect(await listed()).toEqual([6, 7]);
     expect(await objects(id)).toEqual([]);
   });
 
@@ -782,10 +789,22 @@ describe("what stops a version", () => {
     });
   });
 
-  describe("what a new key holds", () => {
-    const roomOf = (bytes: number) => ({ ...tools, limits: { ...LIMITS, newKeyBytesAtMost: bytes } });
-    const sendTo = (to: UploadTools, id: string, bytes: Bytes, now = NOW, first?: FirstUpload) =>
-      uploadDoc({ id, now, ip: "203.0.113.9", bytes: async () => bytes, ...(first ? { first } : {}) }, to);
+  describe("what a key holds", () => {
+    const roomOf = (bytes: number) => ({ ...tools, limits: { ...LIMITS, keyBytesAtMost: bytes } });
+    const sendTo = (to: UploadTools, id: string, bytes: Bytes, now = NOW, first?: FirstUpload, files?: string) =>
+      uploadDoc(
+        {
+          id,
+          now,
+          ip: "203.0.113.9",
+          bytes: async () => bytes,
+          ...(first ? { first } : {}),
+          ...(files ? { files } : {}),
+        },
+        to,
+      );
+    const filesTo = (to: UploadTools, id: string, bytes: Bytes, now = NOW) =>
+      uploadFiles({ id, now, ip: "203.0.113.9", bytes: async () => bytes }, to);
     const twoOf = async (owner: Person) => {
       const one = await started();
       const two = await started();
@@ -810,14 +829,43 @@ describe("what stops a version", () => {
       });
     });
 
-    it("counts a new version with what its document already holds", async () => {
+    it("counts only the latest version, so editing a document never fills it", async () => {
       const fresh = await newPerson();
       const one = await started();
-      const first = await sealedEnvelope({ id: one.id, version: 1, owner: fresh });
-      const next = await sealedEnvelope({ id: one.id, version: 2, owner: fresh });
-      const room = roomOf(first.length + next.length - 1);
-      expect(await sendTo(room, one.id, first, NOW, one)).toEqual({ stored: true, version: 1 });
-      expect(await sendTo(room, one.id, next, LATER)).toEqual({ refused: "room_full" });
+      const versions = await Promise.all(
+        [1, 2, 3].map((version) => sealedEnvelope({ id: one.id, version, owner: fresh })),
+      );
+      const room = roomOf(Math.max(...versions.map((one) => one.length)));
+      expect(await sendTo(room, one.id, versions[0] as Bytes, NOW, one)).toEqual({ stored: true, version: 1 });
+      expect(await sendTo(room, one.id, versions[1] as Bytes, LATER)).toEqual({ stored: true, version: 2 });
+      expect(await sendTo(room, one.id, versions[2] as Bytes, LATER + DAY_MS)).toEqual({ stored: true, version: 3 });
+    });
+
+    it("counts attachments by what they weigh, keeps them while the next version names them, and lets go when not", async () => {
+      const fresh = await newPerson();
+      const { one, two, first, second } = await twoOf(fresh);
+      const files = await sealedEnvelope({ id: one.id, version: 1, owner: fresh, files: [16] });
+      const hash = await filesHashOf(one.id, files);
+      const holding = first.length + files.length;
+      expect(await sendTo(roomOf(holding), one.id, first, NOW, one, hash)).toMatchObject({ stored: true });
+      expect(await filesTo(roomOf(holding - 1), one.id, files)).toEqual({ refused: "room_full" });
+      expect(await filesTo(roomOf(holding), one.id, files)).toEqual({ stored: true, hash });
+
+      const another = async (now: number) => {
+        const start = await started(now);
+        const bytes = await sealedEnvelope({ id: start.id, version: 1, owner: fresh });
+        return sendTo(roomOf(holding + bytes.length - 1), start.id, bytes, now, start);
+      };
+      expect(await sendTo(roomOf(holding + second.length - 1), two.id, second, NOW, two)).toEqual({
+        refused: "room_full",
+      });
+      const again = await sealedEnvelope({ id: one.id, version: 2, owner: fresh });
+      expect(await sendTo(roomOf(holding), one.id, again, LATER, undefined, hash)).toMatchObject({ stored: true });
+      expect(await another(LATER)).toEqual({ refused: "room_full" });
+
+      const plain = await sealedEnvelope({ id: one.id, version: 3, owner: fresh });
+      expect(await sendTo(roomOf(holding), one.id, plain, LATER + DAY_MS)).toEqual({ stored: true, version: 3 });
+      expect(await another(LATER + DAY_MS)).toEqual({ stored: true, version: 1 });
     });
 
     it("frees what stopped being shared", async () => {
@@ -838,60 +886,29 @@ describe("what stops a version", () => {
       expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ stored: true, version: 1 });
     });
 
-    it("counts each new set of attachments at the most it may weigh", async () => {
+    it("holds an old key to it too, while there is no reputation", async () => {
       const fresh = await newPerson();
-      const one = await started();
-      const first = await sealedEnvelope({ id: one.id, version: 1, owner: fresh });
-      const next = await sealedEnvelope({ id: one.id, version: 2, owner: fresh });
-      const weight = first.length + next.length + filesEnvelopeBytesAtMost(LIMITS);
-      await sendTo(roomOf(weight), one.id, first, NOW, one);
-      const withFiles = (room: number) =>
-        uploadDoc(
-          { id: one.id, now: LATER, ip: "203.0.113.9", bytes: async () => next, files: "F".repeat(43) },
-          roomOf(room),
-        );
-      expect(await withFiles(weight - 1)).toEqual({ refused: "room_full" });
-      expect(await withFiles(weight)).toMatchObject({ stored: true, version: 2 });
+      const { one, two, first, second } = await twoOf(fresh);
+      const room = roomOf(first.length + second.length - 1);
+      await sendTo(room, one.id, first, NOW, one);
+      await testEnv.DB.prepare("UPDATE keys SET first_day = first_day - ?").bind(LIMITS.daysAKeyIsNew).run();
+      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ refused: "room_full" });
     });
 
-    it("counts the same attachments once, however many versions name them", async () => {
-      const fresh = await newPerson();
-      const one = await started();
-      const [first, second, third] = await Promise.all(
-        [1, 2, 3].map((version) => sealedEnvelope({ id: one.id, version, owner: fresh })),
-      );
-      const [a, b, c] = [first, second, third].map((one) => (one as Bytes).length) as [number, number, number];
-      const room = roomOf(a + b + c + filesEnvelopeBytesAtMost(LIMITS));
-      const named = (bytes: Bytes, now: number) =>
-        uploadDoc({ id: one.id, now, ip: "203.0.113.9", bytes: async () => bytes, files: "F".repeat(43) }, room);
-      await sendTo(room, one.id, first as Bytes, NOW, one);
-      expect(await named(second as Bytes, LATER)).toMatchObject({ stored: true, version: 2 });
-      expect(await named(third as Bytes, LATER + DAY_MS)).toMatchObject({ stored: true, version: 3 });
-    });
-
-    it("does not count the versions the new one lets go", async () => {
-      const fresh = await newPerson();
-      const one = { ...(await started()), ttlDays: 7 };
-      const at = [NOW, NOW + 3_600_000, NOW + 4 * DAY_MS, NOW + 8 * DAY_MS];
-      const versions = await Promise.all(
-        at.map((_, n) => sealedEnvelope({ id: one.id, version: n + 1, owner: fresh })),
-      );
-      const [v1, v2, v3, v4] = versions.map((one) => one.length) as [number, number, number, number];
-      const room = roomOf(v2 + v3 + v4 + Math.floor(v1 / 2));
-      expect(await sendTo(room, one.id, versions[0] as Bytes, at[0], one)).toEqual({ stored: true, version: 1 });
-      for (const n of [1, 2, 3]) {
-        expect(await sendTo(room, one.id, versions[n] as Bytes, at[n])).toEqual({ stored: true, version: n + 1 });
-      }
-    });
-
-    it("does not count an old owner's document when a new editor uploads", async () => {
+    it("charges an editor's version to the owner's room", async () => {
       const { pair, permit } = await newToken();
       const id = await shared({ permit });
-      await testEnv.DB.prepare("UPDATE keys SET first_day = first_day - ? WHERE root = ?")
-        .bind(LIMITS.daysAKeyIsNew, toBase64Url(mario.rootBytes))
-        .run();
+      const other = await started();
+      const kept = await sealedEnvelope({ id: other.id, version: 1, owner: mario });
+      await send(other.id, kept, NOW, other);
       const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
-      expect(await sendTo(roomOf(1), id, edited, LATER)).toEqual({ stored: true, version: 2 });
+      expect(await sendTo(roomOf(kept.length + edited.length - 1), id, edited, LATER)).toEqual({
+        refused: "room_full",
+      });
+      expect(await sendTo(roomOf(kept.length + edited.length), id, edited, LATER)).toEqual({
+        stored: true,
+        version: 2,
+      });
     });
 
     it("lets its owner's correction through, as the terms promise", async () => {
@@ -903,15 +920,6 @@ describe("what stops a version", () => {
         .run();
       const fixed = await sealedEnvelope({ id: one.id, version: 2, owner: fresh });
       expect(await sendTo(roomOf(1), one.id, fixed, LATER)).toEqual({ stored: true, version: 2 });
-    });
-
-    it("is no longer counted once the key is old", async () => {
-      const fresh = await newPerson();
-      const { one, two, first, second } = await twoOf(fresh);
-      const room = roomOf(first.length + second.length - 1);
-      await sendTo(room, one.id, first, NOW, one);
-      await testEnv.DB.prepare("UPDATE keys SET first_day = first_day - ?").bind(LIMITS.daysAKeyIsNew).run();
-      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ stored: true, version: 1 });
     });
   });
 
@@ -1569,16 +1577,15 @@ describe("the versions it keeps", () => {
     expect(keptVersions(made, 22 * DAY, LEVEL_ONE).map((one) => one.n)).toEqual([3, 4, 5, 6]);
   });
 
-  it("keeps everything replaced in the last seven days, however many", () => {
+  it("keeps everything replaced in its last days, however many", () => {
     const made = versionsAt("a", 0, 1, 2, 3, 4, 5, 6);
     expect(keptVersions(made, 7, LEVEL_ONE)).toHaveLength(7);
   });
 
   it("counts from when a version was replaced, and not from when it arrived", () => {
-    const made = versionsAt("a", 0, 30 * DAY, 31 * DAY, 32 * DAY, 33 * DAY);
-    const kept = keptVersions(made, 33 * DAY, LEVEL_ONE).map((one) => one.n);
-    expect(kept).toEqual([1, 2, 3, 4, 5]);
-    expect(keptVersions(made, 38 * DAY, LEVEL_ONE).map((one) => one.n)).toEqual([3, 4, 5]);
+    const made = versionsAt("a", 0, 30 * DAY, 31 * DAY);
+    expect(keptVersions(made, 32 * DAY, LEVEL_ONE).map((one) => one.n)).toEqual([1, 2, 3]);
+    expect(keptVersions(made, 35 * DAY, LEVEL_ONE).map((one) => one.n)).toEqual([3]);
   });
 
   it("refuses past the list's size rather than letting evidence go", async () => {
@@ -1588,14 +1595,17 @@ describe("the versions it keeps", () => {
       .bind(many.length, JSON.stringify(many), id)
       .run();
     const bytes = await sealedEnvelope({ id, version: many.length + 1, owner: mario });
-    expect(await send(id, bytes, LATER)).toEqual({ refused: "quota", until: NOW + 1 + 7 * DAY_MS });
+    expect(await send(id, bytes, LATER)).toEqual({
+      refused: "quota",
+      until: NOW + 1 + LIMITS.replacedKeptDays * DAY_MS,
+    });
   });
 
   it("says when a full list frees, and nothing while it has room", () => {
     const room = versionsAt("a", 0, 1, 2);
     expect(listFreesAt(room, 3, LEVEL_ONE)).toBeNull();
     const full = versionsAt("a", ...Array.from({ length: LEVEL_ONE.versionsListedAtMost }, (_, at) => at * 1000));
-    expect(listFreesAt(full, 300_000, LEVEL_ONE)).toBe(1000 + 7 * DAY);
+    expect(listFreesAt(full, 300_000, LEVEL_ONE)).toBe(1000 + LEVEL_ONE.replacedKeptDays * DAY);
   });
 });
 

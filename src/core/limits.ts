@@ -3,7 +3,7 @@ export interface Limits {
   sharesAtMost: number;
   languagesAtMost: number;
   daysAKeyIsNew: number;
-  newKeyBytesAtMost: number;
+  keyBytesAtMost: number;
   newKeysBytesADay: number;
   newKeysNetBytesADay: number;
   revokedMachinesAtMost: number;
@@ -58,21 +58,22 @@ export const LEVEL_ONE: Limits = {
   sharesAtMost: 2,
   languagesAtMost: 20,
   daysAKeyIsNew: 30,
-  newKeyBytesAtMost: 25_000_000,
+  keyBytesAtMost: 25_000_000,
   newKeysBytesADay: 5_000_000_000,
   newKeysNetBytesADay: 50_000_000,
   revokedMachinesAtMost: 64,
-  versionsKept: 3,
-  replacedKeptDays: 7,
+  versionsKept: 1,
+  replacedKeptDays: 3,
   versionsListedAtMost: 300,
   envelopeBytesAtMost: 24_000_000,
-  picturesAtMost: 10,
+  picturesAtMost: 64,
   pictureBytesAtMost: 1_000_000,
-  picturesBytesAtMost: 5_000_000,
+  picturesBytesAtMost: 24_000_000,
   firstBytesAtMost: 2_512_000,
   restBytesAtMost: 15_572_000,
-  filesAtMost: 2,
-  filesBytesAtMost: 5_000_000,
+  // What a key holds is what limits it; these only keep each envelope and its manifest inside their frames.
+  filesAtMost: 64,
+  filesBytesAtMost: 24_000_000,
   uploadsAnHour: 60,
   revocationsAnHour: 30,
   revocationsAtOnce: 8,
@@ -113,7 +114,7 @@ export const publishedLimits = (limits: Limits) => ({
   shares_at_most: limits.sharesAtMost,
   languages_at_most: limits.languagesAtMost,
   days_a_key_is_new: limits.daysAKeyIsNew,
-  new_key_bytes_at_most: limits.newKeyBytesAtMost,
+  key_bytes_at_most: limits.keyBytesAtMost,
   envelope_bytes_at_most: limits.envelopeBytesAtMost,
   first_bytes_at_most: limits.firstBytesAtMost,
   rest_bytes_at_most: limits.restBytesAtMost,
