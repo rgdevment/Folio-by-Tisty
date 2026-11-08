@@ -51,13 +51,8 @@ const bytesOfFiles = async ({ id, linkKey, held, caseToken }: FileAsking): Promi
 };
 
 const notOpened = (refusal: EnvelopeRefusal): string => {
-  const { fileNewer, fileDamaged, fileUnsigned, fileCouldNotArrive } = said();
-  const why: Partial<Record<EnvelopeRefusal, string>> = {
-    newer: fileNewer,
-    damaged: fileDamaged,
-    unsigned: fileUnsigned,
-  };
-  return why[refusal] ?? fileCouldNotArrive;
+  const why: Partial<Record<EnvelopeRefusal, string>> = said().fileRefused;
+  return why[refusal] ?? said().fileCouldNotArrive;
 };
 
 const whyNot = (error: unknown): string => {

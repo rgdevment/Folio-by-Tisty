@@ -3,14 +3,7 @@ import type { Arrived } from "../read";
 import { said } from "./speak";
 
 export const notArrived = (refused: string): string | undefined => {
-  const { paused, blocked, tooManyVisits, tooManyVisitsLater, busyToday } = said();
-  const why: Record<string, string> = {
-    paused,
-    blocked,
-    slow: tooManyVisits,
-    quota: tooManyVisitsLater,
-    proof: busyToday,
-  };
+  const why: Record<string, string> = said().notArrived;
   return why[refused];
 };
 

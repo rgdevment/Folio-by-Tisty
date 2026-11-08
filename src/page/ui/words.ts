@@ -1,4 +1,5 @@
 import type { Verdict } from "@tisty/contracts";
+import type { EnvelopeRefusal } from "../../rules/envelope";
 import type { Speech } from "../languages";
 
 const GITHUB_DOCS = "https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs";
@@ -101,8 +102,10 @@ const es = {
   reportGoodFaith:
     "Al enviar, declaras que denuncias de buena fe. Si el operador comprueba que es falsa, las denuncias de tu red dejan de contar hasta 180 días.",
   reportSend: "Enviar denuncia",
-  reportQuota: "Tu red ya envió muchas denuncias en esta hora. Vuelve a intentarlo más tarde.",
-  reportSlow: "Tu red envió muchas denuncias en poco tiempo. Vuelve a intentarlo en un momento.",
+  reportRefused: {
+    quota: "Tu red ya envió muchas denuncias en esta hora. Vuelve a intentarlo más tarde.",
+    slow: "Tu red envió muchas denuncias en poco tiempo. Vuelve a intentarlo en un momento.",
+  } satisfies Record<string, string>,
   reportCouldNotSend: "No se pudo enviar la denuncia. Vuelve a intentarlo en un momento.",
   reportSealed: "Lo cifras aquí, para que solo el operador pueda abrirlo, y nunca incluye lo que permite editar.",
   reportAlwaysOnGrave:
@@ -117,30 +120,36 @@ const es = {
   couldNotArrive: "No se pudo traer el documento. Vuelve a intentarlo en un momento.",
   caseGone: "Este link de caso no existe o ya caducó. Pídele uno nuevo a quien te lo entregó.",
   askingTheKey: "Pega la llave del documento, o su link completo.",
-  refusedNewer:
-    "Este documento se escribió con una versión más nueva de la que esta página sabe leer. Vuelve a intentarlo más tarde.",
-  refusedOlder: "Este documento es demasiado antiguo para esta página.",
-  refusedDamaged: "Este documento llegó dañado, así que no se muestra.",
-  refusedUnsigned: "La firma de este documento no vale, así que no se muestra.",
-  refusedKey: "Este link no abre el documento. Pídele el link completo a quien te lo mandó.",
+  refused: {
+    newer:
+      "Este documento se escribió con una versión más nueva de la que esta página sabe leer. Vuelve a intentarlo más tarde.",
+    older: "Este documento es demasiado antiguo para esta página.",
+    damaged: "Este documento llegó dañado, así que no se muestra.",
+    unsigned: "La firma de este documento no vale, así que no se muestra.",
+    key: "Este link no abre el documento. Pídele el link completo a quien te lo mandó.",
+  } satisfies Record<EnvelopeRefusal, string>,
   downloadRecords: "Descargar registros",
   couldNotBringRecords: "No se pudieron traer los registros",
   recordsFile: "registros",
-  paused: "Quien compartió este documento lo pausó.",
-  blocked: "Este documento fue bloqueado.",
-  tooManyVisits: "Hay demasiadas visitas desde tu red. Vuelve a intentarlo en un momento.",
-  tooManyVisitsLater: "Hay demasiadas visitas desde tu red. Vuelve a intentarlo más tarde.",
-  busyToday: "Este documento tuvo muchas visitas hoy. Vuelve a intentarlo más tarde.",
 
+  notArrived: {
+    paused: "Quien compartió este documento lo pausó.",
+    blocked: "Este documento fue bloqueado.",
+    slow: "Hay demasiadas visitas desde tu red. Vuelve a intentarlo en un momento.",
+    quota: "Hay demasiadas visitas desde tu red. Vuelve a intentarlo más tarde.",
+    proof: "Este documento tuvo muchas visitas hoy. Vuelve a intentarlo más tarde.",
+  } satisfies Record<string, string>,
   fileAsking: "Trayendo el adjunto…",
   fileSaved: "Guardando. Si no empieza, presiona otra vez.",
   fileReady: "Listo para reproducir.",
   fileCouldNotPlay: "No se puede reproducir aquí. Presiona para guardarlo.",
   fileCouldNotArrive: "No se pudo traer el adjunto. Vuelve a intentarlo en un momento.",
   fileNotThere: "El adjunto no está. Recarga la página para volver a intentarlo.",
-  fileNewer: "Este adjunto se escribió con una versión más nueva de la que esta página sabe leer.",
-  fileDamaged: "Este adjunto llegó dañado, así que no se guarda.",
-  fileUnsigned: "La firma de este adjunto no vale, así que no se guarda.",
+  fileRefused: {
+    newer: "Este adjunto se escribió con una versión más nueva de la que esta página sabe leer.",
+    damaged: "Este adjunto llegó dañado, así que no se guarda.",
+    unsigned: "La firma de este adjunto no vale, así que no se guarda.",
+  } satisfies Partial<Record<EnvelopeRefusal, string>>,
   fileMayRun: (name: string): string =>
     `«${name}» puede ser un programa. Folio no revisa lo que se comparte, y abrirlo podría dañar tu equipo. ¿Descargarlo de todos modos?`,
   fileNotSaved: "No se descargó.",
@@ -273,8 +282,10 @@ const en: Words = {
   reportGoodFaith:
     "By sending, you state that you report in good faith. If the operator finds it false, reports from your network stop counting for up to 180 days.",
   reportSend: "Send report",
-  reportQuota: "Your network already sent many reports this hour. Try again later.",
-  reportSlow: "Your network sent many reports in a short time. Try again in a moment.",
+  reportRefused: {
+    quota: "Your network already sent many reports this hour. Try again later.",
+    slow: "Your network sent many reports in a short time. Try again in a moment.",
+  },
   reportCouldNotSend: "The report could not be sent. Try again in a moment.",
   reportSealed: "You encrypt it here, so only the operator can open it, and it never includes what allows editing.",
   reportAlwaysOnGrave:
@@ -290,29 +301,35 @@ const en: Words = {
   couldNotArrive: "The document could not be fetched. Try again in a moment.",
   caseGone: "This case link does not exist or has expired. Ask whoever gave it to you for a new one.",
   askingTheKey: "Paste the document's key, or its whole link.",
-  refusedNewer: "This document was written with a newer version than this page can read. Try again later.",
-  refusedOlder: "This document is too old for this page.",
-  refusedDamaged: "This document arrived damaged, so it is not shown.",
-  refusedUnsigned: "This document's signature does not hold, so it is not shown.",
-  refusedKey: "This link does not open the document. Ask whoever sent it for the whole link.",
+  refused: {
+    newer: "This document was written with a newer version than this page can read. Try again later.",
+    older: "This document is too old for this page.",
+    damaged: "This document arrived damaged, so it is not shown.",
+    unsigned: "This document's signature does not hold, so it is not shown.",
+    key: "This link does not open the document. Ask whoever sent it for the whole link.",
+  },
   downloadRecords: "Download records",
   couldNotBringRecords: "The records could not be fetched",
   recordsFile: "records",
-  paused: "Whoever shared this document paused it.",
-  blocked: "This document was blocked.",
-  tooManyVisits: "There are too many visits from your network. Try again in a moment.",
-  tooManyVisitsLater: "There are too many visits from your network. Try again later.",
-  busyToday: "This document had many visits today. Try again later.",
 
+  notArrived: {
+    paused: "Whoever shared this document paused it.",
+    blocked: "This document was blocked.",
+    slow: "There are too many visits from your network. Try again in a moment.",
+    quota: "There are too many visits from your network. Try again later.",
+    proof: "This document had many visits today. Try again later.",
+  },
   fileAsking: "Fetching the attachment…",
   fileSaved: "Saving. If it does not start, press again.",
   fileReady: "Ready to play.",
   fileCouldNotPlay: "It cannot play here. Press to save it.",
   fileCouldNotArrive: "The attachment could not be fetched. Try again in a moment.",
   fileNotThere: "The attachment is not there. Reload the page to try again.",
-  fileNewer: "This attachment was written with a newer version than this page can read.",
-  fileDamaged: "This attachment arrived damaged, so it is not saved.",
-  fileUnsigned: "This attachment's signature does not hold, so it is not saved.",
+  fileRefused: {
+    newer: "This attachment was written with a newer version than this page can read.",
+    damaged: "This attachment arrived damaged, so it is not saved.",
+    unsigned: "This attachment's signature does not hold, so it is not saved.",
+  },
   fileMayRun: (name) =>
     `“${name}” may be a program. Folio does not review what is shared, and opening it could harm your computer. Download it anyway?`,
   fileNotSaved: "It was not downloaded.",

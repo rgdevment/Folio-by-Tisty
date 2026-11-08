@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { withEnglish } from "../scripts/page-words";
 import { said, speak } from "../src/page/ui/speak";
 import { WORDS } from "../src/page/ui/words";
 
@@ -26,10 +27,8 @@ afterEach(() => {
 });
 
 describe("the page's words", () => {
-  it("are, before anything speaks, the English ones it falls back to", () => {
-    for (const one of page.querySelectorAll<HTMLElement>("[data-say]")) {
-      expect(one.textContent, `${one.dataset.say}: run npm run words`).toBe(WORDS.en[one.dataset.say as "print"]);
-    }
+  it("are, before anything speaks, the English ones it falls back to, in text, links and labels", () => {
+    expect(withEnglish(HTML), "run npm run words").toBe(HTML);
     expect(page.documentElement.lang).toBe("en");
   });
 

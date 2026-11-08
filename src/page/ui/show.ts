@@ -1,7 +1,7 @@
 import type { Translation } from "@tisty/contracts";
 import { fromBase64Url, words } from "../../core/bytes";
 import { openRecords } from "../../core/case-records";
-import { type EnvelopeRefusal, EnvelopeRefused } from "../../rules/envelope";
+import { EnvelopeRefused } from "../../rules/envelope";
 import { preferredTranslation } from "../languages";
 import type { CaseLink } from "../link";
 import { OPERATOR_KEY } from "../operator-key";
@@ -19,18 +19,6 @@ import { answeringProof } from "./solve";
 import { said } from "./speak";
 
 const KEY_IN_WHAT_WAS_PASTED = /[A-Za-z0-9_-]{43}/;
-
-const refusedSaid = (refusal: EnvelopeRefusal): string => {
-  const { refusedNewer, refusedOlder, refusedDamaged, refusedUnsigned, refusedKey } = said();
-  const why: Record<EnvelopeRefusal, string> = {
-    newer: refusedNewer,
-    older: refusedOlder,
-    damaged: refusedDamaged,
-    unsigned: refusedUnsigned,
-    key: refusedKey,
-  };
-  return why[refusal];
-};
 
 interface Showing {
   id: string;
@@ -138,7 +126,7 @@ const opened = async (id: string, linkKey: string, arrived: Arrived, caseToken?:
     return true;
   } catch (error) {
     if (!(error instanceof EnvelopeRefused)) throw error;
-    drawClosed(refusedSaid(error.refusal));
+    drawClosed(said().refused[error.refusal]);
     return false;
   }
 };

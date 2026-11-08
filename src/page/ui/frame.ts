@@ -214,14 +214,13 @@ const fact = (list: HTMLElement, name: string, value: string): void => {
   list.append(row);
 };
 
-const dayOf = (moment: string): string =>
-  new Date(moment).toLocaleDateString(document.documentElement.lang, { dateStyle: "medium" });
+const inPageLanguage = (moment: Date, options: Intl.DateTimeFormatOptions): string =>
+  moment.toLocaleDateString(document.documentElement.lang, options);
+
+const dayOf = (moment: string): string => inPageLanguage(new Date(moment), { dateStyle: "medium" });
 
 const lastDay = (diesOn: number): string =>
-  new Date(diesOn * DAY_MILLISECONDS).toLocaleDateString(document.documentElement.lang, {
-    dateStyle: "long",
-    timeZone: "UTC",
-  });
+  inPageLanguage(new Date(diesOn * DAY_MILLISECONDS), { dateStyle: "long", timeZone: "UTC" });
 
 // What the sheet does not already say: the title and tags are on it, and the paper is in its own panel.
 const SAID_ELSEWHERE = new Set(["title", "tags", "tag", "paper", "sheets", "orientation", "lang"]);

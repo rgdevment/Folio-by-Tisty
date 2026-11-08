@@ -18,9 +18,8 @@ interface Sending {
 }
 
 const refusalSaid = (refused: string | undefined): string => {
-  const { reportQuota, reportSlow, reportCouldNotSend } = said();
-  const why: Record<string, string> = { quota: reportQuota, slow: reportSlow };
-  return why[refused ?? ""] ?? reportCouldNotSend;
+  const why: Record<string, string> = said().reportRefused;
+  return why[refused ?? ""] ?? said().reportCouldNotSend;
 };
 
 const post = ({ id, body }: Sending, proof?: string): Promise<Response> =>
