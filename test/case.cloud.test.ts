@@ -372,9 +372,11 @@ describe("the queue of blocked documents", () => {
     expect((await blockedDoc())?.mayHandOver).toBe(false);
     await moderation.makeCase(ID, { version: 1, tokenHash: "V".repeat(43), sealedRecords: SEALED }, NOW);
     expect((await blockedDoc())?.mayHandOver).toBe(false);
-    await testEnv.DB.prepare("INSERT INTO openings (doc, at, reason) VALUES (?, ?, ?)")
+    await testEnv.DB.prepare("INSERT INTO openings (doc, at, reason, kind) VALUES (?, ?, ?, 'case')")
       .bind(ID, NOW, "case AbCd")
       .run();
+    expect((await blockedDoc())?.mayHandOver).toBe(false);
+    await moderation.opened(ID, "case looked like a phishing kit", NOW + 2, "contact");
     expect((await blockedDoc())?.mayHandOver).toBe(false);
     await moderation.opened(ID, "to copy its key", NOW + 1);
     expect((await blockedDoc())?.mayHandOver).toBe(true);

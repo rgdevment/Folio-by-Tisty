@@ -18,7 +18,7 @@ const REPORT_ROWS_AT_MOST = 1000;
 const REPORTS_BYTES_IN_RECORDS = 300_000;
 const CASE_FOR_THE_AUTHORITY = "c.doc = ?1 AND c.sealed_records IS NOT NULL AND c.until >= ?2";
 // Not a case link's opening, nor reading the reporter's email: only those hand the operator the document's key.
-const OPENED_THE_LINK = "o.reason NOT LIKE 'case %' AND o.reason NOT LIKE 'correo: %'";
+const OPENED_THE_LINK = "o.kind = 'link'";
 // Only after the report was opened: erasing the seal before that would leave nobody able to read the document.
 const READY_TO_HAND_OVER = `EXISTS (SELECT 1 FROM docs d WHERE d.id = ?1 AND d.blocked_by_operator = 1)
   AND EXISTS (SELECT 1 FROM cases c WHERE ${CASE_FOR_THE_AUTHORITY})
@@ -446,13 +446,13 @@ export class CloudModeration {
     );
   }
 
-  async opened(id: string, reason: string, now: number): Promise<Acted> {
+  async opened(id: string, reason: string, now: number, kind: "link" | "contact" = "link"): Promise<Acted> {
     const [, here] = await this.#db.batch([
       this.#db
         .prepare(
-          "INSERT OR IGNORE INTO openings (doc, at, reason) SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM docs WHERE id = ?1)",
+          "INSERT OR IGNORE INTO openings (doc, at, reason, kind) SELECT ?1, ?2, ?3, ?4 WHERE EXISTS (SELECT 1 FROM docs WHERE id = ?1)",
         )
-        .bind(id, now, reason),
+        .bind(id, now, reason, kind),
       this.#db.prepare("SELECT 1 FROM docs WHERE id = ?").bind(id),
     ]);
     return (here?.results.length ?? 0) > 0 ? "done" : "missing";

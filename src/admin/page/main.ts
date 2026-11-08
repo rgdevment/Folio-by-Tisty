@@ -295,8 +295,7 @@ class Panel {
       openReport: (id, command, where, reading) => {
         const what = reading === "link" ? "abres la denuncia" : "lees el correo de quien denunció";
         const reason = prompt(`¿Por qué ${what} de ${id}? ${ON_RECORD}`);
-        if (reason?.trim())
-          void this.#openingReport(id, reading === "link" ? reason : `correo: ${reason}`, command, where, reading);
+        if (reason?.trim()) void this.#openingReport(id, reason, command, where, reading);
       },
       block: (id) => {
         const note = prompt(
@@ -354,7 +353,7 @@ class Panel {
     reading: Reading,
   ): Promise<void> {
     this.#say("Trabajando…");
-    if (!(await asked(`docs/${id}/opened`, reason))) {
+    if (!(await sent(`docs/${id}/opened`, { note: reason, kind: reading }))?.ok) {
       this.#say(COULD_NOT);
       return;
     }

@@ -665,8 +665,8 @@ export class Cloud implements Store {
         .bind(hash, id, today),
       this.#db
         .prepare(
-          `INSERT OR IGNORE INTO openings (doc, at, reason)
-           SELECT ?2, ?4, ?5 FROM cases WHERE token_hash = ?1 AND doc = ?2 AND until >= ?3`,
+          `INSERT OR IGNORE INTO openings (doc, at, reason, kind)
+           SELECT ?2, ?4, ?5, 'case' FROM cases WHERE token_hash = ?1 AND doc = ?2 AND until >= ?3`,
         )
         .bind(hash, id, today, now, `case ${caseNameOf(hash)}`),
     ]);
@@ -1039,12 +1039,24 @@ export class Cloud implements Store {
 
   // A replaced version stays 3 days even with no upload after it, as the privacy policy says.
   async #trimReplaced(today: number, now: number): Promise<void> {
+    const cursor = await this.#db
+      .prepare("SELECT trim_after FROM service_stage WHERE id = 1")
+      .first<{ trim_after: string }>();
+    // From where the last run stopped, so documents a report or an order keeps cannot hold the rest back.
     const rows = await this.#db
       .prepare(
         `SELECT id, versions FROM docs
-         WHERE latest > 0 AND json_array_length(versions) > ?1 AND json_extract(versions, '$[1].at') <= ?2 LIMIT ?3`,
+         WHERE id > ?4 AND latest > 0 AND COALESCE(legal_until, 0) < ?5
+           AND json_array_length(versions) > ?1 AND json_extract(versions, '$[1].at') <= ?2
+         ORDER BY id LIMIT ?3`,
       )
-      .bind(this.#limits.versionsKept, now - this.#limits.replacedKeptDays * DAY_MS, TRIMMED_AT_ONCE)
+      .bind(
+        this.#limits.versionsKept,
+        now - this.#limits.replacedKeptDays * DAY_MS,
+        TRIMMED_AT_ONCE,
+        cursor?.trim_after ?? "",
+        today,
+      )
       .all<{ id: string; versions: string }>();
     for (const row of rows.results) {
       const all = JSON.parse(row.versions) as Version[];
@@ -1052,8 +1064,12 @@ export class Cloud implements Store {
       if (trimmed.length === all.length) continue;
       const kept = await this.#withEvidence(row.id, today, all, trimmed);
       if (kept.length === all.length) continue;
-      // Only if no upload moved it meanwhile, or this would put back what that upload replaced.
-      const moved = await this.#db
+      const dropped = all.filter((one) => !kept.includes(one));
+      const stillNamed = new Set(filesKeysOf(row.id, kept));
+      const filesGone = filesKeysOf(row.id, dropped).filter((key) => !stillNamed.has(key));
+      // Storage first, as forgetting does: a row left listing them is put right on a later run, an object left is not.
+      await this.#envelopes.delete([...dropped.map((one) => objectKey(row.id, one)), ...filesGone]);
+      await this.#db
         .prepare("UPDATE docs SET versions = ?1, bytes = ?2 WHERE id = ?3 AND versions = ?4")
         .bind(
           JSON.stringify(kept),
@@ -1062,12 +1078,17 @@ export class Cloud implements Store {
           row.versions,
         )
         .run();
-      if (moved.meta.changes === 0) continue;
-      const dropped = all.filter((one) => !kept.includes(one));
-      const stillNamed = new Set(filesKeysOf(row.id, kept));
-      const filesGone = filesKeysOf(row.id, dropped).filter((key) => !stillNamed.has(key));
-      await this.#envelopes.delete([...dropped.map((one) => objectKey(row.id, one)), ...filesGone]);
     }
+    const next = rows.results.length < TRIMMED_AT_ONCE ? "" : (rows.results.at(-1)?.id ?? "");
+    // Written only when it moves, so an idle sweep still writes nothing.
+    if (next === (cursor?.trim_after ?? "")) return;
+    await this.#db
+      .prepare(
+        `INSERT INTO service_stage (id, stage, trim_after) VALUES (1, 'open', ?1)
+         ON CONFLICT (id) DO UPDATE SET trim_after = excluded.trim_after`,
+      )
+      .bind(next)
+      .run();
   }
 
   async #noteSwept(hour: number): Promise<void> {
