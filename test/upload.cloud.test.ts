@@ -821,7 +821,12 @@ describe("what stops a version", () => {
       const { one, two, first, second } = await twoOf(fresh);
       const room = roomOf(first.length + second.length - 1);
       expect(await sendTo(room, one.id, first, NOW, one)).toEqual({ stored: true, version: 1 });
-      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ refused: "room_full" });
+      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({
+        refused: "room_full",
+        held: first.length,
+        arriving: second.length,
+        atMost: first.length + second.length - 1,
+      });
       expect(await row(two.id)).toBeNull();
       expect(await sendTo(roomOf(first.length + second.length), two.id, second, NOW, two)).toEqual({
         stored: true,
@@ -848,7 +853,7 @@ describe("what stops a version", () => {
       const hash = await filesHashOf(one.id, files);
       const holding = first.length + files.length;
       expect(await sendTo(roomOf(holding), one.id, first, NOW, one, hash)).toMatchObject({ stored: true });
-      expect(await filesTo(roomOf(holding - 1), one.id, files)).toEqual({ refused: "room_full" });
+      expect(await filesTo(roomOf(holding - 1), one.id, files)).toMatchObject({ refused: "room_full" });
       expect(await filesTo(roomOf(holding), one.id, files)).toEqual({ stored: true, hash });
 
       const another = async (now: number) => {
@@ -856,12 +861,12 @@ describe("what stops a version", () => {
         const bytes = await sealedEnvelope({ id: start.id, version: 1, owner: fresh });
         return sendTo(roomOf(holding + bytes.length - 1), start.id, bytes, now, start);
       };
-      expect(await sendTo(roomOf(holding + second.length - 1), two.id, second, NOW, two)).toEqual({
+      expect(await sendTo(roomOf(holding + second.length - 1), two.id, second, NOW, two)).toMatchObject({
         refused: "room_full",
       });
       const again = await sealedEnvelope({ id: one.id, version: 2, owner: fresh });
       expect(await sendTo(roomOf(holding), one.id, again, LATER, undefined, hash)).toMatchObject({ stored: true });
-      expect(await another(LATER)).toEqual({ refused: "room_full" });
+      expect(await another(LATER)).toMatchObject({ refused: "room_full" });
 
       const plain = await sealedEnvelope({ id: one.id, version: 3, owner: fresh });
       expect(await sendTo(roomOf(holding), one.id, plain, LATER + DAY_MS)).toEqual({ stored: true, version: 3 });
@@ -892,7 +897,7 @@ describe("what stops a version", () => {
       const room = roomOf(first.length + second.length - 1);
       await sendTo(room, one.id, first, NOW, one);
       await testEnv.DB.prepare("UPDATE keys SET first_day = first_day - ?").bind(LIMITS.daysAKeyIsNew).run();
-      expect(await sendTo(room, two.id, second, NOW, two)).toEqual({ refused: "room_full" });
+      expect(await sendTo(room, two.id, second, NOW, two)).toMatchObject({ refused: "room_full" });
     });
 
     it("charges an editor's version to the owner's room", async () => {
@@ -902,7 +907,7 @@ describe("what stops a version", () => {
       const kept = await sealedEnvelope({ id: other.id, version: 1, owner: mario });
       await send(other.id, kept, NOW, other);
       const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
-      expect(await sendTo(roomOf(kept.length + edited.length - 1), id, edited, LATER)).toEqual({
+      expect(await sendTo(roomOf(kept.length + edited.length - 1), id, edited, LATER)).toMatchObject({
         refused: "room_full",
       });
       expect(await sendTo(roomOf(kept.length + edited.length), id, edited, LATER)).toEqual({
