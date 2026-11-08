@@ -208,8 +208,10 @@ describe("a document in several languages", () => {
   it("asks for the files of the document being shown", async () => {
     await opened(["es"]);
     await choose("en");
-    root.querySelector("a[data-file]")?.dispatchEvent(new place.MouseEvent("click", { bubbles: true, composed: true }));
+    const file = root.querySelector("a[data-file]");
+    file?.dispatchEvent(new place.MouseEvent("click", { bubbles: true, composed: true }));
     await vi.waitFor(() => expect(askedFor().at(-1)).toBe(`/api/v1/docs/${ENGLISH}/files/${HASH}`));
+    await vi.waitFor(() => expect(file?.getAttribute("aria-busy")).toBeNull());
     expect(askedFor().filter((one) => one.includes(ANCHOR))).toEqual([]);
   });
 });
