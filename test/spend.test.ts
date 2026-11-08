@@ -166,4 +166,15 @@ describe("checking", () => {
     await checkSpend(NOW, RENEWAL, set);
     expect(usageSince).toHaveBeenCalledWith(Date.UTC(2026, 10, 15), NOW);
   });
+
+  it("leaves what it found for the panel, which cannot ask Cloudflare, even when the stage stays", async () => {
+    const { set } = tools({ ...costing(7), storedGb: 3.4 }, "open");
+    const noteSpend = vi.fn(async () => {});
+    set.store.noteSpend = noteSpend;
+    await checkSpend(NOW, RENEWAL, set);
+    expect(noteSpend).toHaveBeenCalledWith(
+      { bill: billOf({ ...costing(7), storedGb: 3.4 }), line: lineOf(cycleOf(NOW, RENEWAL)), storedGb: 3.4 },
+      NOW,
+    );
+  });
 });

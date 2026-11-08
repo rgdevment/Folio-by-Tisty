@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Doing, drawQueue } from "../src/admin/page/draw";
+import { dayText } from "../src/admin/page/say";
 import type { Queue } from "../src/core/queue";
 
 const HARM = '<img src=x onerror="alert(1)">';
@@ -115,6 +116,7 @@ beforeEach(() => {
     reportsPage: vi.fn(),
     networkWasFalse: vi.fn(),
     clearWarning: vi.fn(),
+    showKey: vi.fn(),
   };
   drawQueue(page, QUEUE, doing as unknown as Doing);
 });
@@ -250,7 +252,7 @@ describe("a warning by light reports", () => {
     const shown = page.getElementById("warned")?.textContent;
     expect(shown).toContain("WaRnEdDc");
     expect(shown).toContain("12 redes");
-    expect(shown).toContain(new Date(20_003 * 86_400_000).toISOString().slice(0, 10));
+    expect(shown).toContain(dayText(20_003));
     pressing("warned", "Quitar aviso");
     expect(doing.clearWarning).toHaveBeenCalledWith("WaRnEdDc");
   });
@@ -386,7 +388,7 @@ describe("a case in the panel", () => {
     pressing("reports", "Botón de pánico");
     await vi.waitFor(() => expect(CASE_LINK()).toContain("#caso."));
     expect(CASE_LINK().split("#")[1]?.split(".")).toHaveLength(3);
-    const sent = paths(fetching).filter((path) => path !== "/api/queue");
+    const sent = paths(fetching).filter((path) => path.startsWith("/api/docs/"));
     expect(sent).toEqual(["/api/docs/AbCdEfGh/panic", "/api/docs/AbCdEfGh/case"]);
     const made = JSON.parse(fetching.mock.calls.at(-1)?.[1]?.body as string);
     expect(made.version).toBe(2);
@@ -398,7 +400,7 @@ describe("a case in the panel", () => {
     const fetching = answering();
     await opened(fetching, "  ");
     pressing("reports", "Botón de pánico");
-    expect(paths(fetching).filter((path) => path !== "/api/queue")).toEqual([]);
+    expect(paths(fetching).filter((path) => path.startsWith("/api/docs/"))).toEqual([]);
   });
 
   it("makes no link when the panic did not hold", async () => {
@@ -437,7 +439,7 @@ describe("a case in the panel", () => {
 
 describe("the panel", () => {
   it("says the state of the service", () => {
-    expect(page.getElementById("state")?.textContent).toBe("Servicio con aviso de gasto. Llaves nuevas hoy: 7.");
+    expect(page.getElementById("state")?.textContent).toBe("Servicio con aviso de gasto");
   });
 
   it("offers to purge a key from a report and from a blocked document", () => {

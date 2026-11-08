@@ -1,3 +1,5 @@
+import SIGNED_LIMITS from "../../docs/limits.json";
+import { CloudDashboard } from "../cloudflare/dashboard";
 import { CloudModeration } from "../cloudflare/moderation";
 import { certsFrom } from "./access";
 import { answer } from "./api";
@@ -14,6 +16,12 @@ export default {
     try {
       return await answer(request, {
         moderation: new CloudModeration(env.DB),
+        dashboard: new CloudDashboard(env.DB),
+        about: {
+          sharingOpen: SIGNED_LIMITS.sharing_open,
+          termsVersion: SIGNED_LIMITS.terms.version,
+          limitsSerial: SIGNED_LIMITS.serial,
+        },
         access: { team: env.ACCESS_TEAM, audience: env.ACCESS_AUDIENCE, email: env.OPERATOR_EMAIL ?? "" },
         certs: certsFrom(env.ACCESS_TEAM),
         now: Date.now(),

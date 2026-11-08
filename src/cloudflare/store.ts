@@ -20,6 +20,7 @@ import type {
   Report,
   Reported,
   Shown,
+  Spent,
   Stage,
   Store,
   Swept,
@@ -29,6 +30,7 @@ import type {
 } from "../core/store";
 import { keptVersions } from "../core/versions";
 import { acceptAppeal, CLAIMED, mayCorrect } from "./moderation";
+import { addProvedTo, NEW_KEYS_NET, PROVED, PROVED_COLUMN, seenTable } from "./seen";
 
 // Two rows by their key at most: the machine that signed the last version and its owner's, the start of owner_mark.
 const revocationsOf = (version: string): string => `(
@@ -107,8 +109,6 @@ const LANGUAGES_OF = (owner: string, anchor: string, today: string): string =>
      AND (l.latest > 0 OR (l.latest = 0 AND l.dies_on >= ${today}))
      AND l.blocked_at IS NULL AND (l.paused_at IS NULL OR l.dies_on >= ${today})`;
 
-// Not a network's digest, which is base64url, so the day's sum of new keys has its own row that the sweep clears too.
-const NEW_KEYS_NET = "~new-keys";
 const NEW_KEYS_NOTICED_AT = 0.9;
 
 const LIVES_ON = "CASE WHEN paused_at IS NULL THEN MAX(dies_on, ?1 + ttl_days) ELSE dies_on END";
@@ -127,10 +127,7 @@ const HOURS_IN_A_DAY = 24;
 
 const encoder = new TextEncoder();
 
-const seenTable = (day: number): string => {
-  if (!Number.isSafeInteger(day) || day < 0) throw new Error(`not a day: ${day}`);
-  return `seen_${day}`;
-};
+const DOC_DAYS_KEPT = 31;
 
 const objectKey = (id: string, version: Pick<Version, "n" | "hash">): string => `${id}/${version.n}.${version.hash}`;
 const filesKey = (id: string, hash: string): string => `${id}/files.${hash}`;
@@ -160,8 +157,8 @@ export class Cloud implements Store {
     const otherLanguages = this.#limits.languagesAtMost - 1;
     const inserted = await this.#db
       .prepare(
-        `INSERT OR IGNORE INTO docs (id, owner, anchor, permit, admin_hash, ttl_days, dies_on, active_day, owner_mark)
-         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?10
+        `INSERT OR IGNORE INTO docs (id, owner, anchor, permit, admin_hash, ttl_days, dies_on, active_day, owner_mark, first_day)
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?10, ?8
          WHERE (?3 IS NOT NULL AND EXISTS (
            SELECT 1 FROM docs a WHERE a.id = ?3 AND a.owner = ?2 AND a.anchor IS NULL AND a.latest >= 0
          ) AND (${LANGUAGES_OF("?2", "?3", "?8")}) < ?11) OR (?3 IS NULL AND (
@@ -292,6 +289,12 @@ export class Cloud implements Store {
               )
               .bind(upload.id, upload.signer, upload.n),
           ]),
+      this.#db
+        .prepare(
+          `INSERT OR IGNORE INTO net_doc (day, doc, net)
+           SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM docs WHERE id = ?2 AND latest = ?4)`,
+        )
+        .bind(today, upload.id, upload.net, upload.n),
     ]);
     if ((moved?.meta.changes ?? 0) === 0) {
       await this.#giveRoomBack(upload.net, bytes, today, upload.newKey);
@@ -410,15 +413,16 @@ export class Cloud implements Store {
       .first<DocRow>();
   }
 
-  async #takeQuota(net: string, docs: number, bytes: number, today: number): Promise<boolean> {
+  async #takeQuota(net: string, docs: number, bytes: number, today: number, uploads = 0): Promise<boolean> {
     if (docs > this.#limits.netDocsADay || bytes > this.#limits.netBytesADay) return false;
     const taken = await this.#db
       .prepare(
-        `INSERT INTO net_day (day, net, docs, bytes) VALUES (?1, ?2, ?3, ?4)
-         ON CONFLICT (day, net) DO UPDATE SET docs = docs + excluded.docs, bytes = bytes + excluded.bytes
+        `INSERT INTO net_day (day, net, docs, bytes, uploads) VALUES (?1, ?2, ?3, ?4, ?7)
+         ON CONFLICT (day, net) DO UPDATE
+           SET docs = docs + excluded.docs, bytes = bytes + excluded.bytes, uploads = uploads + excluded.uploads
          WHERE docs + excluded.docs <= ?5 AND bytes + excluded.bytes <= ?6`,
       )
-      .bind(today, net, docs, bytes, this.#limits.netDocsADay, this.#limits.netBytesADay)
+      .bind(today, net, docs, bytes, this.#limits.netDocsADay, this.#limits.netBytesADay, uploads)
       .run();
     return taken.meta.changes > 0;
   }
@@ -496,7 +500,7 @@ export class Cloud implements Store {
   }
 
   async #takeRoom(net: string, bytes: number, today: number, newKey = false): Promise<Uploaded> {
-    if (!(await this.#takeQuota(net, 0, bytes, today))) return "quota";
+    if (!(await this.#takeQuota(net, 0, bytes, today, 1))) return "quota";
     if (!newKey) return "stored";
     const taken = await this.#db
       .prepare(
@@ -507,19 +511,19 @@ export class Cloud implements Store {
       .bind(today, NEW_KEYS_NET, bytes, this.#limits.newKeysBytesADay, net, this.#limits.newKeysNetBytesADay)
       .run();
     if (taken.meta.changes > 0) return "stored";
-    await this.#giveQuotaBack(net, 0, bytes, today);
+    await this.#giveQuotaBack(net, 0, bytes, today, 1);
     return "new_keys_full";
   }
 
   async #giveRoomBack(net: string, bytes: number, today: number, newKey = false): Promise<void> {
-    await this.#giveQuotaBack(net, 0, bytes, today);
+    await this.#giveQuotaBack(net, 0, bytes, today, 1);
     if (newKey) await this.#giveQuotaBack(NEW_KEYS_NET, 0, bytes, today);
   }
 
-  async #giveQuotaBack(net: string, docs: number, bytes: number, today: number): Promise<void> {
+  async #giveQuotaBack(net: string, docs: number, bytes: number, today: number, uploads = 0): Promise<void> {
     await this.#db
-      .prepare("UPDATE net_day SET docs = docs - ?, bytes = bytes - ? WHERE day = ? AND net = ?")
-      .bind(docs, bytes, today, net)
+      .prepare("UPDATE net_day SET docs = docs - ?, bytes = bytes - ?, uploads = uploads - ? WHERE day = ? AND net = ?")
+      .bind(docs, bytes, uploads, today, net)
       .run();
   }
 
@@ -563,17 +567,28 @@ export class Cloud implements Store {
     try {
       await this.#note(reading, today);
     } catch (error) {
-      if (!String(error).includes("no such table")) throw error;
-      await this.#db.prepare(this.#createSeen(today)).run();
+      const said = String(error);
+      if (said.includes("no such table")) await this.#db.prepare(this.#createSeen(today)).run();
+      else if (said.includes(`no column named ${PROVED}`)) await this.#addProved(seenTable(today));
+      else throw error;
       await this.#note(reading, today);
     }
   }
 
-  async #note({ owner, reader, doc, hour }: Reading, today: number): Promise<void> {
+  async #note({ owner, reader, doc, hour, proved }: Reading, today: number): Promise<void> {
     await this.#db
-      .prepare(`INSERT OR IGNORE INTO ${seenTable(today)} (owner, reader, doc, hour) VALUES (?, ?, ?, ?)`)
-      .bind(owner, reader, doc, hour)
+      .prepare(`INSERT OR IGNORE INTO ${seenTable(today)} (owner, reader, doc, hour, proved) VALUES (?, ?, ?, ?, ?)`)
+      .bind(owner, reader, doc, hour, proved ? 1 : 0)
       .run();
+  }
+
+  // A day's table made before readers carried their proof gets it the first time one arrives.
+  async #addProved(table: string): Promise<void> {
+    try {
+      await this.#db.prepare(addProvedTo(table)).run();
+    } catch (error) {
+      if (!String(error).includes("duplicate column")) throw error;
+    }
   }
 
   async shown(id: string, today: number): Promise<Shown | null> {
@@ -709,7 +724,7 @@ export class Cloud implements Store {
 
   #createSeen(day: number): string {
     return `CREATE TABLE IF NOT EXISTS ${seenTable(day)} (
-      owner TEXT NOT NULL, reader TEXT NOT NULL, doc TEXT NOT NULL, hour INTEGER NOT NULL,
+      owner TEXT NOT NULL, reader TEXT NOT NULL, doc TEXT NOT NULL, hour INTEGER NOT NULL, ${PROVED_COLUMN},
       PRIMARY KEY (owner, reader, doc)
     ) WITHOUT ROWID`;
   }
@@ -936,8 +951,11 @@ export class Cloud implements Store {
     }
     try {
       await this.#db.batch([
+        this.#addUploadsToService(today - 1),
         // Yesterday's stays: the digest at 00:00 counts its new keys, on the same minute as this sweep.
         this.#db.prepare("DELETE FROM net_day WHERE day < ?").bind(today - 1),
+        this.#db.prepare("DELETE FROM net_doc WHERE day < ?").bind(today - 1),
+        this.#db.prepare("DELETE FROM doc_day WHERE day < ?").bind(today - DOC_DAYS_KEPT),
         this.#db.prepare("DELETE FROM net_hour WHERE hour < ?").bind(today * HOURS_IN_A_DAY),
         this.#db.prepare("DELETE FROM false_reporters WHERE at < ?").bind(today - this.#limits.evidenceDays),
         this.#db.prepare("DELETE FROM cases WHERE until < ?").bind(today),
@@ -960,26 +978,66 @@ export class Cloud implements Store {
       failed += 1;
       console.error("the old rows could not be cleaned", String(error));
     }
+    // Once a day, when it adds the day up, so an hourly sweep with nothing to do still writes nothing.
+    if (failed === 0 && summed > 0) await this.#noteSwept(hour);
     return { summed, forgotten, failed };
+  }
+
+  async #noteSwept(hour: number): Promise<void> {
+    await this.#db
+      .prepare(
+        `INSERT INTO service_stage (id, stage, swept_hour) VALUES (1, 'open', ?1)
+         ON CONFLICT (id) DO UPDATE SET swept_hour = excluded.swept_hour`,
+      )
+      .bind(hour)
+      .run();
+  }
+
+  async noteSpend({ bill, line, storedGb }: Spent, at: number): Promise<void> {
+    await this.#db
+      .prepare(
+        `INSERT INTO service_stage (id, stage, bill, line, stored_gb, spent_at) VALUES (1, 'open', ?1, ?2, ?3, ?4)
+         ON CONFLICT (id) DO UPDATE SET bill = ?1, line = ?2, stored_gb = ?3, spent_at = ?4`,
+      )
+      .bind(bill, line, storedGb, at)
+      .run();
+  }
+
+  // Assigned, not added, so every sweep of the day can say it again, and only a change writes.
+  #addUploadsToService(day: number): D1PreparedStatement {
+    return this.#db
+      .prepare(
+        `INSERT INTO service_day (day, readers, docs, hours, uploads, new_docs, new_keys)
+         SELECT ?1, 0, 0, '{}', SUM(uploads), SUM(docs), SUM(keys) FROM net_day WHERE day = ?1 HAVING COUNT(*) > 0
+         ON CONFLICT (day) DO UPDATE
+           SET uploads = excluded.uploads, new_docs = excluded.new_docs, new_keys = excluded.new_keys
+           WHERE uploads <> excluded.uploads OR new_docs <> excluded.new_docs OR new_keys <> excluded.new_keys`,
+      )
+      .bind(day);
   }
 
   async #sumPastDays(today: number): Promise<{ summed: number; failed: number }> {
     const tables = await this.#db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB 'seen_[0-9]*'")
-      .all<{ name: string }>();
+      .prepare(
+        `SELECT name, instr(sql, '${PROVED}') > 0 AS proved FROM sqlite_master
+         WHERE type = 'table' AND name GLOB 'seen_[0-9]*'`,
+      )
+      .all<{ name: string; proved: number }>();
     const days = tables.results
-      .map((one) => Number(one.name.slice("seen_".length)))
-      .filter((day) => day < today)
-      .sort((a, b) => a - b);
+      .map((one) => ({ day: Number(one.name.slice("seen_".length)), proved: one.proved === 1 }))
+      .filter(({ day }) => day < today)
+      .sort((a, b) => a.day - b.day);
     let summed = 0;
     let failed = 0;
-    for (const day of days) {
+    for (const { day, proved } of days) {
       const table = seenTable(day);
       try {
         // In one batch, so a day is either counted and gone or still there to count: never lost, never counted twice.
         await this.#db.batch([
+          ...(proved ? [] : [this.#db.prepare(addProvedTo(table))]),
           this.#addToDocs(table, day),
           this.#addToService(table, day),
+          this.#addToDocDays(table, day),
           this.#db.prepare(`DROP TABLE ${table}`),
         ]);
         summed += 1;
@@ -1014,6 +1072,21 @@ export class Cloud implements Store {
          WHERE docs.id = t.doc`,
       )
       .bind(day, this.#limits.historyDays, this.#limits.hoursFromReaders, `$."${day}"`);
+  }
+
+  #addToDocDays(table: string, day: number): D1PreparedStatement {
+    return this.#db
+      .prepare(
+        `INSERT INTO doc_day (doc, day, nets, proved, hours, peak, by_uploader)
+         SELECT h.doc, ?1, SUM(h.n), SUM(h.p), COUNT(*), MAX(h.n),
+           SUM(h.n) = 1 AND EXISTS (
+             SELECT 1 FROM ${table} s JOIN net_doc u ON u.day = ?1 AND u.doc = s.doc AND u.net = s.reader WHERE s.doc = h.doc
+           )
+         FROM (SELECT doc, hour, COUNT(*) AS n, SUM(${PROVED}) AS p FROM ${table} GROUP BY doc, hour) h
+         GROUP BY h.doc
+         ON CONFLICT (doc, day) DO UPDATE SET nets = nets + excluded.nets, proved = proved + excluded.proved`,
+      )
+      .bind(day);
   }
 
   #addToService(table: string, day: number): D1PreparedStatement {
@@ -1100,6 +1173,7 @@ export class Cloud implements Store {
         .bind(ids),
       this.#db.prepare("DELETE FROM docs WHERE id IN (SELECT value FROM json_each(?))").bind(ids),
       this.#db.prepare("DELETE FROM editors WHERE doc IN (SELECT value FROM json_each(?))").bind(ids),
+      this.#db.prepare("DELETE FROM doc_day WHERE doc IN (SELECT value FROM json_each(?))").bind(ids),
     ]);
     return deleted?.meta.changes ?? 0;
   }
