@@ -1,6 +1,6 @@
 # Privacidad de Folio by Tisty
 
-**Vigente desde el 8 de noviembre de 2026.**
+**Versión 2, vigente desde el 8 de noviembre de 2026.**
 
 ## En corto
 
@@ -49,6 +49,24 @@ descarta al terminar el día. Su llave cambia cada día y no se guarda. La base 
 datos conserva su propia copia hasta por 30 días, para recuperarse de una falla,
 y el resumen sigue ahí hasta entonces; nunca entra en los respaldos.
 
+## De quién, de dónde y con qué base
+
+Guarda datos de cuatro grupos de personas: quienes comparten desde Tisty,
+quienes abren un link, quienes denuncian y quienes le escriben al operador. Todo
+llega de ti, desde tu Tisty o tu navegador, o de tu conexión, que es de donde
+Cloudflare saca el país y el centro de datos. Una denuncia trae lo que quien
+denuncia escribió sobre un documento. Nada viene de fuentes de acceso público.
+
+- **Compartir y servir lo compartido** es lo que pides al aceptar los
+  [términos](TERMINOS.md).
+- **Los topes, los resúmenes de red, las denuncias, los registros y los
+  respaldos** responden al interés legítimo de que el servicio siga seguro,
+  dentro de su costo y sin abusos. Ese interés nunca necesita saber quién eres.
+- **Lo que pide una autoridad** se guarda o se entrega por obligación legal.
+- **El correo que dejas en una denuncia** es lo único que depende de tu
+  consentimiento. Puedes retirarlo cuando quieras pidiendo que se borre, y eso
+  no cambia lo que ya se hizo con él.
+
 ## Cloudflare y otros proveedores
 
 Folio corre en Cloudflare (Workers, D1 y R2). Cloudflare recibe tu IP y
@@ -72,7 +90,12 @@ También participan otros tres, cada uno con su propia política:
   termina cada tarea programada, para avisar si deja de llegar. No lleva datos
   de nadie.
 
-Estos proveedores operan fuera de Chile, así que lo que reciben sale del país.
+Estos proveedores operan fuera de Chile, así que lo que reciben sale del país:
+Cloudflare y GitHub desde Estados Unidos, Migadu desde Suiza y Healthchecks.io
+desde Letonia, en la Unión Europea. La Agencia de Protección de Datos Personales
+todavía no declara qué países ofrecen un nivel adecuado de protección. Mientras
+tanto, las garantías son la política de cada proveedor, enlazada arriba, y que
+lo compartido les llega cifrado.
 
 ## La promesa del cifrado, dicha con honestidad
 
@@ -86,10 +109,36 @@ Estos proveedores operan fuera de Chile, así que lo que reciben sale del país.
   hace en los casos que dicen los [términos](TERMINOS.md), y cada apertura
   queda registrada.
 
+## Lo que se decide solo
+
+Algunas reglas actúan sin que nadie mire, siempre sobre una llave, una red o un
+documento, nunca sobre una persona que se conozca:
+
+- **Una llave nueva** parte con los topes más bajos durante sus primeros 30
+  días, y cada red trae solo unas pocas llaves nuevas al día.
+- **Una red que pasa su cupo** espera, y pasado cierto número de lectores el
+  navegador hace un pequeño trabajo de cómputo antes de leer.
+- **Las denuncias** pueden pedirle a quien compartió una versión nueva, o
+  bloquear un documento, cuando llegan desde varias redes de proveedores
+  distintos.
+
+Los [términos](TERMINOS.md) dicen cada umbral y cómo se reclama. El operador
+puede revisar y deshacer lo que estas reglas hicieron.
+
+## La seguridad
+
+Lo que protege el diseño y cómo reportar una falla está en la
+[política de seguridad](SEGURIDAD.md). Si una falla expone datos personales, el
+operador la informa a la Agencia de Protección de Datos Personales y, cuando la
+ley lo pide, a cada persona afectada.
+
 ## Tus derechos
 
 Bajo la Ley 21.719 puedes pedir saber qué datos tuyos hay, corregirlos,
-borrarlos u oponerte a su uso. Como no hay cuentas, lo más directo es:
+borrarlos, oponerte a su uso, llevártelos o bloquearlos mientras se resuelve
+otra petición. El operador responde dentro de 30 días corridos. Lo que
+compartiste ya está en tu Tisty, en su formato, y Folio no guarda otra copia
+que pueda leer. Como no hay cuentas, lo más directo es:
 
 - **Borrar lo que compartiste:** con tu link de administración, o dejando de
   compartirlo desde Tisty. Deja de servirse de inmediato y se borra del servidor
@@ -108,6 +157,9 @@ borrarlos u oponerte a su uso. Como no hay cuentas, lo más directo es:
   lugares: en los documentos que sigues compartiendo y las versiones que firmaste,
   en una llave que retiraste, en lo que guarda una denuncia hasta por 180 días y
   en los respaldos por 30 días.
+
+Si el operador no responde a tiempo o rechaza tu petición, puedes reclamar ante
+la Agencia de Protección de Datos Personales.
 
 ## Menores de edad
 

@@ -1,6 +1,6 @@
 # Folio by Tisty privacy policy
 
-**In force since November 8, 2026.**
+**Version 2, in force since November 8, 2026.**
 
 ## The short version
 
@@ -50,6 +50,24 @@ the day ends. Its key changes every day and is not kept. The database keeps its
 own copy for up to 30 days, to recover from a failure, and the digest stays
 there until then; it never goes into the backups.
 
+## Whose, from where and on what basis
+
+It keeps data about four groups of people: those who share from Tisty, those
+who open a link, those who report and those who write to the operator. All of it
+comes from you, from your Tisty or your browser, or from your connection, which
+is where Cloudflare takes the country and the data center from. A report brings
+what its reporter wrote about a document. Nothing comes from public sources.
+
+- **Sharing and serving what is shared** is what you ask for when you accept the
+  [terms](TERMS.md).
+- **The limits, the network digests, the reports, the logs and the backups**
+  serve the legitimate interest of keeping the service safe, within its cost and
+  free of abuse. That interest never needs to know who you are.
+- **What an authority asks for** is kept or handed over under a legal duty.
+- **The email you leave in a report** is the only thing that rests on your
+  consent. You may take it back whenever you want by asking for it to be erased,
+  and that does not undo what was already done with it.
+
 ## Cloudflare and other providers
 
 Folio runs on Cloudflare (Workers, D1 and R2). Cloudflare receives your
@@ -72,7 +90,12 @@ Three others take part, each with a policy of its own:
 - **[Healthchecks.io](https://healthchecks.io/privacy/)** gets a signal when each
   scheduled task ends, to warn if one stops arriving. It carries nobody's data.
 
-These providers operate outside Chile, so what they receive leaves the country.
+These providers operate outside Chile, so what they receive leaves the country:
+Cloudflare and GitHub from the United States, Migadu from Switzerland and
+Healthchecks.io from Latvia, in the European Union. Chile's Personal Data
+Protection Agency has not yet declared which countries offer an adequate level
+of protection. Until it does, the safeguards are each provider's policy, linked
+above, and that what is shared reaches them encrypted.
 
 ## The promise of encryption, said honestly
 
@@ -85,11 +108,35 @@ These providers operate outside Chile, so what they receive leaves the country.
 - **A report with the link to read it** makes that document readable. It is
   done only in the cases the [terms](TERMS.md) list, and every opening is logged.
 
+## What is decided on its own
+
+Some rules act without anyone looking, always on a key, a network or a document,
+never on a person anyone knows:
+
+- **A new key** starts with the lowest limits for its first 30 days, and each
+  network brings only a few new keys a day.
+- **A network past its share** waits, and past a certain number of readers the
+  browser does a small piece of computing work before reading.
+- **Reports** can ask whoever shared for a new version, or block a document,
+  when they come from several networks of different providers.
+
+The [terms](TERMS.md) give each threshold and how to appeal. The operator can
+review and undo what these rules did.
+
+## Security
+
+What the design protects and how to report a flaw is in the
+[security policy](SECURITY.md). If a flaw exposes personal data, the operator
+tells Chile's Personal Data Protection Agency and, where the law asks, each
+person affected.
+
 ## Your rights
 
 Under Chilean Law 21.719 you may ask what data about you there is, have it
-corrected or deleted, or object to its use. Since there are no accounts, the
-most direct ways are:
+corrected or deleted, object to its use, take it with you, or have it blocked
+while another request is settled. The operator answers within 30 calendar days.
+What you shared is already in your Tisty, in its own format, and Folio keeps no
+other copy it can read. Since there are no accounts, the most direct ways are:
 
 - **Delete what you shared:** with your management link, or by no longer
   sharing it from Tisty. It stops being served at once and is deleted from the
@@ -107,6 +154,9 @@ most direct ways are:
   reputation gone and no mark left. It stays for as long as these last: in the
   documents you still share and the versions you signed, in a key you took back,
   in what a report keeps for up to 180 days, and in the backups for 30 days.
+
+If the operator does not answer in time or turns your request down, you may
+complain to Chile's Personal Data Protection Agency.
 
 ## Children
 
