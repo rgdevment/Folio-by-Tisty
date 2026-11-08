@@ -677,6 +677,37 @@ describe("widgets and files", () => {
     expect(root.querySelector(".widget-said")?.textContent).toContain("no es un widget");
   });
 
+  const escaped = (said: string): string =>
+    said.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+
+  it.each([
+    ["a script", "<script>window.ran = true</script>"],
+    ["a script in other capitals", "<ScRiPt>window.ran = true</sCrIpT>"],
+    ["a script split to slip past a filter", "<scr<script>ipt>window.ran = true</script>"],
+    ["an event on a picture", '<img src="x" onerror="window.ran = true">'],
+    ["an event on any tag", '<div onclick="window.ran = true">x</div>'],
+    ["an address that runs", '<img src="javascript:window.ran = true">'],
+    ["a picture from elsewhere", '<img src="https://evil.example/pixel.png">'],
+    ["a link", '<a href="https://evil.example">x</a>'],
+    ["a frame", '<iframe src="https://evil.example"></iframe>'],
+    ["an object", '<object data="https://evil.example/x"></object>'],
+    ["an embed", '<embed src="https://evil.example/x">'],
+    ["a form", '<form action="https://evil.example"><input name="key"></form>'],
+    ["a refresh", '<meta http-equiv="refresh" content="0;url=https://evil.example">'],
+    ["a base address", '<base href="https://evil.example/">'],
+    ["a drawing that runs", '<svg onload="window.ran = true"></svg>'],
+    ["math hiding a picture", '<math><mtext><table><mglyph><style><img src=x onerror="window.ran = true">'],
+    ["a quote closed inside an attribute", '<noscript><p title="</noscript><img src=x onerror=window.ran=true>">'],
+    ["a style from elsewhere", "<style>@import url(https://evil.example/x.css);</style>"],
+    ["a background from elsewhere", '<div style="background: url(https://evil.example/t.png)">x</div>'],
+    ["an entity in an event's name", '<img src="x" o&#110;error="window.ran = true">'],
+  ])("draws nothing a fork could send as %s, and shows it as code", (_, body) => {
+    draw(holding(widget("<figcaption>Paseos</figcaption>", escaped(body))));
+    expect(root.querySelector("figure.widget, iframe, script, object, embed, form, base, meta")).toBeNull();
+    expect(root.querySelector("code.language-widget")?.textContent).toBe(body);
+    expect(root.querySelector(".widget-said")?.textContent).toContain("no es un widget");
+  });
+
   it("serves the frame's page under the widget's own policy, and lets only this page frame it", () => {
     const headers = readFileSync("src/page/public/_headers", "utf8");
     const [, ofTheFrame] =
