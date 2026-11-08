@@ -1,18 +1,25 @@
 import type { Top, TopDoc, TopOrder } from "../core/dashboard";
 import { dayOf, type Limits, type ReportLevel } from "../core/limits";
 import { type DayReading, LONE_AFTER_DAYS, signalsOf } from "../core/signals";
-import type { Version } from "../core/store";
+import { HELD_BYTES } from "./room";
 import { seenOf } from "./seen";
 
 const LISTED = 50;
-const WATCHED_AT_MOST = 2000;
+const ALL = -1;
 
-const BORN = "COALESCE(d.first_day, CAST(json_extract(d.versions, '$[0].at') / 86400000 AS INTEGER))";
+const DAY_OF = (at: string): string => `${at} / 86400000`;
+// Without its first day, the oldest version kept and the first day it was read only bound how long it has lived.
+const KNOWN_SINCE = `COALESCE(d.first_day, MIN(${DAY_OF("json_extract(d.versions, '$[0].at')")},
+  COALESCE((SELECT MIN(CAST(j.key AS INTEGER)) FROM json_each(d.days) j), ?1)))`;
+const EDITS_A_DAY = `(SELECT MAX(c) FROM (
+  SELECT COUNT(*) AS c FROM json_each(d.versions) v
+  WHERE ${DAY_OF("json_extract(v.value, '$.at')")} IN (?1, ?1 - 1)
+  GROUP BY ${DAY_OF("json_extract(v.value, '$.at')")}))`;
 const ORDERS: Record<TopOrder, string> = {
   readers: "nets DESC, d.id",
   weight: "bytes DESC, d.id",
   edits: "d.latest DESC, d.id",
-  oldest: "born, d.id",
+  oldest: "known_since, d.id",
 };
 const NOBODY_READ = "SELECT NULL AS doc, 0 AS nets, 0 AS proved, 0 AS hours, 0 AS peak WHERE 0";
 const NO_OWNER_READ = "SELECT NULL AS owner, 0 AS n WHERE 0";
@@ -21,11 +28,13 @@ interface Row {
   id: string;
   owner: string;
   latest: number;
-  versions: string;
+  latest_at: number | null;
+  edits_a_day: number | null;
   bytes: number;
   ttl_days: number;
   dies_on: number;
-  born: number | null;
+  first_shared: number | null;
+  known_since: number;
   blocked_at: number | null;
   paused_at: number | null;
   key_day: number | null;
@@ -57,17 +66,24 @@ const readOfToday = async (db: D1Database, today: number): Promise<{ docs: strin
   };
 };
 
-const editsADay = (versions: Version[], today: number): number => {
-  const onDay = (day: number): number => versions.filter((one) => dayOf(one.at) === day).length;
-  return Math.max(onDay(today), onDay(today - 1));
-};
-
 const topDocOf = (row: Row, today: number, limits: Limits): TopDoc => {
-  const versions = JSON.parse(row.versions) as Version[];
   const read: DayReading = { nets: row.nets, proved: row.proved, hours: row.hours, peak: row.peak };
   const yesterday: DayReading | null =
     row.y_nets === null ? null : { nets: row.y_nets, proved: row.y_proved, hours: row.y_hours, peak: row.y_peak };
-  const liveDays = row.born === null ? 0 : today - row.born;
+  const signals = signalsOf(
+    {
+      today: read,
+      yesterday,
+      ownerRows: row.owner_rows,
+      liveDays: today - row.known_since,
+      mostNetsADay: row.most_nets,
+      byUploader: row.by_uploader === 1,
+      uploader: row.up_keys === null ? null : { keys: row.up_keys, docs: row.up_docs ?? 0 },
+      editsADay: row.edits_a_day ?? 0,
+      report: row.report,
+    },
+    limits,
+  );
   return {
     id: row.id,
     owner: row.owner,
@@ -75,29 +91,16 @@ const topDocOf = (row: Row, today: number, limits: Limits): TopDoc => {
     languages: row.languages,
     today: read,
     yesterday,
-    ownerAtTop: row.owner_rows >= limits.rowsPerOwnerADay,
+    ownerAtTop: signals.some((one) => one.kind === "cap"),
     bytes: row.bytes,
     latest: row.latest,
-    latestAt: versions.at(-1)?.at ?? null,
-    firstDay: row.born,
+    latestAt: row.latest_at,
+    firstDay: row.first_shared,
     ttlDays: row.ttl_days,
     diesOn: row.dies_on,
     blocked: row.blocked_at !== null,
     paused: row.paused_at !== null,
-    signals: signalsOf(
-      {
-        today: read,
-        yesterday,
-        ownerRows: row.owner_rows,
-        liveDays,
-        mostNetsADay: row.most_nets,
-        byUploader: row.by_uploader === 1,
-        uploader: row.up_keys === null ? null : { keys: row.up_keys, docs: row.up_docs ?? 0 },
-        editsADay: editsADay(versions, today),
-        report: row.report,
-      },
-      limits,
-    ),
+    signals,
   };
 };
 
@@ -118,8 +121,9 @@ export const topDocs = async (
            FROM net_doc u JOIN net_day q ON q.day = u.day AND q.net = u.net
            WHERE u.day >= ?1 - 1 GROUP BY u.doc
          )
-       SELECT d.id, d.owner, d.latest, d.versions, d.ttl_days, d.dies_on, d.blocked_at, d.paused_at,
-         json_extract(d.versions, '$[#-1].bytes') + d.files_bytes AS bytes, ${BORN} AS born,
+       SELECT d.id, d.owner, d.latest, d.ttl_days, d.dies_on, d.blocked_at, d.paused_at,
+         json_extract(d.versions, '$[#-1].at') AS latest_at, ${EDITS_A_DAY} AS edits_a_day,
+         ${HELD_BYTES} AS bytes, d.first_day AS first_shared, ${KNOWN_SINCE} AS known_since,
          k.first_day AS key_day,
          (SELECT COUNT(*) FROM docs l WHERE l.anchor = d.id AND l.owner = d.owner AND l.latest > 0) AS languages,
          COALESCE(t.nets, 0) AS nets, COALESCE(t.proved, 0) AS proved, COALESCE(t.hours, 0) AS hours,
@@ -139,7 +143,7 @@ export const topDocs = async (
        WHERE d.latest > 0
        ORDER BY ${ORDERS[order]} LIMIT ?2`,
     )
-    .bind(today, flaggedOnly ? WATCHED_AT_MOST : LISTED, LONE_AFTER_DAYS)
+    .bind(today, flaggedOnly ? ALL : LISTED, LONE_AFTER_DAYS)
     .all<Row>();
   const docs = rows.results.map((row) => topDocOf(row, today, limits));
   return {

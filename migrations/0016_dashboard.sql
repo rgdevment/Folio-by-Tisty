@@ -22,6 +22,7 @@ ALTER TABLE service_day ADD COLUMN uploads INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE service_day ADD COLUMN new_docs INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE service_day ADD COLUMN new_keys INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE docs ADD COLUMN first_day INTEGER;
+UPDATE docs SET first_day = json_extract(versions, '$[0].at') / 86400000 WHERE json_extract(versions, '$[0].n') = 1;
 ALTER TABLE service_stage ADD COLUMN bill REAL;
 ALTER TABLE service_stage ADD COLUMN line REAL;
 ALTER TABLE service_stage ADD COLUMN stored_gb REAL;

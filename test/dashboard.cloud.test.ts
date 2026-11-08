@@ -114,6 +114,16 @@ describe("a day of readers, added up", () => {
     expect((await docDay("Eeeeeeee"))?.by_uploader).toBe(0);
   });
 
+  it("does not keep saying the uploader alone read it once a late reader adds to that day", async () => {
+    await shared("Dddddddd", ROOT, { net: "home" });
+    await read("Dddddddd", "home", { hour: 2 });
+    await store.sweep(TODAY + 1);
+    expect((await docDay("Dddddddd"))?.by_uploader).toBe(1);
+    await read("Dddddddd", "late", { hour: 23 });
+    await store.sweep(TODAY + 1);
+    expect(await docDay("Dddddddd")).toEqual({ nets: 2, proved: 0, hours: 1, peak: 1, by_uploader: 0 });
+  });
+
   it("does not say the uploader alone read it when others read it too", async () => {
     await shared("Dddddddd", ROOT, { net: "home" });
     await read("Dddddddd", "home");
@@ -297,6 +307,23 @@ describe("the top documents", () => {
     expect(ofTop(top, "Qqqqqqqq")?.yesterday?.nets).toBe(30);
   });
 
+  it("does not blame a quiet document for the ceiling its owner's other one reached", async () => {
+    await shared("Cccccccc", BOTS);
+    await read("Cccccccc", "r1", { owner: BOTS });
+    const top = await dashboard.top(NOW, "readers", false);
+    expect(ofTop(top, "Cccccccc")?.signals).toEqual([]);
+    expect(ofTop(top, "Cccccccc")?.ownerAtTop).toBe(false);
+  });
+
+  it("bounds how long one without its first day has lived by the oldest version kept and the days it was read", async () => {
+    await testEnv.DB.prepare("UPDATE docs SET first_day = NULL, days = ? WHERE id = 'Llllllll'")
+      .bind(JSON.stringify({ [TODAY - 45]: { n: 1 } }))
+      .run();
+    const top = await dashboard.top(NOW, "oldest", false);
+    expect(ofTop(top, "Llllllll")).toMatchObject({ firstDay: null, signals: [{ kind: "lone", days: 45 }] });
+    expect(top.docs[0]?.id).toBe("Llllllll");
+  });
+
   it("looks back 30 days for one network alone, and no further", async () => {
     await summarized("Llllllll", TODAY - 35, 9);
     expect(ofTop(await dashboard.top(NOW, "readers", false), "Llllllll")?.signals.map((one) => one.kind)).toEqual([
@@ -382,6 +409,24 @@ describe("a key", () => {
     expect(await dashboard.key("N".repeat(43), NOW)).toBeNull();
   });
 
+  it("counts a translation alive by its anchor as open, and one whose anchor is gone as expired", async () => {
+    await testEnv.DB.prepare("UPDATE docs SET blocked_at = NULL WHERE id = 'Eeeeeeee'").run();
+    await store.create(
+      { id: "Ffffffff", owner: ROOT, anchor: "Dddddddd", adminHash: "a", ttlDays: 3, net: "up" },
+      TODAY,
+    );
+    await testEnv.DB.prepare("UPDATE docs SET latest = 1, dies_on = ? WHERE id = 'Ffffffff'")
+      .bind(TODAY - 2)
+      .run();
+    const alive = await dashboard.key(ROOT, NOW);
+    expect(alive?.docs).toEqual({ open: 3, expired: 0, blocked: 0 });
+    expect(alive?.listed.find((one) => one.id === "Ffffffff")?.alive).toBe(true);
+    await testEnv.DB.prepare("UPDATE docs SET dies_on = ? WHERE id = 'Dddddddd'")
+      .bind(TODAY - 1)
+      .run();
+    expect((await dashboard.key(ROOT, NOW))?.docs).toEqual({ open: 1, expired: 2, blocked: 0 });
+  });
+
   it("exports its records without who reported", async () => {
     const records = JSON.stringify(await dashboard.keyRecords(ROOT, NOW));
     expect(records).toContain("Dddddddd");
@@ -406,8 +451,10 @@ describe("a key", () => {
       kind: "net",
       net,
       days: [{ day: TODAY, docs: 2, bytes: 10, keys: 1 }],
-      reports: 0,
     });
+    expect(await dashboard.find("secret-net".padEnd(43, "x"), NOW)).toEqual({ kind: "none" });
+    await testEnv.DB.prepare("UPDATE reports SET net = ?").bind("e".repeat(43)).run();
+    expect(await dashboard.find("e".repeat(43), NOW)).toEqual({ kind: "reporter", net: "e".repeat(43), reports: 1 });
     expect(await dashboard.find("nothing", NOW)).toEqual({ kind: "none" });
   });
 });

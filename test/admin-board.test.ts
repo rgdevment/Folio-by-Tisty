@@ -69,6 +69,7 @@ const VIEW: KeyView = {
       blockedAt: null,
       pausedAt: null,
       legalUntil: null,
+      alive: true,
     },
   ],
 };

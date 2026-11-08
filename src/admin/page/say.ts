@@ -1,5 +1,6 @@
-const DAY_MS = 86_400_000;
-const HOUR_MS = 3_600_000;
+import { DAY_MS } from "../../core/limits";
+
+export const HOUR_MS = 3_600_000;
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic"];
 
 export type Tone = "ok" | "warn" | "danger" | "soft" | "accent";
@@ -92,6 +93,13 @@ export const daysText = (days: number): string => (days === 1 ? "1 día" : `${co
 export const shortKey = (root: string): string => `${root.slice(0, 4)}…${root.slice(-3)}`;
 
 export const todayOf = (now: number): number => Math.floor(now / DAY_MS);
+
+export const cell = (page: Document, said: string, className = ""): HTMLTableCellElement => {
+  const one = page.createElement("td");
+  if (className) one.className = className;
+  one.textContent = said;
+  return one;
+};
 
 export const filled = (place: Element, page: Document, cards: HTMLElement[], none: string): void => {
   place.replaceChildren(...(cards.length > 0 ? cards : [piece(page, "p", "card-line", none)]));

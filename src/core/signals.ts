@@ -46,10 +46,14 @@ const evenAllDay = (day: DayReading | null): boolean =>
 const keptAliveAlone = ({ liveDays, mostNetsADay, today }: Watched): boolean =>
   liveDays > LONE_AFTER_DAYS && mostNetsADay !== null && Math.max(mostNetsADay, today.nets) <= 1;
 
+// The ceiling is the owner's, so only a document that alone went past the free readers is named for it.
+const reachedTheCeiling = ({ ownerRows, today }: Watched, limits: Limits): boolean =>
+  ownerRows >= limits.rowsPerOwnerADay && today.nets > limits.newReadersFree;
+
 export const signalsOf = (watched: Watched, limits: Limits = LEVEL_ONE): Signal[] => {
   const { today, yesterday, uploader, report } = watched;
   return [
-    ...(watched.ownerRows >= limits.rowsPerOwnerADay ? [{ kind: "cap" } as const] : []),
+    ...(reachedTheCeiling(watched, limits) ? [{ kind: "cap" } as const] : []),
     ...(mostlyProved(today) ? [{ kind: "proved" } as const] : []),
     ...(evenAllDay(today) || evenAllDay(yesterday) ? [{ kind: "even" } as const] : []),
     ...(keptAliveAlone(watched)

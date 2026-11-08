@@ -1,6 +1,6 @@
 import type { Top, TopDoc } from "../../core/dashboard";
 import type { Signal } from "../../core/signals";
-import { ago, button, count, daysText, megabytes, piece, shortDay, shortKey, type Tone, todayOf } from "./say";
+import { ago, button, cell, count, daysText, megabytes, piece, shortDay, shortKey, type Tone, todayOf } from "./say";
 
 const SHOWN_AT_FIRST = 10;
 const BOTS: Signal["kind"][] = ["cap", "proved", "even"];
@@ -60,13 +60,6 @@ export const signalText = (signals: Signal[]): { said: string; tone: Tone } => {
     (one) => BOTS.includes(one.kind) || one.kind === "keys" || (one.kind === "report" && one.level === "grave"),
   );
   return { said, tone: alarming ? "danger" : "warn" };
-};
-
-const cell = (page: Document, said: string, className = ""): HTMLTableCellElement => {
-  const one = page.createElement("td");
-  if (className) one.className = className;
-  one.textContent = said;
-  return one;
 };
 
 const rowOf = (page: Document, doc: TopDoc, now: number, ranking: Ranking): HTMLTableRowElement => {

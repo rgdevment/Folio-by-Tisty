@@ -207,9 +207,9 @@ export class CloudDashboard implements Dashboard {
     ]);
     if (firstOf(key)) return { kind: "key", root: said };
     const listed = (days?.results ?? []) as { day: number; docs: number; bytes: number; keys: number }[];
+    if (listed.length > 0) return { kind: "net", net: said, days: listed };
+    // A reporter's network is digested with the evidence key, not the day's, so it never meets the quotas.
     const reported = firstOf<{ n: number }>(reports)?.n ?? 0;
-    return listed.length > 0 || reported > 0
-      ? { kind: "net", net: said, days: listed, reports: reported }
-      : { kind: "none" };
+    return reported > 0 ? { kind: "reporter", net: said, reports: reported } : { kind: "none" };
   }
 }

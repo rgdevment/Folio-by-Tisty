@@ -22,9 +22,15 @@ describe("what a document's reading flags", () => {
     expect(signalsOf(FRIENDS)).toEqual([]);
   });
 
-  it("flags an owner whose readers reached the day's ceiling, and not one just under it", () => {
-    expect(kinds({ ownerRows: LEVEL_ONE.rowsPerOwnerADay })).toEqual(["cap"]);
-    expect(kinds({ ownerRows: LEVEL_ONE.rowsPerOwnerADay - 1 })).toEqual([]);
+  it("flags a document past the free readers of an owner at the day's ceiling, and not one just under it", () => {
+    const busy = { ...QUIET, nets: LEVEL_ONE.newReadersFree + 1 };
+    expect(kinds({ today: busy, ownerRows: LEVEL_ONE.rowsPerOwnerADay })).toEqual(["cap"]);
+    expect(kinds({ today: busy, ownerRows: LEVEL_ONE.rowsPerOwnerADay - 1 })).toEqual([]);
+  });
+
+  it("does not blame a quiet document for the ceiling its owner's other one reached", () => {
+    const fewer = { ...QUIET, nets: LEVEL_ONE.newReadersFree };
+    expect(kinds({ today: fewer, ownerRows: LEVEL_ONE.rowsPerOwnerADay })).toEqual([]);
   });
 
   it("flags most networks coming with a proof of work, and not half of them", () => {

@@ -1,8 +1,19 @@
 import type { KeyDoc, KeyView } from "../../core/dashboard";
 import { LEVEL_ONE } from "../../core/limits";
-import { actions, bar, button, count, daysText, dayText, megabytes, piece, shortDay, todayOf, when } from "./say";
-
-const HOUR_MS = 3_600_000;
+import {
+  actions,
+  bar,
+  button,
+  count,
+  daysText,
+  dayText,
+  HOUR_MS,
+  megabytes,
+  piece,
+  shortDay,
+  todayOf,
+  when,
+} from "./say";
 
 export interface Keying {
   blockKey: (root: string) => void;
@@ -24,7 +35,7 @@ const termsSaid = ({ termsVersion, termsHour }: KeyView, now: number): string =>
 const docState = (doc: KeyDoc, today: number): string => {
   if (doc.blockedAt !== null) return "bloqueado";
   if (doc.legalUntil !== null && doc.legalUntil >= today) return "retenido";
-  if (doc.diesOn < today) return "caducado";
+  if (!doc.alive) return "caducado";
   return doc.pausedAt === null ? "abierto" : "en pausa";
 };
 

@@ -96,6 +96,7 @@ export interface KeyDoc {
   blockedAt: number | null;
   pausedAt: number | null;
   legalUntil: number | null;
+  alive: boolean;
 }
 
 export interface KeyView extends Owner {
@@ -112,7 +113,8 @@ export interface KeyView extends Owner {
 export type Found =
   | { kind: "doc"; id: string; owner: string }
   | { kind: "key"; root: string }
-  | { kind: "net"; net: string; days: { day: number; docs: number; bytes: number; keys: number }[]; reports: number }
+  | { kind: "net"; net: string; days: { day: number; docs: number; bytes: number; keys: number }[] }
+  | { kind: "reporter"; net: string; reports: number }
   | { kind: "none" };
 
 export interface Dashboard {

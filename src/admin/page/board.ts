@@ -1,5 +1,18 @@
 import type { About, Logged, NetsNearTheirTop, Overview, ServiceDay } from "../../core/dashboard";
-import { bar, clock, count, decimal, gigabytes, megabytes, piece, shortKey, type Tone, when } from "./say";
+import {
+  bar,
+  cell,
+  clock,
+  count,
+  decimal,
+  gigabytes,
+  HOUR_MS,
+  megabytes,
+  piece,
+  shortKey,
+  type Tone,
+  when,
+} from "./say";
 
 export type Overlook = Overview & About & { operator: string };
 
@@ -30,7 +43,6 @@ const ACTIONS: Record<string, string> = {
 
 const SPEND_STALE_MS = 3_600_000;
 const SWEEP_STALE_HOURS = 26;
-const HOUR_MS = 3_600_000;
 
 const tile = (page: Document, label: string, value: string, under: string, tone: Tone): HTMLElement => {
   const one = page.createElement("div");
@@ -201,13 +213,6 @@ export const drawDays = (page: Document, place: Element, days: ServiceDay[]): vo
     chart(page, "Lectores por día", days, "readers", "accent"),
     chart(page, "Subidas por día", days, "uploads", "ok"),
   );
-};
-
-const cell = (page: Document, said: string, className = ""): HTMLTableCellElement => {
-  const one = page.createElement("td");
-  if (className) one.className = className;
-  one.textContent = said;
-  return one;
 };
 
 export const drawLog = (page: Document, place: Element, logged: Logged[], now: number): void => {

@@ -85,6 +85,11 @@ export const checkSpend = async (now: number, renewalDay: number, tools: SpendTo
     if (was === "blocked") await store.liftCut(dayOf(now));
     await store.setStage(stage);
   }
-  await store.noteSpend?.({ bill: billOf(usage), line: lineOf(cycle), storedGb: usage.storedGb }, now);
+  try {
+    await store.noteSpend?.({ bill: billOf(usage), line: lineOf(cycle), storedGb: usage.storedGb }, now);
+  } catch (error) {
+    // Only the panel reads it, so failing to note it must not look like a review that failed.
+    console.error("what the review found could not be noted", String(error));
+  }
   return stage;
 };

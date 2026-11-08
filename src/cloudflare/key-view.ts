@@ -1,12 +1,14 @@
 import type { KeyDoc, KeyView, Owner } from "../core/dashboard";
 import type { Limits, ReportLevel } from "../core/limits";
+import { HELD_BYTES, HOLDS_ROOM } from "./room";
 
 const LISTED_AT_MOST = 200;
 const RECORDS_AT_MOST = 1000;
 
-const HOLDS = (today: string): string =>
-  `COALESCE(SUM(CASE WHEN d.latest >= 0 AND d.dies_on >= ${today} AND d.blocked_at IS NULL
-     THEN json_extract(d.versions, '$[#-1].bytes') + d.files_bytes END), 0)`;
+const HOLDS = (today: string): string => `COALESCE(SUM(CASE WHEN ${HOLDS_ROOM(today)} THEN ${HELD_BYTES} END), 0)`;
+// A language lives by its anchor, so its own days passing does not make it expire.
+const ALIVE = `(d.dies_on >= ?2 OR (d.anchor IS NOT NULL AND d.paused_at IS NULL
+  AND EXISTS (SELECT 1 FROM docs a WHERE a.id = d.anchor AND a.latest >= 0 AND a.dies_on >= ?2)))`;
 
 export const levelsOf = (rows: { level: string; n: number }[]): Record<ReportLevel, number> => {
   const levels: Record<ReportLevel, number> = { grave: 0, medium: 0, light: 0 };
@@ -39,8 +41,8 @@ export const keyView = async (db: D1Database, limits: Limits, root: string, toda
     db
       .prepare(
         `SELECT COUNT(*) AS n, ${HOLDS("?2")} AS holds,
-           COALESCE(SUM(d.latest > 0 AND d.dies_on >= ?2 AND d.blocked_at IS NULL), 0) AS open,
-           COALESCE(SUM(d.latest >= 0 AND d.dies_on < ?2 AND d.blocked_at IS NULL), 0) AS expired,
+           COALESCE(SUM(d.latest > 0 AND d.blocked_at IS NULL AND ${ALIVE}), 0) AS open,
+           COALESCE(SUM(d.latest >= 0 AND d.blocked_at IS NULL AND NOT ${ALIVE}), 0) AS expired,
            COALESCE(SUM(d.blocked_at IS NOT NULL), 0) AS blocked,
            COALESCE(SUM(MAX(d.latest, 0)), 0) AS versions
          FROM docs d WHERE d.owner = ?1`,
@@ -55,11 +57,11 @@ export const keyView = async (db: D1Database, limits: Limits, root: string, toda
       .bind(root),
     db
       .prepare(
-        `SELECT id, anchor, latest, json_extract(versions, '$[#-1].bytes') + files_bytes AS bytes, first_day AS firstDay,
-           dies_on AS diesOn, blocked_at AS blockedAt, paused_at AS pausedAt, legal_until AS legalUntil
-         FROM docs WHERE owner = ?1 AND latest >= 0 ORDER BY dies_on DESC, id LIMIT ?2`,
+        `SELECT d.id, d.anchor, d.latest, ${HELD_BYTES} AS bytes, d.first_day AS firstDay, d.dies_on AS diesOn,
+           d.blocked_at AS blockedAt, d.paused_at AS pausedAt, d.legal_until AS legalUntil, ${ALIVE} AS alive
+         FROM docs d WHERE d.owner = ?1 AND d.latest >= 0 ORDER BY d.dies_on DESC, d.id LIMIT ?3`,
       )
-      .bind(root, LISTED_AT_MOST),
+      .bind(root, today, LISTED_AT_MOST),
   ]);
   const known = key?.results[0] as
     | { first_day: number; terms_version: string | null; terms_hour: number | null; blocked_at: number | null }
@@ -80,7 +82,10 @@ export const keyView = async (db: D1Database, limits: Limits, root: string, toda
     versions: counted?.versions ?? 0,
     asEditor: (editors?.results[0] as { n: number } | undefined)?.n ?? 0,
     reports: levelsOf((reports?.results ?? []) as { level: string; n: number }[]),
-    listed: (listed?.results ?? []) as unknown as KeyDoc[],
+    listed: ((listed?.results ?? []) as (Omit<KeyDoc, "alive"> & { alive: number })[]).map((one) => ({
+      ...one,
+      alive: one.alive === 1,
+    })),
   };
 };
 

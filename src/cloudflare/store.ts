@@ -30,6 +30,7 @@ import type {
 } from "../core/store";
 import { keptVersions } from "../core/versions";
 import { acceptAppeal, CLAIMED, mayCorrect } from "./moderation";
+import { HELD_BYTES, HOLDS_ROOM } from "./room";
 import { addProvedTo, NEW_KEYS_NET, PROVED, PROVED_COLUMN, seenTable } from "./seen";
 
 // Two rows by their key at most: the machine that signed the last version and its owner's, the start of owner_mark.
@@ -431,9 +432,7 @@ export class Cloud implements Store {
   async heldByOwner(owner: string, today: number, except: string): Promise<number> {
     const held = await this.#db
       .prepare(
-        `SELECT COALESCE(SUM(json_extract(d.versions, '$[#-1].bytes') + d.files_bytes), 0) AS n
-         FROM docs d
-         WHERE d.owner = ?1 AND d.latest >= 0 AND d.dies_on >= ?2 AND d.blocked_at IS NULL AND d.id <> ?3`,
+        `SELECT COALESCE(SUM(${HELD_BYTES}), 0) AS n FROM docs d WHERE d.owner = ?1 AND ${HOLDS_ROOM("?2")} AND d.id <> ?3`,
       )
       .bind(owner, today, except)
       .first<{ n: number }>();
@@ -1074,6 +1073,7 @@ export class Cloud implements Store {
       .bind(day, this.#limits.historyDays, this.#limits.hoursFromReaders, `$."${day}"`);
   }
 
+  // A day added up twice was read by more than one network, so the uploader was not alone.
   #addToDocDays(table: string, day: number): D1PreparedStatement {
     return this.#db
       .prepare(
@@ -1084,7 +1084,8 @@ export class Cloud implements Store {
            )
          FROM (SELECT doc, hour, COUNT(*) AS n, SUM(${PROVED}) AS p FROM ${table} GROUP BY doc, hour) h
          GROUP BY h.doc
-         ON CONFLICT (doc, day) DO UPDATE SET nets = nets + excluded.nets, proved = proved + excluded.proved`,
+         ON CONFLICT (doc, day) DO UPDATE SET nets = nets + excluded.nets, proved = proved + excluded.proved,
+           hours = MAX(hours, excluded.hours), peak = MAX(peak, excluded.peak), by_uploader = 0`,
       )
       .bind(day);
   }
