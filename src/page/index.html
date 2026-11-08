@@ -66,6 +66,11 @@
       <div class="scrim" id="scrim" hidden></div>
       <aside class="panels" id="panels" aria-label="Sobre este documento">
         <section class="panel panel-actions">
+          <div class="language" id="language-choice" hidden>
+            <label for="language">Idioma</label>
+            <select id="language"></select>
+            <p class="language-said" id="language-said" role="status"></p>
+          </div>
           <a class="action action-main" id="edit-in-tisty" href="tisty://edit">Editar en Tisty</a>
           <button class="action" id="print" type="button">Imprimir</button>
           <p class="actions-note">Editas tu copia; el original sigue igual.</p>
@@ -101,6 +106,7 @@
             <div><dt>Dueño</dt><dd><bdi id="owner"></bdi></dd></div>
             <div><dt>Huella del dueño</dt><dd class="fingerprint" id="owner-fingerprint"></dd></div>
           </dl>
+          <p class="shared-by-another" id="shared-by-another" hidden>Este idioma lo comparte otra persona.</p>
           <details class="explain">
             <summary>Cómo comprobarla</summary>
             <p>Pídele la huella a quien te lo mandó, por otro canal, y compárala. La firma dice quién lo escribió, no que el contenido sea seguro. Si esa llave se retiró, aquí se avisa, según lo que dice el servidor.</p>

@@ -185,7 +185,8 @@ describe("the panic button", () => {
     const records = (await moderation.panic(ID, "looks real", NOW + 1)) as Record<string, never>;
     const written = JSON.stringify(records);
     expect(written).not.toContain("secret-net");
-    expect(written).not.toContain("4242");
+    expect(written).not.toContain('"asn"');
+    expect(written).not.toMatch(/[:[,]4242[,\]}]/);
     expect(written).not.toContain("secret-link");
     expect(written).not.toContain("secret-mail");
     expect(records).toMatchObject({

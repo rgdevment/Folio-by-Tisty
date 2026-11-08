@@ -36,7 +36,7 @@ const draw = (html: string, held = PLAYING.document): void => {
   const document = { ...held, html };
   const cleaner = domPurifyCleaner(place);
   const press = filePresser({ id: ID, linkKey: LINK_KEY, held: document });
-  drawFrame(document, (words) => finished(cleaner.clean(words), []), SEAL, press);
+  drawFrame({ held: document, wordsOf: (words) => finished(cleaner.clean(words), []), seal: SEAL, pressFile: press });
 };
 
 const fileAt = (at: number): HTMLElement => root.querySelector(`a[data-file="${at}"]`) as HTMLElement;

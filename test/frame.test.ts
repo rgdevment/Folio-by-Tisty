@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { domPurifyCleaner } from "../src/page/ui/clean";
 import { finished } from "../src/page/ui/finish";
-import { drawFrame } from "../src/page/ui/frame";
+import { drawFrame, type Seal } from "../src/page/ui/frame";
 
 const SEAL = { verdict: "holds", fingerprint: "1", ownerFingerprint: null, diesOn: "mañana" } as const;
 const ADDRESS = "https://tisty.cl/k7Qm2xPa#THEKEY";
@@ -59,7 +59,7 @@ const click = (words: string): boolean => {
 
 const draw = (held: Document): void => {
   const cleaner = domPurifyCleaner(place);
-  drawFrame(held, (html) => finished(cleaner.clean(html), []), SEAL);
+  drawFrame({ held, wordsOf: (html) => finished(cleaner.clean(html), []), seal: SEAL });
 };
 
 beforeEach(() => {
@@ -273,7 +273,7 @@ describe("a card in the words", () => {
   it("cleans a page once for its card, however many times the reader comes back", () => {
     const cleaner = domPurifyCleaner(place);
     const wordsOf = vi.fn((html: string) => finished(cleaner.clean(html), []));
-    drawFrame(withWords('<p><a class="card" href="tisty:page/1">Enero</a></p>'), wordsOf, SEAL);
+    drawFrame({ held: withWords('<p><a class="card" href="tisty:page/1">Enero</a></p>'), wordsOf, seal: SEAL });
     const cleanedOfEnero = () => wordsOf.mock.calls.filter(([html]) => html.includes("tranquilo")).length;
     expect(cleanedOfEnero()).toBe(1);
     root.querySelector<HTMLElement>("a.doc-card")?.click();
@@ -461,9 +461,10 @@ describe("who signed it", () => {
 
   it("names the owner apart when another root signed this version", () => {
     const cleaner = domPurifyCleaner(place);
-    drawFrame({ ...HELD, signed_as: "Ana", owner_name: "Mario" }, (html) => finished(cleaner.clean(html), []), {
-      ...SEAL,
-      ownerFingerprint: "2",
+    drawFrame({
+      held: { ...HELD, signed_as: "Ana", owner_name: "Mario" },
+      wordsOf: (html) => finished(cleaner.clean(html), []),
+      seal: { ...SEAL, ownerFingerprint: "2" },
     });
     expect(facts().hidden).toBe(false);
     expect(place.document.getElementById("signer")?.textContent).toBe("Ana");
@@ -1042,5 +1043,102 @@ describe("the index", () => {
     draw({ id: "k7Qm2xPa", title: "Solo", body: "", html: "<p>Sin títulos.</p>" });
     expect(panel()?.hidden).toBe(true);
     expect(dockButton()?.hidden).toBe(true);
+  });
+});
+
+describe("another language in the same frame", () => {
+  const JANUARY: Page = { ...ENERO, id: "p2", page_of: "enWords1", title: "January", html: "<h1>January</h1>" };
+  const ENGLISH: Document = {
+    id: "enWords1",
+    title: "Walks",
+    lang: "en",
+    body: "",
+    html: [
+      '<h1 id="walks">Walks</h1>',
+      '<p><a href="tisty:cited/0">other</a> <a href="tisty:file/0">attached</a></p>',
+      '<h2 id="river">River</h2>',
+    ].join(""),
+    pages: [JANUARY],
+    cited: [{ document: "citedEn", key: "ENKEY" }],
+    files: [{ at: 0, name: "notes.txt" }],
+    made: "2026-01-01T00:00:00Z",
+  };
+  const shownOf = (held: Document, pressFile?: (link: HTMLElement) => void, seal: Seal = SEAL) => {
+    const cleaner = domPurifyCleaner(place);
+    return {
+      held,
+      wordsOf: (html: string) => finished(cleaner.clean(html), []),
+      seal,
+      ...(pressFile ? { pressFile } : {}),
+    };
+  };
+  const SPANISH: Document = { ...HELD, files: [{ at: 0, name: "notas.txt" }], made: "2026-01-01T00:00:00Z" };
+
+  beforeEach(() => {
+    vi.stubGlobal("innerHeight", 900);
+  });
+
+  it("draws the other document in the same sheet, and answers each click once", () => {
+    const before = vi.fn();
+    const after = vi.fn();
+    place.print = vi.fn();
+    const redraw = drawFrame(shownOf(SPANISH, before));
+    redraw(shownOf(ENGLISH, after));
+    expect(place.document.title).toBe("Walks · Folio");
+    expect(root.querySelector(".sheet")?.getAttribute("lang")).toBe("en");
+    expect(click("other")).toBe(true);
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith("/citedEn#ENKEY");
+    linkSaying("attached")?.dispatchEvent(new place.MouseEvent("click", { bubbles: true, composed: true }));
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(before).not.toHaveBeenCalled();
+    place.document.getElementById("print")?.click();
+    expect(place.print).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists only the new document's pages and details", () => {
+    const redraw = drawFrame(shownOf(SPANISH));
+    redraw(shownOf(ENGLISH));
+    const pages = [...place.document.querySelectorAll("#pages button")].map((one) => one.textContent);
+    expect(pages).toEqual(["January"]);
+    expect(place.document.querySelectorAll("#details > div")).toHaveLength(1);
+  });
+
+  it("keeps the reader on the page in the same place, and in the section with the same count", () => {
+    const LONG_ENERO: Page = { ...ENERO, html: '<h1 id="enero">Enero</h1><h2 id="uno">Uno</h2><h2 id="dos">Dos</h2>' };
+    const LONG_JANUARY: Page = {
+      ...JANUARY,
+      html: '<h1 id="january">January</h1><h2 id="one">One</h2><h2 id="two">Two</h2>',
+    };
+    const tops: Record<string, number> = { enero: -500, uno: -100, dos: 600 };
+    place.Element.prototype.getBoundingClientRect = function (this: Element) {
+      return { top: tops[this.id] ?? 0 } as DOMRect;
+    };
+    const redraw = drawFrame(shownOf({ ...SPANISH, pages: [LONG_ENERO] }));
+    click("Enero");
+    redraw(shownOf({ ...ENGLISH, pages: [LONG_JANUARY] }));
+    expect(place.document.title).toBe("January · Folio");
+    expect(place.document.getElementById("crumb-title")?.textContent).toBe("Walks");
+    expect(scrolled.map((one) => one.id)).toEqual(["one"]);
+  });
+
+  it("opens the other document at its start when it has no page in that place", () => {
+    const redraw = drawFrame(shownOf(SPANISH));
+    click("Enero");
+    redraw(shownOf({ ...ENGLISH, pages: [] }));
+    expect(place.document.title).toBe("Walks · Folio");
+    expect(place.document.getElementById("crumb")?.hidden).toBe(true);
+    expect(place.document.getElementById("pages-card")?.hidden).toBe(true);
+  });
+
+  it("says so when the language shown is shared by someone other than the anchor's owner", () => {
+    const warning = () => place.document.getElementById("shared-by-another") as HTMLElement;
+    const redraw = drawFrame(shownOf(SPANISH));
+    expect(warning().hidden).toBe(true);
+    redraw(shownOf(ENGLISH, undefined, { ...SEAL, sharedByAnother: true }));
+    expect(warning().hidden).toBe(false);
+    expect(warning().textContent).toContain("otra persona");
+    redraw(shownOf(SPANISH));
+    expect(warning().hidden).toBe(true);
   });
 });

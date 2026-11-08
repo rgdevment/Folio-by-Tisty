@@ -50,7 +50,7 @@ const sent = async (sending: Sending): Promise<string | null> => {
   return REFUSALS[lastRefusal ?? ""] ?? COULD_NOT_SEND;
 };
 
-export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): void => {
+export const offerReport = (shown: () => Reportable): void => {
   const button = element<HTMLButtonElement>("report");
   const dialog = element<HTMLDialogElement>("report-dialog");
   const form = element<HTMLFormElement>("report-form");
@@ -65,7 +65,7 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
   const categoryOf = (): string => new FormData(form).get("category")?.toString() ?? "";
   const detailOf = (): string => new FormData(form).get("detail")?.toString().trim() ?? "";
   const contactOf = (): string => new FormData(form).get("contact")?.toString().trim() ?? "";
-  const bodyOf = async (): Promise<string> => {
+  const bodyOf = async ({ id, linkKey, operatorKey, version }: Reportable): Promise<string> => {
     const category = categoryOf();
     const detail = detailOf();
     const level = levelOfReport(category);
@@ -98,6 +98,8 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const reportable = shown();
+    const { linkKey } = reportable;
     const detail = detailOf();
     if (holdsALink(detail) || (linkKey !== "" && detail.includes(linkKey))) {
       said.textContent = LINK_IN_DETAIL;
@@ -110,8 +112,8 @@ export const offerReport = ({ id, linkKey, operatorKey, version }: Reportable): 
     }
     submit.disabled = true;
     said.textContent = "Enviando…";
-    const failed = await bodyOf()
-      .then((body) => sent({ id, body }))
+    const failed = await bodyOf(reportable)
+      .then((body) => sent({ id: reportable.id, body }))
       .catch(() => COULD_NOT_SEND);
     said.textContent = failed ?? "Recibimos tu denuncia. Gracias.";
     submit.disabled = failed === null;

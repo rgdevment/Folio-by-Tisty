@@ -37,6 +37,7 @@ export interface Seal {
   fingerprint: string;
   ownerFingerprint: string | null;
   diesOn: string;
+  sharedByAnother?: boolean;
 }
 
 // Through the object model, since the page's policy lets no style be written into it.
@@ -117,6 +118,8 @@ const centerInItsList = (button: HTMLElement): void => {
   if (list) list.scrollTop = button.offsetTop - list.clientHeight / 2;
 };
 
+const headingsIn = (root: ShadowRoot): Element[] => [...root.querySelectorAll("h1, h2, h3, h4, h5, h6")];
+
 // The last heading past the limit. They go down the page in order, so a long page is asked about only a few of them.
 const lastPast = (headings: Element[], limit: number): Element | undefined => {
   let low = 0;
@@ -165,7 +168,7 @@ const drawIndex = (root: ShadowRoot, held: Document | Page): AbortController => 
   // A new page starts at its top, so its list does too, wherever the last one had got to.
   list.scrollTop = 0;
   const marks = new Map<Element, HTMLElement>();
-  const headings = [...root.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6")];
+  const headings = headingsIn(root);
   // The title is already the first thing on the sheet, so the index starts after it.
   const shown = headings[0]?.textContent === held.title ? headings.slice(1) : headings;
   for (const heading of shown) {
@@ -220,6 +223,7 @@ const SAID_ELSEWHERE = new Set(["title", "tags", "tag", "paper", "sheets", "orie
 
 const drawDetails = (root: ShadowRoot, held: Document): void => {
   const list = element("details");
+  list.replaceChildren();
   if (held.made) fact(list, "Creado", dayOf(held.made));
   if (held.wrote) fact(list, "Editado", dayOf(held.wrote));
   // The properties travel hidden in the HTML, and a reader shows them here (contract, «text»).
@@ -237,7 +241,7 @@ const drawOwner = (held: Document, ownerFingerprint: string | null): void => {
   element("owner-fingerprint").textContent = ownerFingerprint ?? "";
 };
 
-const drawSeal = (held: Document, { verdict, fingerprint, ownerFingerprint, diesOn }: Seal): void => {
+const drawSeal = (held: Document, { verdict, fingerprint, ownerFingerprint, diesOn, sharedByAnother }: Seal): void => {
   const { text, tone } = VERDICTS[verdict];
   const seal = element("seal");
   seal.hidden = false;
@@ -246,6 +250,7 @@ const drawSeal = (held: Document, { verdict, fingerprint, ownerFingerprint, dies
   element("signer").textContent = held.signed_as ?? "Sin nombre";
   element("fingerprint").textContent = fingerprint;
   drawOwner(held, ownerFingerprint);
+  element("shared-by-another").hidden = sharedByAnother !== true;
   element("dies-on").textContent = diesOn;
 };
 
@@ -363,19 +368,18 @@ const nameOf = (shown: Document | Page): string => shown.title ?? "Sin título";
 
 // At the end of the document and on a card of their own, as Tisty shows them.
 const drawPages = (pages: Page[], goTo: (shown: Page) => void): void => {
-  if (pages.length === 0) return;
-  element("pages-card").hidden = false;
+  element("pages-card").hidden = pages.length === 0;
   element("pages-count").textContent = String(pages.length);
-  const list = element("pages");
-  for (const shown of pages) {
+  const items = pages.map((shown) => {
     const item = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = nameOf(shown);
     button.addEventListener("click", () => goTo(shown));
     item.append(button);
-    list.append(item);
-  }
+    return item;
+  });
+  element("pages").replaceChildren(...items);
 };
 
 const markPage = (at: number): void => {
@@ -394,13 +398,21 @@ const drawWayBack = (held: Document, at: number, total: number, goTo: (shown: Do
   element("crumb-back").onclick = () => goTo(held);
 };
 
+const sectionBeingRead = (root: ShadowRoot): number => {
+  const headings = headingsIn(root);
+  const reached = lastPast(headings, innerHeight / 3);
+  return reached ? headings.indexOf(reached) : -1;
+};
+
+export interface Shown {
+  held: Document;
+  wordsOf: (html: string) => DocumentFragment;
+  seal: Seal;
+  pressFile?: (link: HTMLElement) => void;
+}
+
 // What it draws is already clean: `wordsOf` gives what the cleaner gave back, never the HTML as it arrived.
-export const drawFrame = (
-  held: Document,
-  wordsOf: (html: string) => DocumentFragment,
-  seal: Seal,
-  pressFile?: (link: HTMLElement) => void,
-): void => {
+export const drawFrame = (first: Shown): ((next: Shown) => void) => {
   const host = element("sheet");
   // The sheet goes in a shadow root, which keeps its CSS, ids and classes apart in both directions.
   const root = host.attachShadow({ mode: "closed" });
@@ -412,8 +424,9 @@ export const drawFrame = (
   sheet.tabIndex = -1;
   root.append(styles, sheet);
 
-  const pages = held.pages ?? [];
-  const withCards = cardsFor(held, wordsOf);
+  let { held, wordsOf, pressFile } = first;
+  let pages: Page[] = [];
+  let withCards: ReturnType<typeof cardsFor>;
   let reading: AbortController | undefined;
   let drawing: AbortController | undefined;
   let showing: Document | Page = held;
@@ -439,10 +452,21 @@ export const drawFrame = (
     sheet.focus({ preventScroll: true });
   };
   root.addEventListener("click", (event) => followLink(event, root, held, turnTo));
-  if (pressFile) offerFiles(root, pressFile);
+  offerFiles(root, (link) => pressFile?.(link));
 
-  drawPages(pages, turnTo);
-  goTo(held);
+  const draw = (next: Shown, page = -1, section = -1): void => {
+    ({ held, wordsOf, pressFile } = next);
+    pages = held.pages ?? [];
+    withCards = cardsFor(held, wordsOf);
+    drawPages(pages, turnTo);
+    goTo(held);
+    drawDetails(root, held);
+    drawSeal(held, next.seal);
+    const samePlace = pages[page];
+    if (samePlace) goTo(samePlace);
+    headingsIn(root)[section]?.scrollIntoView({ block: "start" });
+  };
+  draw(first);
   const printedPage = (page: Document | Page, side: string, signal: AbortSignal): HTMLElement => {
     const printed = document.createElement("section");
     printed.className = `printed-page ${side}`;
@@ -464,12 +488,12 @@ export const drawFrame = (
     },
   });
   drawPaperPanel(host, held);
-  drawDetails(root, held);
-  drawSeal(held, seal);
   drawActions();
   drawDock();
   measurePanels();
   element("loading").hidden = true;
   element("desk").hidden = false;
   document.body.dataset.state = "open";
+  // As in Tisty, another language keeps the reader on the page in the same place and in the section with the same count.
+  return (next) => draw(next, pages.indexOf(showing as Page), sectionBeingRead(root));
 };
