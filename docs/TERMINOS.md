@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 14, vigente desde el 8 de noviembre de 2026.**
+**Versión 15, vigente desde el 8 de noviembre de 2026.**
 
 ## En corto
 
@@ -51,7 +51,14 @@ con lo que lees es tu responsabilidad.
   llave. Un link de leer no se puede retirar si no dejas de compartir.
 - **Lo compartido va cifrado de punta a punta.** La llave va en el link, después
   del `#`, y los navegadores no la envían al servidor. El servidor guarda bytes
-  que no puede leer. Si pierdes el link, nadie puede recuperarlo por ti.
+  que no puede leer.
+- **Si pierdes un link, nadie puede recuperarlo por ti,** porque el servidor
+  nunca tuvo su llave. Tu documento sigue en tu Tisty, que guarda los links de
+  lo que compartes mientras está compartido: los de leer y editar se vuelven a
+  copiar desde la fila *Compartido* del documento, donde también se pausa, se
+  reanuda y se deja de compartir. Cuando lo compartido caduca o lo dejas de
+  compartir, sus links se pierden para siempre; si vuelves a compartir el
+  documento, recibe links nuevos.
 - **Lo compartido caduca solo** tras el plazo sin actividad que elijas al
   compartir, de un día a 15 días como mucho: sin lecturas, sin visitas tuyas y
   sin versiones nuevas. Al caducar, los links dejan de funcionar y la copia del

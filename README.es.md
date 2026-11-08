@@ -28,6 +28,10 @@ sus promesas. Sus links viven en tisty.cl, y su sitio es
   viene de ti.
 - **Caduca sola** después del tiempo sin actividad que elijas, de un día a 15
   como mucho. Tu documento se queda en tu Tisty.
+- **Un link perdido no se puede recuperar,** porque el servidor nunca tuvo su
+  llave. Mientras el documento está compartido, Tisty guarda sus links: vuelve a
+  copiarlos desde su fila *Compartido*. Si ya caducó o lo dejaste de compartir,
+  compártelo otra vez para tener links nuevos.
 - **Un link se abre en cualquier navegador,** en tisty.cl, y se edita en otro
   Tisty con *Editar en Tisty*.
 

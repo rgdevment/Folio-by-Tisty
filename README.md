@@ -26,6 +26,10 @@ live at tisty.cl, and its site is [www.tisty.app](https://www.tisty.app).
   came from you.
 - **It expires on its own** after the time without activity you choose, from one
   day to 15 at most. Your document stays in your Tisty.
+- **A lost link cannot be recovered,** because the server never had its key.
+  While the document is shared, Tisty keeps its links: copy them again from its
+  *Shared* row. Once it expires or you stop sharing it, share it again for new
+  ones.
 - **A link opens in any browser,** at tisty.cl, and is edited in another Tisty
   with *Edit in Tisty*.
 
