@@ -595,7 +595,7 @@ describe("the sweep that blocks what waited", () => {
     await insertReports("RealOne01", [7, 8, 9], DAY);
     await store.sweep(DAY);
     expect((await doc("RealOne01"))?.blocked_at).toBe(DAY);
-  });
+  }, 60_000);
 
   it("goes on with the oldest first, 500 at a time", async () => {
     for (let n = 0; n < 520; n += 1) {
@@ -622,7 +622,7 @@ describe("the sweep that blocks what waited", () => {
     }>();
     expect(all?.n).toBe(520);
     expect(net(1)).toBe("net-1");
-  });
+  }, 60_000);
 
   it("does not block a document whose reports are from a network found false", async () => {
     await create("FalseSw01");

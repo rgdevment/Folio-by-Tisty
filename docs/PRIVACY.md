@@ -11,8 +11,8 @@ except your key's public part and the keys you took back; the operator deletes
 their mail by hand. This policy says exactly what it keeps, why, and for how
 long.
 
-Who answers for this data: Mario, a natural person in Chile, who runs Folio
-as a non-profit. Contact: <rgdevment@tisty.app>.
+Who answers for this data: Mario Hidalgo G., a natural person in Chile, who
+runs Folio as a non-profit. Contact: <rgdevment@tisty.app>.
 
 ## What it cannot see
 

@@ -10,8 +10,8 @@ ni nada de terceros en la página. Lo que guarda caduca solo, salvo la parte
 pública de tu llave y las llaves que retiraste; el operador borra sus correos a
 mano. Esta política cuenta exactamente qué guarda, por qué y por cuánto tiempo.
 
-Quién responde por estos datos: Mario, persona natural en Chile, que opera
-Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
+Quién responde por estos datos: Mario Hidalgo G., persona natural en Chile, que
+opera Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 
 ## Lo que no puede ver
 
