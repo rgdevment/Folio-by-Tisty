@@ -9,7 +9,7 @@ export interface Doing {
   reportWasFalse: (id: string, net: string) => void;
   forgetContact: (id: string, net: string) => void;
   networkWasFalse: (id: string, net: string) => void;
-  opened: (id: string) => void;
+  openReport: (id: string, command: string) => void;
   blockKey: (root: string) => void;
   unblockKey: (root: string) => void;
   copy: (said: string) => void;
@@ -122,11 +122,9 @@ const reportCard = (page: Document, report: QueuedReport, doing: Doing, owner: O
   if (ownerToBlock) buttons.push(button(page, "Bloquear llave del dueño", () => doing.blockKey(ownerToBlock), true));
   if (report.sealedLink) {
     const sealed = report.sealedLink;
-    card.append(piece(page, "code", "sealed", sealed));
     buttons.unshift(
+      button(page, "Abrir denuncia", () => doing.openReport(report.doc, openCommand(report.doc, sealed))),
       button(page, "Comprobar sin abrir", () => doing.copy(checkCommand(report.doc, sealed))),
-      button(page, "Copiar para abrir", () => doing.copy(openCommand(report.doc, sealed))),
-      button(page, "Anotar apertura", () => doing.opened(report.doc)),
     );
   }
   if (report.sealedContact) {

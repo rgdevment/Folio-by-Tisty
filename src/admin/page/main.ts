@@ -226,9 +226,9 @@ const load = async (): Promise<void> => {
         ),
       reportWasFalse: (id, net) =>
         confirmed("¿Esta denuncia era falsa? Esa red dejará de contar.", `docs/${id}/reports/${net}/false`),
-      opened: (id) => {
-        const reason = prompt("¿Por qué se abrió este documento?");
-        if (reason?.trim()) void doing(`docs/${id}/opened`, reason);
+      openReport: (id, command) => {
+        const reason = prompt(`¿Por qué abres la denuncia de ${id}? Queda anotado en el registro.`);
+        if (reason?.trim()) void openingReport(id, reason, command);
       },
       panic: (id, version) => {
         const note = prompt(`¿Por qué bloquear y retener ${id}? Dejará de servirse y se retiene 180 días.`);
@@ -254,6 +254,20 @@ const load = async (): Promise<void> => {
     todayOf(Date.now()),
   );
   said.textContent = "";
+};
+
+// Noted before the command is handed over, so no report is opened without its reason on record.
+const openingReport = async (id: string, reason: string, command: string): Promise<void> => {
+  said.textContent = "Trabajando…";
+  if (!(await asked(`docs/${id}/opened`, reason))) {
+    said.textContent = COULD_NOT;
+    return;
+  }
+  copying(
+    command,
+    "Copiado. Pégalo en tu terminal, en la carpeta de Folio, con la ruta de tu llave en vez de <llave>: te da el link de la denuncia.",
+  );
+  void loadBoard();
 };
 
 const doing = async (path: string, note?: string): Promise<void> => {

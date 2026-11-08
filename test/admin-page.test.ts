@@ -106,7 +106,7 @@ beforeEach(() => {
     accept: vi.fn(),
     reject: vi.fn(),
     reportWasFalse: vi.fn(),
-    opened: vi.fn(),
+    openReport: vi.fn(),
     copy: vi.fn(),
     panic: vi.fn(),
     purgeOwner: vi.fn(),
@@ -396,6 +396,33 @@ describe("a case in the panel", () => {
     expect(page.getElementById("case-link")?.hidden).toBe(false);
   });
 
+  it("opens a report with one button: notes why, then copies what gives its link", async () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const fetching = answering();
+    await opened(fetching, "verificar la denuncia");
+    pressing("reports", "Abrir denuncia");
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
+    const noted = fetching.mock.calls.find(([path]) => path === "/api/docs/AbCdEfGh/opened");
+    expect(JSON.parse(String(noted?.[1]?.body))).toEqual({ note: "verificar la denuncia" });
+    expect(writeText).toHaveBeenCalledWith("node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque");
+    expect(page.getElementById("said")?.textContent).toContain("te da el link de la denuncia");
+  });
+
+  it("copies nothing when the opening could not be noted, or had no reason", async () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const refusing = answering({ "/opened": () => new Response("{}", { status: 500 }) });
+    await opened(refusing);
+    pressing("reports", "Abrir denuncia");
+    await vi.waitFor(() => expect(page.getElementById("said")?.textContent).toContain("No se pudo"));
+    const silent = answering();
+    await opened(silent, " ");
+    pressing("reports", "Abrir denuncia");
+    expect(silent.mock.calls.some(([path]) => path.endsWith("/opened"))).toBe(false);
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
   it("does nothing without a reason", async () => {
     const fetching = answering();
     await opened(fetching, "  ");
@@ -479,17 +506,19 @@ describe("the panel", () => {
   });
 
   it("hands over a sealed link only as a command for the operator's own machine", () => {
-    pressing("reports", "Copiar para abrir");
-    expect(doing.copy).toHaveBeenCalledWith("node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque");
-    pressing("reports", "Anotar apertura");
-    expect(doing.opened).toHaveBeenCalledWith("AbCdEfGh");
+    pressing("reports", "Abrir denuncia");
+    expect(doing.openReport).toHaveBeenCalledWith(
+      "AbCdEfGh",
+      "node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque",
+    );
+    expect(page.getElementById("reports")?.textContent).not.toContain("sealed1.opaque");
   });
 
   it("offers to mark any report false, and opening only where a link came", () => {
     pressing("reports", "Era falsa", 1);
     expect(doing.reportWasFalse).toHaveBeenCalledWith("IjKlMnOp", "n2");
     const second = (page.getElementById("reports") as Element).querySelectorAll(".card")[1];
-    expect(second?.textContent).not.toContain("Copiar para abrir");
+    expect(second?.textContent).not.toContain("Abrir denuncia");
   });
 
   it("says which reports come from a network already marked false", () => {
