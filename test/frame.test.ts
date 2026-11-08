@@ -6,7 +6,7 @@ import { domPurifyCleaner } from "../src/page/ui/clean";
 import { finished } from "../src/page/ui/finish";
 import { drawFrame, type Seal } from "../src/page/ui/frame";
 
-const SEAL = { verdict: "holds", fingerprint: "1", ownerFingerprint: null, diesOn: "mañana" } as const;
+const SEAL = { verdict: "holds", fingerprint: "1", ownerFingerprint: null, diesOn: 20_773 } as const;
 const ADDRESS = "https://tisty.cl/k7Qm2xPa#THEKEY";
 
 const ENERO: Page = {
@@ -82,7 +82,7 @@ beforeEach(() => {
   vi.stubGlobal("MutationObserver", place.MutationObserver);
   vi.stubGlobal("AbortController", place.AbortController);
   vi.stubGlobal("location", { href: ADDRESS, hash: "#THEKEY", assign });
-  vi.stubGlobal("navigator", {});
+  vi.stubGlobal("navigator", { languages: ["es-CL"] });
   vi.stubGlobal("scrollTo", vi.fn());
   vi.stubGlobal("addEventListener", vi.fn());
   vi.stubGlobal("requestAnimationFrame", vi.fn());
@@ -96,6 +96,27 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("the language around the sheet", () => {
+  it("is the document's when it is English, while the sheet keeps its own lang", () => {
+    draw({ ...HELD, lang: "en" });
+    expect(place.document.documentElement.lang).toBe("en");
+    expect(root.querySelector(".sheet")?.getAttribute("lang")).toBe("en");
+    expect(place.document.getElementById("seal-text")?.textContent).toBe("Valid signature");
+  });
+
+  it("is the reader's when the document is in another language, which the sheet still says", () => {
+    draw({ ...HELD, lang: "fr" });
+    expect(place.document.documentElement.lang).toBe("es");
+    expect(root.querySelector(".sheet")?.getAttribute("lang")).toBe("fr");
+    expect(place.document.getElementById("seal-text")?.textContent).toBe("Firma válida");
+  });
+
+  it("writes the last day in the language spoken", () => {
+    draw({ ...HELD, lang: "en" });
+    expect(place.document.getElementById("dies-on")?.textContent).toBe("November 16, 2026");
+  });
 });
 
 describe("a click on what the sheet links to", () => {
@@ -350,6 +371,7 @@ describe("a link that lets someone edit", () => {
     };
     vi.stubGlobal("window", place);
     vi.stubGlobal("document", place.document);
+    vi.stubGlobal("navigator", { languages: ["es-CL"] });
     vi.stubGlobal("location", place.location);
     draw(HELD);
   });
@@ -883,7 +905,7 @@ describe("editing in Tisty", () => {
     expect(notice().hidden).toBe(true);
     button().click();
     expect(notice().hidden).toBe(false);
-    expect(notice().querySelector("a")?.getAttribute("href")).toBe("https://www.tisty.app/");
+    expect(notice().querySelector("a")?.getAttribute("href")).toBe("https://www.tisty.app/es/");
   });
 
   it("stays while the focus is away, and closes when the reader comes back from the app", () => {

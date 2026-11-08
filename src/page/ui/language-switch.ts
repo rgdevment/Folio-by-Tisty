@@ -1,4 +1,5 @@
 import { element } from "./frame";
+import { said } from "./speak";
 
 export interface LanguageSwitch {
   langs: string[];
@@ -7,16 +8,13 @@ export interface LanguageSwitch {
   choose: (lang: string) => Promise<boolean>;
 }
 
-const MISSED_THE_READERS = "No se pudo abrir el documento en tu idioma, así que lo ves en el idioma del link.";
-const COULD_NOT_SWITCH = "No se pudo abrir ese idioma, así que sigues en este.";
-
 // In its own language, so a reader who does not read the page's still finds theirs.
 const nameOf = (lang: string): string => {
   try {
     const name = new Intl.DisplayNames([lang], { type: "language" }).of(lang) ?? lang;
     return name.charAt(0).toLocaleUpperCase(lang) + name.slice(1);
   } catch {
-    return lang || "Original";
+    return lang || said().original;
   }
 };
 
@@ -29,19 +27,19 @@ const optionOf = (lang: string): HTMLOptionElement => {
 
 export const offerLanguages = ({ langs, shown, missedTheReaders, choose }: LanguageSwitch): void => {
   const select = element<HTMLSelectElement>("language");
-  const said = element("language-said");
+  const told = element("language-said");
   select.replaceChildren(...langs.map(optionOf));
   select.value = shown;
   element("language-choice").hidden = false;
-  if (missedTheReaders) said.textContent = MISSED_THE_READERS;
+  if (missedTheReaders) told.textContent = said().missedTheReaders;
   let reading = shown;
   select.addEventListener("change", async () => {
     select.disabled = true;
-    said.textContent = "";
+    told.textContent = "";
     if (await choose(select.value)) reading = select.value;
     else {
       select.value = reading;
-      said.textContent = COULD_NOT_SWITCH;
+      told.textContent = said().couldNotSwitch;
     }
     select.disabled = false;
   });

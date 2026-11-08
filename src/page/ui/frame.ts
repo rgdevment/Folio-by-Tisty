@@ -3,6 +3,7 @@ import { cardsFor, referenceOf } from "./cards";
 import { bareUrl } from "./clean";
 import { offerPrinting } from "./print";
 import sheetStyles from "./sheet.css?url";
+import { said, speak } from "./speak";
 
 export const element = <T extends HTMLElement>(id: string): T => {
   const found = document.getElementById(id);
@@ -24,19 +25,21 @@ const LONG_PAGE_WIDTH_PIXELS = 820;
 
 const pixels = (millimetres: number): number => Math.round((millimetres / MILLIMETRES_PER_INCH) * PIXELS_PER_INCH);
 
-const VERDICTS: Record<Verdict, { text: string; tone: string }> = {
-  holds: { text: "Firma válida", tone: "good" },
-  retired: { text: "Firma de una llave retirada después", tone: "warn" },
-  doubtful: { text: "Firma dudosa: la llave estaba retirada", tone: "bad" },
-  refused: { text: "La firma no vale", tone: "bad" },
-  unreadable: { text: "No se pudo leer la firma", tone: "bad" },
+const DAY_MILLISECONDS = 86_400_000;
+
+const TONES: Record<Verdict, string> = {
+  holds: "good",
+  retired: "warn",
+  doubtful: "bad",
+  refused: "bad",
+  unreadable: "bad",
 };
 
 export interface Seal {
   verdict: Verdict;
   fingerprint: string;
   ownerFingerprint: string | null;
-  diesOn: string;
+  diesOn: number;
 }
 
 // Through the object model, since the page's policy lets no style be written into it.
@@ -215,7 +218,14 @@ const fact = (list: HTMLElement, name: string, value: string): void => {
   list.append(row);
 };
 
-const dayOf = (moment: string): string => new Date(moment).toLocaleDateString(undefined, { dateStyle: "medium" });
+const dayOf = (moment: string): string =>
+  new Date(moment).toLocaleDateString(document.documentElement.lang, { dateStyle: "medium" });
+
+const lastDay = (diesOn: number): string =>
+  new Date(diesOn * DAY_MILLISECONDS).toLocaleDateString(document.documentElement.lang, {
+    dateStyle: "long",
+    timeZone: "UTC",
+  });
 
 // What the sheet does not already say: the title and tags are on it, and the paper is in its own panel.
 const SAID_ELSEWHERE = new Set(["title", "tags", "tag", "paper", "sheets", "orientation", "lang"]);
@@ -223,8 +233,9 @@ const SAID_ELSEWHERE = new Set(["title", "tags", "tag", "paper", "sheets", "orie
 const drawDetails = (root: ShadowRoot, held: Document): void => {
   const list = element("details");
   list.replaceChildren();
-  if (held.made) fact(list, "Creado", dayOf(held.made));
-  if (held.wrote) fact(list, "Editado", dayOf(held.wrote));
+  const { made, wrote } = said();
+  if (held.made) fact(list, made, dayOf(held.made));
+  if (held.wrote) fact(list, wrote, dayOf(held.wrote));
   // The properties travel hidden in the HTML, and a reader shows them here (contract, «text»).
   for (const name of root.querySelectorAll("dl.front > dt")) {
     const key = name.textContent ?? "";
@@ -236,20 +247,19 @@ const drawDetails = (root: ShadowRoot, held: Document): void => {
 
 const drawOwner = (held: Document, ownerFingerprint: string | null): void => {
   element("owner-facts").hidden = ownerFingerprint === null;
-  element("owner").textContent = held.owner_name ?? "Sin nombre";
+  element("owner").textContent = held.owner_name ?? said().noName;
   element("owner-fingerprint").textContent = ownerFingerprint ?? "";
 };
 
 const drawSeal = (held: Document, { verdict, fingerprint, ownerFingerprint, diesOn }: Seal): void => {
-  const { text, tone } = VERDICTS[verdict];
   const seal = element("seal");
   seal.hidden = false;
-  seal.dataset.tone = tone;
-  element("seal-text").textContent = text;
-  element("signer").textContent = held.signed_as ?? "Sin nombre";
+  seal.dataset.tone = TONES[verdict];
+  element("seal-text").textContent = said().verdicts[verdict];
+  element("signer").textContent = held.signed_as ?? said().noName;
   element("fingerprint").textContent = fingerprint;
   drawOwner(held, ownerFingerprint);
-  element("dies-on").textContent = diesOn;
+  element("dies-on").textContent = lastDay(diesOn);
 };
 
 // A browser never says whether Tisty is installed, so every click also offers it, until the app takes the focus away.
@@ -362,7 +372,7 @@ const offerFiles = (root: ShadowRoot, pressFile: (link: HTMLElement) => void): v
   });
 };
 
-const nameOf = (shown: Document | Page): string => shown.title ?? "Sin título";
+const nameOf = (shown: Document | Page): string => shown.title ?? said().untitled;
 
 // At the end of the document and on a card of their own, as Tisty shows them.
 const drawPages = (pages: Page[], goTo: (shown: Page) => void): void => {
@@ -392,7 +402,7 @@ const drawWayBack = (held: Document, at: number, total: number, goTo: (shown: Do
   element("crumb").hidden = at < 0;
   if (at < 0) return;
   element("crumb-title").textContent = nameOf(held);
-  element("crumb-at").textContent = `${at + 1} de ${total}`;
+  element("crumb-at").textContent = said().pageOf(at + 1, total);
   element("crumb-back").onclick = () => goTo(held);
 };
 
@@ -454,6 +464,7 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
 
   const draw = (next: Shown, page = -1, section = -1): void => {
     ({ held, wordsOf, pressFile } = next);
+    speak(held.lang);
     pages = held.pages ?? [];
     withCards = cardsFor(held, wordsOf);
     drawPages(pages, turnTo);

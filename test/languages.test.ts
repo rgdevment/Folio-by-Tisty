@@ -1,6 +1,6 @@
 import type { Translation } from "@tisty/contracts";
 import { describe, expect, it } from "vitest";
-import { preferredTranslation } from "../src/page/languages";
+import { preferredTranslation, readerSpeech } from "../src/page/languages";
 
 const ENGLISH: Translation = { lang: "en", document: "enWords1", key: "ENKEY" };
 const BRAZILIAN: Translation = { lang: "pt-BR", document: "ptWords1" };
@@ -42,5 +42,28 @@ describe("the language a reader is shown", () => {
 
   it("still finds a translation when the anchor says no language", () => {
     expect(preferredTranslation(["en"], undefined, GROUP)).toBe(ENGLISH);
+  });
+});
+
+describe("the language the page speaks", () => {
+  it("is the document's when it is English or Spanish, whatever the reader prefers", () => {
+    expect(readerSpeech("en", ["es-CL", "es"])).toBe("en");
+    expect(readerSpeech("es-MX", ["en-US"])).toBe("es");
+  });
+
+  it("is the reader's first English or Spanish when the document is in another language", () => {
+    expect(readerSpeech("fr", ["de", "es-CL", "en"])).toBe("es");
+    expect(readerSpeech(undefined, ["pt-BR", "en-GB"])).toBe("en");
+  });
+
+  it("is English when neither the document nor the reader says English or Spanish", () => {
+    expect(readerSpeech("fr", ["de", "it"])).toBe("en");
+    expect(readerSpeech(undefined, [])).toBe("en");
+    expect(readerSpeech("", [""])).toBe("en");
+  });
+
+  it("ignores case and region, as language tags do", () => {
+    expect(readerSpeech("EN-gb", [])).toBe("en");
+    expect(readerSpeech(undefined, ["ES-419"])).toBe("es");
   });
 });

@@ -1,3 +1,5 @@
+import { said } from "./speak";
+
 type Theme = "light" | "dark";
 
 // The key and values www.tisty.app uses, and the key public/theme.js reads before anything is painted.
@@ -24,7 +26,7 @@ export const offerThemes = (): void => {
     const theme = shown();
     // The sheet's shadow root cannot see the page's root, and a diagram travels in one drawing per theme.
     sheet.dataset.theme = theme;
-    const offer = theme === "dark" ? "Usar el modo claro" : "Usar el modo oscuro";
+    const offer = theme === "dark" ? said().toLight : said().toDark;
     toggle.setAttribute("aria-label", offer);
     toggle.title = offer;
   };
@@ -48,5 +50,6 @@ export const offerThemes = (): void => {
     else change();
   });
   system.addEventListener("change", draw);
+  new MutationObserver(draw).observe(root, { attributeFilter: ["lang"] });
   draw();
 };

@@ -2,17 +2,11 @@ import type { Picture } from "@tisty/contracts";
 import type { Bytes } from "../../core/bytes";
 import { pictureHolds } from "../open";
 import { bareUrl } from "./clean";
+import { said } from "./speak";
 
 const PICTURE = /^tisty:picture\/(\d+)$/;
 const LEAVES = /^(https?|mailto):/i;
 const FILE = /^tisty:file\/(\d+)$/i;
-const CALLOUTS: Record<string, string> = {
-  note: "Nota",
-  tip: "Consejo",
-  important: "Importante",
-  warning: "Aviso",
-  caution: "Cuidado",
-};
 
 // One that does not hold has no address: it shows its alt, and the words still read.
 export const pictureAddresses = (said: Picture[], bytes: Bytes[]): (string | null)[] =>
@@ -62,8 +56,9 @@ const whereItGoes = (where: string, said: string): string | null => {
 };
 
 export const finished = (words: DocumentFragment, addresses: (string | null)[]): DocumentFragment => {
+  const { callouts } = said(words.ownerDocument);
   for (const callout of words.querySelectorAll("blockquote[data-callout]")) {
-    callout.setAttribute("data-said", CALLOUTS[callout.getAttribute("data-callout") ?? ""] ?? CALLOUTS.note ?? "");
+    callout.setAttribute("data-said", callouts[callout.getAttribute("data-callout") ?? ""] ?? callouts.note ?? "");
   }
   for (const image of words.querySelectorAll("img")) {
     const at = PICTURE.exec(bareUrl(image.getAttribute("src") ?? ""))?.[1];

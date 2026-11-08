@@ -11,7 +11,7 @@ import { drawFrame } from "../src/page/ui/frame";
 
 // biome-ignore lint/suspicious/noExplicitAny: these are the contract's own samples, in the shape it writes them.
 const SAMPLES = VECTORS as any;
-const SEAL = { verdict: "holds", fingerprint: "1", ownerFingerprint: null, diesOn: "mañana" } as const;
+const SEAL = { verdict: "holds", fingerprint: "1", ownerFingerprint: null, diesOn: 20_773 } as const;
 const ID = "k7Qm2xPa";
 const LINK_KEY: string = SAMPLES.link_key;
 
@@ -68,11 +68,12 @@ beforeEach(() => {
   };
   vi.stubGlobal("window", place);
   vi.stubGlobal("document", place.document);
+  place.document.documentElement.lang = "es";
   vi.stubGlobal("DOMParser", place.DOMParser);
   vi.stubGlobal("MutationObserver", place.MutationObserver);
   vi.stubGlobal("AbortController", place.AbortController);
   vi.stubGlobal("location", { href: place.location.href, hash: `#${LINK_KEY}` });
-  vi.stubGlobal("navigator", {});
+  vi.stubGlobal("navigator", { languages: ["es-CL"] });
   agrees = vi.fn(() => true);
   vi.stubGlobal("confirm", agrees);
   vi.stubGlobal("scrollTo", vi.fn());

@@ -143,7 +143,7 @@ describe("the panels", () => {
     const details = HTML.slice(HTML.indexOf('id="panel-details"'), HTML.indexOf('class="foot"'));
     expect(details).toContain('id="signer"');
     expect(details).toContain('id="fingerprint"');
-    expect(details).toContain("Cómo comprobarla");
+    expect(details).toContain('data-say="howToCheck"');
   });
 
   it("say in the details only what the sheet does not already say", () => {

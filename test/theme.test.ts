@@ -14,11 +14,13 @@ const toggle = () => place.document.getElementById("theme") as HTMLButtonElement
 const sheet = () => place.document.getElementById("sheet") as HTMLElement;
 
 beforeEach(() => {
-  place = new JSDOM('<!doctype html><button id="theme"></button><div id="sheet"></div>').window as never;
+  place = new JSDOM('<!doctype html><html lang="es"><button id="theme"></button><div id="sheet"></div>')
+    .window as never;
   kept = new Map();
   followers = [];
   systemIsDark = false;
   vi.stubGlobal("document", place.document);
+  vi.stubGlobal("MutationObserver", place.MutationObserver);
   vi.stubGlobal("localStorage", {
     getItem: (key: string) => kept.get(key) ?? null,
     setItem: (key: string, value: string) => kept.set(key, value),

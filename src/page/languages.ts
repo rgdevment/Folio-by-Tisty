@@ -1,5 +1,9 @@
 import type { Translation } from "@tisty/contracts";
 
+export type Speech = "en" | "es";
+
+const SPOKEN: readonly Speech[] = ["en", "es"];
+
 type Matching = (lang: string, wanted: string) => boolean;
 
 const primaryOf = (lang: string): string => lang.toLowerCase().split("-")[0] ?? "";
@@ -22,3 +26,9 @@ export const preferredTranslation = (
   }
   return undefined;
 };
+
+const speechOf = (lang: string | undefined): Speech | undefined => SPOKEN.find((one) => one === primaryOf(lang ?? ""));
+
+// The document's own language first, since whoever shared it wrote around it; then the reader's; then English.
+export const readerSpeech = (documentLang: string | undefined, wanted: readonly string[]): Speech =>
+  speechOf(documentLang) ?? wanted.map(speechOf).find((one) => one !== undefined) ?? "en";

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { REPORT_CATEGORIES } from "../src/core/limits";
 import { offerReport } from "../src/page/ui/report";
 import { solved } from "../src/page/ui/solve";
+import { speak } from "../src/page/ui/speak";
 
 vi.mock("../src/page/ui/solve", () => ({ solved: vi.fn(async () => "the proof") }));
 
@@ -41,6 +42,8 @@ beforeEach(async () => {
   place.HTMLDialogElement.prototype.showModal = vi.fn();
   place.HTMLDialogElement.prototype.close = vi.fn();
   vi.stubGlobal("document", place.document);
+  vi.stubGlobal("navigator", { languages: ["es-CL"] });
+  speak();
   vi.stubGlobal("FormData", place.FormData);
   asked = vi.fn(async () => answer(202, { received: true }));
   vi.stubGlobal("fetch", asked);

@@ -1,4 +1,5 @@
 import { checkWidget, strayInWidget, WIDGET, widgetPage } from "@tisty/contracts/check";
+import { said } from "./speak";
 
 // The page's own policy would strip a srcdoc of its styles, so the frame gets a page served under the widget's policy.
 const EMPTY_PAGE = "/widget-frame";
@@ -7,20 +8,15 @@ const TALLEST = 2400;
 const WRONG_SHOWN_AT_MOST = 3;
 const WRONG_SHOWN_CHARACTERS = 60;
 
-const NOT_A_WIDGET = "Este bloque no es un widget y por eso se muestra como código: ";
-const ONLY_HTML_AND_CSS = "Un widget es solo HTML y CSS, sin nada que se ejecute ni venga de afuera.";
-const TOO_BIG = `Un widget puede tener hasta ${Math.round(WIDGET.bytes / 1000)} KB; este pasa de ahí, así que se muestra como código.`;
-const COULD_NOT_DRAW =
-  "No se pudo dibujar este widget, así que se muestra como código. Recarga la página para volver a intentarlo.";
-
 const shortened = (said: string): string =>
   said.length > WRONG_SHOWN_CHARACTERS ? `${said.slice(0, WRONG_SHOWN_CHARACTERS)}…` : said;
 
 const whyNotDrawn = (source: string): string | null => {
-  if (new TextEncoder().encode(source).length > WIDGET.bytes) return TOO_BIG;
+  const { widgetTooBig, notAWidget, onlyHtmlAndCss } = said();
+  if (new TextEncoder().encode(source).length > WIDGET.bytes) return widgetTooBig(Math.round(WIDGET.bytes / 1000));
   const wrong = [...new Set([...checkWidget(source), ...strayInWidget(source)])];
   if (wrong.length === 0) return null;
-  return `${NOT_A_WIDGET}${wrong.slice(0, WRONG_SHOWN_AT_MOST).map(shortened).join(", ")}. ${ONLY_HTML_AND_CSS}`;
+  return `${notAWidget}${wrong.slice(0, WRONG_SHOWN_AT_MOST).map(shortened).join(", ")}. ${onlyHtmlAndCss}`;
 };
 
 const sizing = (frame: HTMLIFrameElement, box: Element) => {
@@ -84,7 +80,7 @@ const framed = (
   const frame = page.createElement("iframe");
   frame.setAttribute("sandbox", "allow-same-origin");
   frame.setAttribute("referrerpolicy", "no-referrer");
-  frame.title = name || "Widget";
+  frame.title = name || said().widget;
   frame.style.height = `${SHORTEST}px`;
   frame.addEventListener(
     "load",
@@ -132,7 +128,9 @@ export const widgetDrawer = () => {
         caption.textContent = name;
         drawn.append(caption);
       }
-      drawn.append(framed(page, name, source, signal, () => drawn.replaceWith(saying(page, COULD_NOT_DRAW), figure)));
+      drawn.append(
+        framed(page, name, source, signal, () => drawn.replaceWith(saying(page, said().widgetCouldNotDraw), figure)),
+      );
       figure.replaceWith(drawn);
     }
   };

@@ -35,6 +35,8 @@ beforeEach(() => {
   place = new JSDOM(readFileSync("src/page/index.html", "utf8"), { url: `https://tisty.cl/${ID}` }).window;
   replace = vi.fn();
   vi.stubGlobal("document", place.document);
+  vi.stubGlobal("navigator", { languages: ["es-CL"] });
+  place.document.documentElement.lang = "es";
   vi.stubGlobal("location", { href: place.location.href, replace, hash: "" });
   vi.stubGlobal("window", place);
   vi.stubGlobal("Worker", SolvingWorker);
@@ -96,7 +98,7 @@ describe("a case link", () => {
     vi.stubGlobal("DOMParser", place.DOMParser);
     vi.stubGlobal("MutationObserver", place.MutationObserver);
     vi.stubGlobal("AbortController", place.AbortController);
-    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("navigator", { languages: ["es-CL"] });
     vi.stubGlobal(
       "ResizeObserver",
       class {
