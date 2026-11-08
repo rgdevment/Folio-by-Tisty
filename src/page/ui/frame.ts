@@ -1,4 +1,6 @@
 import type { Document, Orientation, Page, Paper, Verdict } from "@tisty/contracts";
+import { type Standing, shownNameOf } from "../../core/look-alike";
+import { MAKER } from "../maker";
 import { cardsFor, referenceOf } from "./cards";
 import { bareUrl } from "./clean";
 import { element } from "./element";
@@ -35,6 +37,8 @@ export interface Seal {
   verdict: Verdict;
   fingerprint: string;
   ownerFingerprint: string | null;
+  signerStanding: Standing;
+  ownerStanding: Standing;
   diesOn: number;
 }
 
@@ -240,20 +244,37 @@ const drawDetails = (root: ShadowRoot, held: Document): void => {
   list.hidden = list.childElementCount === 0;
 };
 
-const drawOwner = (held: Document, ownerFingerprint: string | null): void => {
+const drawName = (who: "signer" | "owner", alias: string | undefined, standing: Standing): void => {
+  const verified = standing === "verified";
+  element(who).textContent = (verified && MAKER ? shownNameOf(MAKER) : alias) ?? said().noName;
+  element(`${who}-verified`).hidden = !verified;
+  const note = element(`${who}-note`);
+  const notes: Record<Standing, string> = {
+    verified: MAKER?.name === undefined ? "" : (MAKER.domain ?? ""),
+    imitates: said().anotherKey,
+    takenBack: said().takenBack,
+    plain: "",
+  };
+  note.textContent = notes[standing];
+  note.hidden = note.textContent === "";
+  note.classList.toggle("is-warning", !verified);
+};
+
+const drawOwner = (held: Document, { ownerFingerprint, ownerStanding }: Seal): void => {
   element("owner-facts").hidden = ownerFingerprint === null;
-  element("owner").textContent = held.owner_name ?? said().noName;
+  drawName("owner", held.owner_name, ownerStanding);
   element("owner-fingerprint").textContent = ownerFingerprint ?? "";
 };
 
-const drawSeal = (held: Document, { verdict, fingerprint, ownerFingerprint, diesOn }: Seal): void => {
-  const seal = element("seal");
-  seal.hidden = false;
-  seal.dataset.tone = TONES[verdict];
+const drawSeal = (held: Document, seal: Seal): void => {
+  const { verdict, fingerprint, signerStanding, diesOn } = seal;
+  const shown = element("seal");
+  shown.hidden = false;
+  shown.dataset.tone = TONES[verdict];
   element("seal-text").textContent = said().verdicts[verdict];
-  element("signer").textContent = held.signed_as ?? said().noName;
+  drawName("signer", held.signed_as, signerStanding);
   element("fingerprint").textContent = fingerprint;
-  drawOwner(held, ownerFingerprint);
+  drawOwner(held, seal);
   element("dies-on").textContent = lastDay(diesOn);
 };
 

@@ -11,7 +11,14 @@ import { drawFrame } from "../src/page/ui/frame";
 
 // biome-ignore lint/suspicious/noExplicitAny: these are the contract's own samples, in the shape it writes them.
 const SAMPLES = VECTORS as any;
-const SEAL = { verdict: "holds", fingerprint: "1", ownerFingerprint: null, diesOn: 20_773 } as const;
+const SEAL = {
+  verdict: "holds",
+  fingerprint: "1",
+  ownerFingerprint: null,
+  signerStanding: "plain",
+  ownerStanding: "plain",
+  diesOn: 20_773,
+} as const;
 const ID = "k7Qm2xPa";
 const LINK_KEY: string = SAMPLES.link_key;
 

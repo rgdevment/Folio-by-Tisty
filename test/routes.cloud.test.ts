@@ -6,9 +6,9 @@ import { type AdminAction, administer } from "../src/core/admin";
 import { dayOf, LEVEL_ONE } from "../src/core/limits";
 import { netDigest } from "../src/core/net";
 import { type ReportTools, reportDoc } from "../src/core/report";
-import { proofHolds, tokenHash } from "../src/core/start";
+import { hourOf, macOf, proofHolds, tokenHash } from "../src/core/start";
 import worker from "../src/private/index";
-import { SIGNED_BY_THE_OWNER } from "./sealed";
+import { newPerson, SIGNED_BY_THE_OWNER, sealedEnvelope } from "./sealed";
 
 const testEnv = env as unknown as {
   DB: D1Database;
@@ -78,8 +78,21 @@ beforeEach(async () => {
 });
 
 describe("sharing over HTTP", () => {
-  const sharing = (more: object) =>
-    send(API, { method: "PUT", headers: { "Folio-Start": "not a real start" }, body: "x" }, undefined, more);
+  // Someone who is not the maker, so the setting alone decides: the maker's root is the one in the signed limits.
+  const sharing = async (more: object) => {
+    const headers = {
+      "Folio-Start": await macOf(testEnv.FOLIO_SECRET, `start|${ID}|${hourOf(Date.now())}`),
+      "Folio-Ttl-Days": "3",
+      "Folio-Admin": TOKEN,
+    };
+    const body = await sealedEnvelope({ id: ID, version: 1, owner: await newPerson() });
+    const put = (proof: Record<string, string> = {}) =>
+      send(API, { method: "PUT", headers: { ...headers, ...proof }, body }, undefined, more);
+    const asked = await put();
+    if (asked.status !== 429) return asked;
+    const { salt, bits } = (await asked.json()) as { salt: string; bits: number };
+    return put({ "Folio-Proof": await solve(salt, bits) });
+  };
 
   it.each([
     ["says it is closed", { SHARING_OPEN: "false" }],
@@ -91,9 +104,9 @@ describe("sharing over HTTP", () => {
     expect(await answer.json()).toEqual({ refused: "uploads_off" });
   });
 
-  it("goes on to look at a new document when it is open", async () => {
+  it("takes a new document when it is open", async () => {
     const answer = await sharing({ SHARING_OPEN: "true" });
-    expect(await answer.json()).toEqual({ refused: "bad_upload" });
+    expect(await answer.json()).toEqual({ stored: true, version: 1 });
   });
 });
 

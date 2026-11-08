@@ -11,6 +11,8 @@ const ASSETS = "dist/page/assets";
 const ONLY_IN_THE_SAMPLE = "Camila";
 // A word only the whole contract has: the page takes its light entry, and the whole one would still fit under the limit.
 const ONLY_IN_THE_WHOLE_CONTRACT = "reader_refuses";
+// A field only the rest of the signed limits has: the page takes the maker alone.
+const ONLY_IN_THE_REST_OF_THE_LIMITS = "uploads_of_a_root_an_hour";
 
 const squeezed = (data) =>
   brotliCompressSync(data, { params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY } }).length;
@@ -32,6 +34,10 @@ if (scripts.some(({ data }) => data.includes(ONLY_IN_THE_SAMPLE))) {
 }
 if (scripts.some(({ data }) => data.includes(ONLY_IN_THE_WHOLE_CONTRACT))) {
   console.error("x  the whole contract was built into the page, and not its check entry");
+  process.exit(1);
+}
+if (scripts.some(({ data }) => data.includes(ONLY_IN_THE_REST_OF_THE_LIMITS))) {
+  console.error("x  the whole signed limits were built into the page, and not only the maker");
   process.exit(1);
 }
 if (!existsSync("dist/page/licenses.txt")) {

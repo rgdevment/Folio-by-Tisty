@@ -11,6 +11,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEVEL_ONE, publishedLimits } from "../src/core/limits.ts";
+import { dnsLookup, domainFaults, makerFaults, makerIn } from "./limits-maker.ts";
 import { sharingFaults } from "./limits-sharing.ts";
 
 type Published = ReturnType<typeof publishedLimits>;
@@ -110,18 +111,19 @@ const holdsTo = (name: string, said: unknown, server: unknown): boolean => {
   return said === server;
 };
 
+const PASSED_ALONG = ["sharing_closed_note", "maker"];
+const NOT_LIMITS = new Set(["serial", "uploads_halted_until", "terms", "sharing_open", ...PASSED_ALONG]);
+
+const limitsIn = (said: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(said).filter(([name]) => !NOT_LIMITS.has(name)));
+
+const passedAlong = (said: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(PASSED_ALONG.flatMap((name) => (said[name] === undefined ? [] : [[name, said[name]]])));
+
 // The file may ask for less than the server takes, never for more: a number there that it would refuse fails its reader.
 export const pastTheServer = (said: Record<string, unknown>, server: Published): string[] => {
   const held = server as Record<string, unknown>;
-  const {
-    serial: _serial,
-    uploads_halted_until: _halted,
-    terms: _terms,
-    sharing_open: _open,
-    sharing_closed_note: _note,
-    ...numbers
-  } = said;
-  const unknown = Object.keys(numbers).filter((name) => !Object.hasOwn(held, name));
+  const unknown = Object.keys(limitsIn(said)).filter((name) => !Object.hasOwn(held, name));
   const wrong = Object.keys(held).filter((name) => !holdsTo(name, said[name], held[name]));
   return [...unknown, ...wrong];
 };
@@ -166,27 +168,20 @@ export const signLimits = (
   const current = existsSync(files.limits)
     ? (JSON.parse(readFileSync(files.limits, "utf8")) as Record<string, unknown>)
     : {};
-  const {
-    serial = 0,
-    uploads_halted_until: kept,
-    terms,
-    sharing_open: sharingOpen = false,
-    sharing_closed_note: note,
-    ...numbers
-  } = current;
+  const { serial = 0, uploads_halted_until: kept, terms, sharing_open: sharingOpen = false } = current;
   const until = haltedUntil(haltedDays, kept, Math.floor(now / 1000));
   const next = {
     serial: (serial as number) + 1,
     ...server,
-    ...numbers,
+    ...limitsIn(current),
     terms: termsOf(files, terms as Terms | undefined),
     sharing_open: sharingOpen,
-    ...(note === undefined ? {} : { sharing_closed_note: note }),
+    ...passedAlong(current),
     ...(until === null ? {} : { uploads_halted_until: until }),
   };
   const past = pastTheServer(next, server);
   if (past.length > 0) throw new Error(`the server would not hold to these: ${past.join(", ")}`);
-  const faults = sharingFaults(next);
+  const faults = [...sharingFaults(next), ...makerFaults(current.maker)];
   if (faults.length > 0) throw new Error(`Tisty would not take this: ${faults.join("; ")}`);
 
   const said = Buffer.from(`${JSON.stringify(next, null, 2)}\n`);
@@ -204,8 +199,14 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (what === "new" && keyFile) {
     console.log(createKeys(keyFile));
   } else if (what === "sign" && keyFile) {
-    signLimits(keyFile, haltedDays, Date.now());
-    console.log(`signed ${PUBLISHED.limits}`);
+    const unpublished = await domainFaults(makerIn(PUBLISHED.limits) ?? { root: "" }, dnsLookup);
+    if (unpublished.length > 0) {
+      console.error(`the maker's domain does not hold, so nothing was signed: ${unpublished.join("; ")}`);
+      process.exitCode = 1;
+    } else {
+      signLimits(keyFile, haltedDays, Date.now());
+      console.log(`signed ${PUBLISHED.limits}`);
+    }
   } else {
     console.error(USAGE);
     process.exitCode = 1;

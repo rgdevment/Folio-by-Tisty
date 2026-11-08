@@ -43,7 +43,7 @@ const opening = async (id: string, linkKey: string, arrived: Arrived): Promise<S
 const ownerOf = ({ fingerprint, ownerFingerprint }: Opened): string => ownerFingerprint ?? fingerprint;
 
 const shownOf = ({ id, linkKey, opened }: Showing, caseToken?: string): Shown => {
-  const { held, pictures, verdict, fingerprint, ownerFingerprint, diesOn } = opened;
+  const { held, pictures, verdict, fingerprint, ownerFingerprint, signerStanding, ownerStanding, diesOn } = opened;
   const cleaner = domPurifyCleaner(window);
   const addresses = pictureAddresses(held.pictures ?? [], pictures);
   return {
@@ -53,6 +53,8 @@ const shownOf = ({ id, linkKey, opened }: Showing, caseToken?: string): Shown =>
       verdict,
       fingerprint,
       ownerFingerprint,
+      signerStanding,
+      ownerStanding,
       diesOn,
     },
     pressFile: filePresser({ id, linkKey, held, ...(caseToken === undefined ? {} : { caseToken }) }),

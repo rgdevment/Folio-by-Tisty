@@ -42,7 +42,9 @@ opera Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 | Las denuncias: categoría, detalle y versión denunciada, en claro; si lo dejaron el link y un correo, sellados para que solo el operador los abra; y un resumen de la red de quien denuncia (un HMAC con una llave que cambia cada 180 días), para que cada red denuncie una sola vez, junto al número de su proveedor (ASN), para que un bloqueo necesite denuncias de proveedores distintos | Moderar y enviarlas a quien corresponde | 180 días, o más si una orden o una autoridad lo pide. Si el operador comprueba que era falsa, el resumen de esa red queda, con el día y la hora en que se marcó falsa por primera vez, hasta 180 días desde la última vez que se marcó, para que deje de contar |
 
 **Sobre la firma:** tu llave pública permite saber que dos documentos son de la
-misma persona, aunque no quién eres.
+misma persona, aunque no quién eres. La excepción es la llave del operador, que
+firma como rgdevment: su parte pública y ese nombre están publicados en los
+límites de Folio, y lo que firma puede mostrarse como «verificado».
 
 **Sobre las lecturas:** se cuentan sin guardar quién leyó. Para no contar dos
 veces a la misma persona el mismo día se usa un resumen temporal, que anota si

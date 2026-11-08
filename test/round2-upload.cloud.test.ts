@@ -28,6 +28,7 @@ const toolsWith = (over: Partial<Limits> = {}): UploadTools => {
     limits,
     secret: SECRET,
     sharingOpen: true,
+    makerRoot: null,
     termsVersion: TERMS_ACCEPTED,
     limiter: { allows: async () => true },
     dayKey: async () => "a key for the day",

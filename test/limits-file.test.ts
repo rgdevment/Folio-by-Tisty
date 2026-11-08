@@ -16,6 +16,9 @@ import {
 import { sharingFaults } from "../scripts/limits-sharing";
 import { LEVEL_ONE, publishedLimits } from "../src/core/limits";
 
+// The same key as KEY in Tisty's crates/tisty-carrier/src/folio_limits.rs: a key swapped in docs/limits.pub must not pass.
+const TISTY_LIMITS_KEY = "RWTBkOCJN2ITUeWMK6V3gXmiJGo2hT6mX+hgcjpQ9F6QBO9sWnO84Mak";
+
 const said = Buffer.from('{"serial":1}\n');
 const NOW = Date.UTC(2026, 10, 6);
 const NOW_SECONDS = NOW / 1000;
@@ -59,6 +62,14 @@ describe("what the file may say", () => {
   it("may ask for less than the server takes", () => {
     expect(pastTheServer({ ...SERVER, files_bytes_at_most: 1 }, SERVER)).toEqual([]);
     expect(pastTheServer({ ...SERVER, ttl_days: [1] }, SERVER)).toEqual([]);
+  });
+
+  it("names the maker without counting it as a limit", () => {
+    expect(pastTheServer({ ...SERVER, maker: { root: "A".repeat(43), name: "rgdevment" } }, SERVER)).toEqual([]);
+  });
+
+  it("names a field it does not know", () => {
+    expect(pastTheServer({ ...SERVER, made_up: 1 }, SERVER)).toEqual(["made_up"]);
   });
 
   it("may not ask for more than the server takes", () => {
@@ -234,6 +245,16 @@ describe("signing the limits", () => {
     ).toBe(true);
   });
 
+  it("keeps the maker it was given, and refuses one that is not a maker", () => {
+    signing();
+    const maker = { root: "A".repeat(43), name: "rgdevment", domain: "rgdevment.dev" };
+    writeFileSync(files.limits, JSON.stringify({ ...read(), maker }));
+    signing();
+    expect(read().maker).toEqual(maker);
+    writeFileSync(files.limits, JSON.stringify({ ...read(), maker: { root: "not a root" } }));
+    expect(() => signing()).toThrow("maker.root is not a root");
+  });
+
   it("names the terms by the hash of their exact bytes", () => {
     signing();
     expect(read().terms).toEqual({ version: "1", es: sha256("términos\n"), en: sha256("terms\n") });
@@ -359,8 +380,8 @@ describe("the limits Folio publishes", () => {
 
   it("are signed with the key Tisty is built with", () => {
     const signature = readFileSync("docs/limits.json.minisig", "utf8");
-    const publicKey = readFileSync("docs/limits.pub", "utf8");
-    expect(holdsSignature(file, signature, publicKey, "limits.json")).toBe(true);
+    expect(readFileSync("docs/limits.pub", "utf8").trim()).toBe(TISTY_LIMITS_KEY);
+    expect(holdsSignature(file, signature, TISTY_LIMITS_KEY, "limits.json")).toBe(true);
   });
 
   it("name the terms exactly as they are published", () => {

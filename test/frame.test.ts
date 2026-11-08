@@ -7,7 +7,14 @@ import { finished } from "../src/page/ui/finish";
 import { drawFrame, type Seal } from "../src/page/ui/frame";
 import { desktopOf } from "../src/page/ui/offer-tisty";
 
-const SEAL = { verdict: "holds", fingerprint: "1", ownerFingerprint: null, diesOn: 20_773 } as const;
+const SEAL = {
+  verdict: "holds",
+  fingerprint: "1",
+  ownerFingerprint: null,
+  signerStanding: "plain",
+  ownerStanding: "plain",
+  diesOn: 20_773,
+} as const;
 const ADDRESS = "https://tisty.cl/k7Qm2xPa#THEKEY";
 
 const ENERO: Page = {
@@ -540,6 +547,67 @@ describe("who signed it", () => {
     expect(place.document.getElementById("signer")?.textContent).toBe("Ana");
     expect(place.document.getElementById("owner")?.textContent).toBe("Mario");
     expect(place.document.getElementById("owner-fingerprint")?.textContent).toBe("2");
+  });
+});
+
+describe("whom it names", () => {
+  const byId = (id: string) => place.document.getElementById(id) as HTMLElement;
+  const drawStanding = (
+    signedAs: string | undefined,
+    signerStanding: "verified" | "imitates" | "takenBack" | "plain",
+  ) => {
+    const cleaner = domPurifyCleaner(place);
+    drawFrame({
+      held: { ...HELD, ...(signedAs === undefined ? {} : { signed_as: signedAs }) },
+      wordsOf: (html) => finished(cleaner.clean(html), []),
+      seal: { ...SEAL, signerStanding },
+    });
+  };
+
+  it("names the maker by its name, verified, with its domain beneath and no link", () => {
+    drawStanding("whatever it wrote", "verified");
+    expect(byId("signer").textContent).toBe("rgdevment");
+    expect(byId("signer-verified").hidden).toBe(false);
+    expect(byId("signer-note").hidden).toBe(false);
+    expect(byId("signer-note").textContent).toBe("rgdevment.dev");
+    expect(byId("signer-note").querySelector("a")).toBeNull();
+    expect(byId("signer-note").classList.contains("is-warning")).toBe(false);
+  });
+
+  it("warns beneath a name that imitates the maker's, where the domain would go", () => {
+    drawStanding("rgdevrnent", "imitates");
+    expect(byId("signer").textContent).toBe("rgdevrnent");
+    expect(byId("signer-verified").hidden).toBe(true);
+    expect(byId("signer-note").hidden).toBe(false);
+    expect(byId("signer-note").classList.contains("is-warning")).toBe(true);
+  });
+
+  it("warns beneath the maker's name when its key was taken back", () => {
+    drawStanding("rgdevment", "takenBack");
+    expect(byId("signer").textContent).toBe("rgdevment");
+    expect(byId("signer-verified").hidden).toBe(true);
+    expect(byId("signer-note").textContent).toBe("Llave retirada: ya no habla por este nombre");
+    expect(byId("signer-note").classList.contains("is-warning")).toBe(true);
+  });
+
+  it("leaves any other name with nothing beside it", () => {
+    drawStanding("Ana", "plain");
+    expect(byId("signer").textContent).toBe("Ana");
+    expect(byId("signer-verified").hidden).toBe(true);
+    expect(byId("signer-note").hidden).toBe(true);
+  });
+
+  it("says no name, with nothing beside it, when there is none", () => {
+    drawStanding(undefined, "plain");
+    expect(byId("signer").textContent).toBe("Sin nombre");
+    expect(byId("signer-note").hidden).toBe(true);
+  });
+
+  it("keeps a right-to-left name inside its own isolate, apart from the mark", () => {
+    drawStanding("‮rgdevment verified", "imitates");
+    expect(byId("signer").tagName).toBe("BDI");
+    expect(byId("signer-note").parentElement?.contains(byId("signer"))).toBe(true);
+    expect(byId("signer").contains(byId("signer-note"))).toBe(false);
   });
 });
 

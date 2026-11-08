@@ -1,7 +1,9 @@
 import type { Document, Revocation, Verdict } from "@tisty/contracts";
 import { type Bytes, fromBase64Url } from "../core/bytes";
+import { type Standing, standingOf } from "../core/look-alike";
 import { momentOf } from "../core/moment";
 import { refuse } from "../rules/envelope";
+import { MAKER } from "./maker";
 import { documentIn, openEnvelope } from "./open";
 import { fingerprintOf, verdictOf, worseOf } from "./verdict";
 
@@ -19,6 +21,8 @@ export interface Opened {
   verdict: Verdict;
   fingerprint: string;
   ownerFingerprint: string | null;
+  signerStanding: Standing;
+  ownerStanding: Standing;
   diesOn: number;
 }
 
@@ -40,12 +44,15 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived): P
   const { signature, manifest } = open;
   const signer = await verdictOf(signature, served);
   const owner = manifest.owner;
+  const ownerVerdict = owner ? await verdictOf(owner, served) : signer;
   return {
     held,
     pictures: open.opened.slice(FIRST_PICTURE_PART),
-    verdict: owner ? worseOf(signer, await verdictOf(owner, served)) : signer,
+    verdict: worseOf(signer, ownerVerdict),
     fingerprint: await fingerprintOf(signature.root),
     ownerFingerprint: owner && owner.root !== signature.root ? await fingerprintOf(owner.root) : null,
+    signerStanding: standingOf(signature.root, signer, held.signed_as, MAKER),
+    ownerStanding: standingOf(owner?.root ?? signature.root, ownerVerdict, held.owner_name, MAKER),
     diesOn: arrived.diesOn,
   };
 };

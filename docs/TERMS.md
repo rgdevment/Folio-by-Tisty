@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 15, in force since November 8, 2026.**
+**Version 16, in force since November 8, 2026.**
 
 ## The short version
 
@@ -86,6 +86,14 @@ but what you do with what you read is your responsibility.
   documents are gone, unless you ask to have it deleted as the [privacy
   policy](PRIVACY.md) says. It does not say who you are. The name you choose to
   show travels encrypted, and only whoever has the link reads it.
+- **«Verified» says who signed, not what the document says.** For now only the
+  operator's key carries it, which signs as rgdevment: its public part and that
+  name are published in Folio's limits. It does not say the content is safe,
+  and a version another key uploads with an edit link does not carry it. A name
+  equal or close to a verified one, signed with another key, is shown as
+  another key's.
+- **The operator may share while sharing is closed,** only with their own key,
+  to publish Tisty's guides and to test the service.
 - **Your reputation belongs to that key.** Limits start low, and reputation is
   what will give access to more. How it is earned is not decided yet, and these
   terms will say when it is. Reports alone never take it away: only what the

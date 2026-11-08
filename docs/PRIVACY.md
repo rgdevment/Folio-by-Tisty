@@ -43,7 +43,9 @@ runs Folio as a non-profit. Contact: <rgdevment@tisty.app>.
 | Reports: category, detail and the version reported, in the clear; the link and an email if given, sealed so only the operator can open them; and a digest of the reporter's network (an HMAC with a key that changes every 180 days), so each network reports only once, with the number of its provider (ASN), so a block needs reports from different providers | To moderate and pass them where they belong | 180 days, or longer if an order or an authority asks for it. If the operator finds it false, that network's digest stays, with the day and hour it was first found false, for up to 180 days from the last time it was, so it stops counting |
 
 **About signing:** your public key lets anyone tell that two documents come from
-the same person, though not who you are.
+the same person, though not who you are. The exception is the operator's key,
+which signs as rgdevment: its public part and that name are published in
+Folio's limits, and what it signs may be shown as «verified».
 
 **About reads:** they are counted without keeping who read. Not to count the
 same person twice on one day, a short-lived digest is used, which notes whether

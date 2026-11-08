@@ -23,6 +23,12 @@ interface Env extends Bindings, SpendBindings, MailBindings {
   FOLIO_TAG?: string;
 }
 
+const makerRootOf = (limits: object): string | null => {
+  const { maker } = limits as { maker?: { root?: unknown } };
+  return typeof maker?.root === "string" ? maker.root : null;
+};
+const MAKER_ROOT = makerRootOf(SIGNED_LIMITS);
+
 const WEEKLY = "0 4 * * SUN";
 const SPEND = "*/15 * * * *";
 const DIGEST = "0 0,6,12,18 * * *";
@@ -53,6 +59,7 @@ export default {
         limits: LEVEL_ONE,
         secret: env.FOLIO_SECRET,
         sharingOpen: env.SHARING_OPEN === "true",
+        makerRoot: MAKER_ROOT,
         termsVersion: SIGNED_LIMITS.terms.version,
         limiter: { allows: async (key) => (await env.READS.limit({ key })).success },
         syncLimiter: { allows: async (key) => (await env.SYNCS.limit({ key })).success },
