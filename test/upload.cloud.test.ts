@@ -894,6 +894,25 @@ describe("what stops a version", () => {
       expect(await another(LATER + DAY_MS)).toEqual({ stored: true, version: 1 });
     });
 
+    it("lets only what fits through when attachments arrive at once, as each one is checked in its own write", async () => {
+      const fresh = await newPerson();
+      const { one, two } = await twoOf(fresh);
+      const firstFiles = await sealedEnvelope({ id: one.id, version: 1, owner: fresh, files: [16] });
+      const secondFiles = await sealedEnvelope({ id: two.id, version: 1, owner: fresh, files: [16] });
+      const firstHash = await filesHashOf(one.id, firstFiles);
+      const secondHash = await filesHashOf(two.id, secondFiles);
+      const first = await sealedEnvelope({ id: one.id, version: 1, owner: fresh });
+      const second = await sealedEnvelope({ id: two.id, version: 1, owner: fresh });
+      const versions = first.length + second.length;
+      const roomy = roomOf(versions + firstFiles.length + secondFiles.length);
+      await sendTo(roomy, one.id, first, NOW, one, firstHash);
+      await sendTo(roomy, two.id, second, NOW, two, secondHash);
+      const room = roomOf(versions + Math.max(firstFiles.length, secondFiles.length));
+      const answers = await Promise.all([filesTo(room, one.id, firstFiles), filesTo(room, two.id, secondFiles)]);
+      expect(answers.filter((one) => "stored" in one)).toHaveLength(1);
+      expect(answers.filter((one) => "refused" in one && one.refused === "room_full")).toHaveLength(1);
+    });
+
     it("lets only what fits through when versions arrive at once, as each one is checked in its own write", async () => {
       const fresh = await newPerson();
       const { one, two, first, second } = await twoOf(fresh);
@@ -1211,7 +1230,7 @@ describe("what stops a version", () => {
       expect((await newKeysBytes())?.bytes).toBe(before);
     });
 
-    it("takes the files of a version already kept past the ceiling, so it never stays without them, and counts them", async () => {
+    it("refuses a new key's files past what new keys may store in a day, as the terms say, and keeps nothing of them", async () => {
       const first = await started();
       const main = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
       expect(await send(first.id, main, NOW, first)).toEqual({ stored: true, version: 1 });
@@ -1225,8 +1244,24 @@ describe("what stops a version", () => {
         { id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => files },
         limited(1),
       );
+      expect(answer).toEqual({ refused: "uploads_off" });
+      expect((await newKeysBytes())?.bytes).toBe(before);
+      expect(await testEnv.ENVELOPES.head(`${first.id}/files.${hash}`)).toBeNull();
+    });
+
+    it("takes a new key's files while new keys still have room that day, and counts them", async () => {
+      const first = await started();
+      const main = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+      expect(await send(first.id, main, NOW, first)).toEqual({ stored: true, version: 1 });
+      const files = await sealedEnvelope({ id: first.id, version: 2, owner: mario, files: [16] });
+      const hash = await filesHashOf(first.id, files);
+      await testEnv.DB.prepare("UPDATE docs SET versions = json_set(versions, '$[#-1].files', ?) WHERE id = ?")
+        .bind(hash, first.id)
+        .run();
+      const before = (await newKeysBytes())?.bytes ?? 0;
+      const answer = await uploadFiles({ id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => files }, tools);
       expect(answer).toEqual({ stored: true, hash });
-      expect((await newKeysBytes())?.bytes).toBe((before ?? 0) + files.length);
+      expect((await newKeysBytes())?.bytes).toBe(before + files.length);
     });
 
     it("leaves no share behind when a first version is refused, so it holds nothing the next day", async () => {

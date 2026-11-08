@@ -688,29 +688,37 @@ export class Cloud implements Store {
     return (await this.#envelopes.head(filesKey(id, hash)))?.size ?? null;
   }
 
-  // A version already kept is never left without its files, but a new key's still count against new keys' bytes.
-  async keepFiles({ id, hash, body, net, latest, newKey }: KeptFiles, today: number): Promise<"stored" | "quota"> {
-    if (!(await this.#takeQuota(net, 0, body.length, today))) return "quota";
+  // Checked in the write, as versions are, so attachments sent at once cannot each see the room empty.
+  async keepFiles(
+    { id, hash, body, net, newKey, roomAtMost }: KeptFiles,
+    today: number,
+  ): Promise<"stored" | "quota" | "new_keys_full" | "room_full" | "behind"> {
+    const room = await this.#takeRoom(net, body.length, today, newKey);
+    if (room !== "stored") return room === "new_keys_full" ? room : "quota";
+    const key = filesKey(id, hash);
     try {
-      await this.#envelopes.put(filesKey(id, hash), body);
+      await this.#envelopes.put(key, body);
     } catch (error) {
-      await this.#giveQuotaBack(net, 0, body.length, today);
+      await this.#giveRoomBack(net, body.length, today, newKey);
       throw error;
     }
-    if (newKey) {
-      await this.#db
-        .prepare(
-          `INSERT INTO net_day (day, net, docs, bytes) VALUES (?1, ?2, 0, ?3)
-           ON CONFLICT (day, net) DO UPDATE SET bytes = bytes + excluded.bytes`,
-        )
-        .bind(today, NEW_KEYS_NET, body.length)
-        .run();
-    }
-    await this.#db
-      .prepare("UPDATE docs SET files_bytes = ?1 WHERE id = ?2 AND latest = ?3")
-      .bind(body.length, id, latest)
+    const kept = await this.#db
+      .prepare(
+        `UPDATE docs SET files_bytes = ?1
+         WHERE id = ?2 AND json_extract(versions, '$[#-1].files') = ?3
+           AND ?1 + COALESCE(json_extract(versions, '$[#-1].bytes'), 0) + (SELECT COALESCE(SUM(${HELD_BYTES}), 0)
+             FROM docs d WHERE d.owner = docs.owner AND d.id <> docs.id AND ${HOLDS_ROOM("?4")}) <= ?5`,
+      )
+      .bind(body.length, id, hash, today, roomAtMost)
       .run();
-    return "stored";
+    if (kept.meta.changes > 0) return "stored";
+    await this.#envelopes.delete(key);
+    await this.#giveRoomBack(net, body.length, today, newKey);
+    const named = await this.#db
+      .prepare("SELECT 1 FROM docs WHERE id = ? AND json_extract(versions, '$[#-1].files') = ?")
+      .bind(id, hash)
+      .first();
+    return named ? "room_full" : "behind";
   }
 
   async filesOf(id: string, hash: string): Promise<ReadableStream | null> {
