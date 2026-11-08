@@ -14,6 +14,8 @@ info:
 
     **`failed`** means something broke on this side. Send it again: what was done stays done.
 
+    **A path or method not listed here** answers 404 with `refused: missing`.
+
     **`Folio-Worker`** carries the tag of the version that answered, on every answer once deployed.
 
     **A proof of work:** `refused: proof` gives a `salt` and `bits`. Find a number whose
@@ -910,7 +912,7 @@ components:
             fixBy:
               type: [integer, "null"]
               description: "With light reports, the last day to send a new version. Past it the document is not served until one arrives."
-            readTotal: { type: integer, description: "One per day and network." }
+            readTotal: { type: integer, description: "One per day and network, added when the day closes, so today's reads show tomorrow." }
             days:
               type: object
               description: "By day: `n`, the readers, and `h`, their hours, once they are enough not to single anyone out."

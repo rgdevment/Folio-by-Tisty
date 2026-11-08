@@ -414,11 +414,11 @@ export class CloudModeration {
   #namingFalse(id: string, net: string, now: number): D1PreparedStatement {
     return this.#db
       .prepare(
-        `INSERT INTO false_reporters (net, at, since)
-         SELECT net, ?3, ?3 FROM reports WHERE doc = ?1 AND net = ?2 AND cleared = 0
+        `INSERT INTO false_reporters (net, at, since, since_hour)
+         SELECT net, ?3, ?3, ?4 FROM reports WHERE doc = ?1 AND net = ?2 AND cleared = 0
          ON CONFLICT (net) DO UPDATE SET at = excluded.at`,
       )
-      .bind(id, net, dayOf(now));
+      .bind(id, net, dayOf(now), hourOf(now));
   }
 
   async reportWasFalse(id: string, net: string, now: number): Promise<Acted> {

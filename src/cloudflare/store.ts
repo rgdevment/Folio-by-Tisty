@@ -81,7 +81,7 @@ const KEYS_AT_ONCE = 1000;
 const COUNTED_REPORT = "r.cleared = 0 AND r.over_cap = 0 AND r.net NOT IN (SELECT net FROM false_reporters)";
 // A network is often shared: finding one report false says nothing of what others on it reported before.
 const REPORT_AS_EVIDENCE =
-  "r.cleared = 0 AND (r.over_cap = 0 OR r.level = 'grave') AND r.level <> 'light' AND r.net NOT IN (SELECT f.net FROM false_reporters f WHERE COALESCE(f.since, f.at) < r.at)";
+  "r.cleared = 0 AND (r.over_cap = 0 OR r.level = 'grave') AND r.level <> 'light' AND r.net NOT IN (SELECT f.net FROM false_reporters f WHERE CASE WHEN f.since_hour IS NULL THEN COALESCE(f.since, f.at) < r.at ELSE f.since_hour <= r.at_hour END)";
 // The API now refuses a grave report without its link: this is for what was reported before it did (decision 153).
 const REPORT_THAT_BLOCKS = `${COUNTED_REPORT} AND (r.level = 'medium' OR (r.level = 'grave' AND r.sealed_link IS NOT NULL))`;
 const LIGHT_REPORT = `${COUNTED_REPORT} AND r.level = 'light'`;
@@ -775,7 +775,9 @@ export class Cloud implements Store {
              SET at = CASE WHEN reports.cleared = 1 THEN excluded.at
                    WHEN EXISTS (SELECT 1 FROM false_reporters f WHERE f.net = excluded.net) THEN reports.at
                    WHEN ${REPORT_MOVES} THEN excluded.at ELSE reports.at END,
-                 at_hour = CASE WHEN ${REPORT_MOVES} THEN excluded.at_hour ELSE reports.at_hour END,
+                 at_hour = CASE WHEN reports.cleared = 1 THEN excluded.at_hour
+                   WHEN EXISTS (SELECT 1 FROM false_reporters f WHERE f.net = excluded.net) THEN reports.at_hour
+                   WHEN ${REPORT_MOVES} THEN excluded.at_hour ELSE reports.at_hour END,
                  asn = CASE WHEN ${REPORT_MOVES} THEN excluded.asn ELSE reports.asn END,
                  category = CASE WHEN ${REPORT_REPLACES} THEN excluded.category ELSE reports.category END,
                  level = CASE WHEN ${REPORT_REPLACES} THEN excluded.level ELSE reports.level END,
