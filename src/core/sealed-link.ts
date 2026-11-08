@@ -5,8 +5,8 @@ export const SEALED_CONTACT_AT_MOST = 512;
 
 const SEALED_BODY = /^[A-Za-z0-9_-]{150,}$/;
 const SEALED_CONTACT_BODY = /^[A-Za-z0-9_-]{80,}$/;
-// After a # always; bare too, since it would sit in the database the same, unless it is a path or a query value of an address.
-const KEY_IN_A_LINK = /#[A-Za-z0-9_-]{43}|(?<![A-Za-z0-9_\-/]|[?&][A-Za-z0-9_.-]*=)[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/;
+// After a # always; bare too, since it would sit in the database the same, unless it is a segment of an address's path.
+const KEY_IN_A_LINK = /#[A-Za-z0-9_-]{43}|(?<![A-Za-z0-9_\-/])[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/;
 
 export const isSealedLink = (said: string): boolean =>
   said.startsWith(SEALED_LINK_PREFIX) && SEALED_BODY.test(said.slice(SEALED_LINK_PREFIX.length));

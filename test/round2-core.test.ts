@@ -24,6 +24,8 @@ describe("a key in the detail of a report", () => {
     ["in parentheses", `(${KEY})`],
     ["in quotes", `"${KEY}"`],
     ["after an equals sign", `key=${KEY}`],
+    ["as the value of an address's query", `https://tisty.cl/?k=${KEY}`],
+    ["as a later value of an address's query", `https://evil.example/login?a=1&k=${KEY}&x=1`],
     ["after a colon", `llave:${KEY}`],
     ["on its own line", `hola\n${KEY}\nadios`],
     ["with a tab around it", `\t${KEY}\t`],
@@ -66,7 +68,6 @@ describe("a key in the detail of a report", () => {
       "a url whose last segment is a 43-character slug",
       "https://news.example/2026/11/un-articulo-de-largo-justo-cuarenta-y-tres-x",
     ],
-    ["a url with a 43-character query value", `https://phishing.example/login?session=${"b".repeat(43)}&x=1`],
   ])("does not turn away a report that quotes %s, though it holds no key", (_what, detail) => {
     expect(holdsALink(detail), "a long address is how phishing is reported").toBe(false);
   });

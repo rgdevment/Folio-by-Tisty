@@ -391,6 +391,18 @@ describe("the top documents", () => {
     expect(top.docs.map((one) => one.id).sort()).toEqual(["Bbbbbbbb", "Eeeeeeee", "Kkkkkkkk", "Llllllll", "Rrrrrrrr"]);
   });
 
+  it("still finds among the flagged what only yesterday's reading or edits mark", async () => {
+    await testEnv.DB.prepare(
+      "UPDATE doc_day SET nets = 2400, hours = 24, peak = 110 WHERE doc = 'Qqqqqqqq' AND day = ?",
+    )
+      .bind(TODAY - 1)
+      .run();
+    await shared("Yyyyyyyy", "Y".repeat(43), { day: TODAY - 1, versions: 21 });
+    const top = await dashboard.top(NOW, "weight", true);
+    expect(ofTop(top, "Qqqqqqqq")?.signals).toEqual([{ kind: "even" }]);
+    expect(ofTop(top, "Yyyyyyyy")?.signals).toEqual([{ kind: "edits", edits: 21 }]);
+  });
+
   it("says when each was first shared and when it was to expire", async () => {
     const top = await dashboard.top(NOW, "oldest", false);
     expect(ofTop(top, "Llllllll")).toMatchObject({ firstDay: TODAY - 40, ttlDays: 3, diesOn: TODAY + 3 });

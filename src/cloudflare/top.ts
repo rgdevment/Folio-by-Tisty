@@ -5,7 +5,7 @@ import { HELD_BYTES, SERVED } from "./room";
 import { seenOf } from "./seen";
 
 const LISTED = 50;
-const FLAGGED_SCANNED = 5000;
+const FLAGGED_SCANNED = 1000;
 
 const DAY_OF = (at: string): string => `${at} / 86400000`;
 // Without its first day, the oldest version kept and the first day it was read only bound how long it has lived.
@@ -21,6 +21,11 @@ const ORDERS: Record<TopOrder, string> = {
   edits: "d.latest DESC, d.id",
   oldest: "known_since, d.id",
 };
+// Only presence, never a threshold: what no signal can come from stays out of the scan, and signalsOf still decides.
+const MAY_SIGNAL = `t.doc IS NOT NULL OR up.doc IS NOT NULL
+  OR json_extract(d.versions, '$[#-1].at') >= (?1 - 1) * 86400000
+  OR EXISTS (SELECT 1 FROM reports r WHERE r.doc = d.id AND r.cleared = 0)
+  OR EXISTS (SELECT 1 FROM doc_day x WHERE x.doc = d.id AND x.day >= ?1 - ?3)`;
 const NOBODY_READ = "SELECT NULL AS doc, 0 AS nets, 0 AS proved, 0 AS hours, 0 AS peak WHERE 0";
 const NO_OWNER_READ = "SELECT NULL AS owner, 0 AS n WHERE 0";
 
@@ -142,7 +147,7 @@ export const topDocs = async (
          LEFT JOIN owner_rows o ON o.owner = d.owner
          LEFT JOIN doc_day y ON y.doc = d.id AND y.day = ?1 - 1
          LEFT JOIN uploaders up ON up.doc = d.id
-       WHERE d.latest > 0
+       WHERE d.latest > 0${flaggedOnly ? ` AND (${MAY_SIGNAL})` : ""}
        ORDER BY ${ORDERS[order]} LIMIT ?2`,
     )
     .bind(today, flaggedOnly ? FLAGGED_SCANNED : LISTED, LONE_AFTER_DAYS)
