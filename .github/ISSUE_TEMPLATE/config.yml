@@ -9,3 +9,6 @@ contact_links:
   - name: Abuse or a document that should come down
     url: https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/TERMS.md
     about: Reports and removal follow the terms of use, never a public issue.
+  - name: A checked domain
+    url: mailto:rgdevment@tisty.app?subject=Checked%20domain
+    about: Write privately with the domain and your root once its _tisty TXT record is up, never in a public issue, so nothing public ties the two together.
