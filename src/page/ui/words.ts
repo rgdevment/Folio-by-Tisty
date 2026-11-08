@@ -64,8 +64,13 @@ const es = {
   security: "Seguridad",
   securityAt: `${GITHUB_DOCS}/SEGURIDAD.md`,
 
-  openingTisty: "Abriendo Tisty… ¿No lo tienes?",
-  meetAndInstall: "Conócelo e instálalo",
+  openingTisty: "Abriendo Tisty…",
+  notOpened: "Si no se abrió, instálalo gratis y vuelve a este link.",
+  getOnWindows: "Descargar de Microsoft Store",
+  getOnMac: "Descargar para macOS (.dmg)",
+  otherWays: "Otras formas de instalarlo",
+  onlyDesktop: "Tisty es para Windows y macOS. Abre este link en tu computador para editarlo.",
+  openAgain: "Ya lo tengo, abrir de nuevo",
 
   report: "Denunciar este documento",
   reportCopyright: "¿Infringe tus derechos de autor? Si eres su titular, escribe a",
@@ -226,8 +231,13 @@ const en: Words = {
   security: "Security",
   securityAt: `${GITHUB_DOCS}/SECURITY.md`,
 
-  openingTisty: "Opening Tisty… Don't have it?",
-  meetAndInstall: "Meet it and install it",
+  openingTisty: "Opening Tisty…",
+  notOpened: "If nothing opened, install it for free and come back to this link.",
+  getOnWindows: "Get it from the Microsoft Store",
+  getOnMac: "Download for macOS (.dmg)",
+  otherWays: "Other ways to install it",
+  onlyDesktop: "Tisty is for Windows and macOS. Open this link on your computer to edit it.",
+  openAgain: "I have it, open it again",
 
   report: "Report this document",
   reportCopyright: "Does it infringe your copyright? If you hold it, write to",

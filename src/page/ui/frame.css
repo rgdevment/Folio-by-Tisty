@@ -623,10 +623,50 @@ body::before {
   margin: 0;
 }
 
-.opening-tisty a {
+.opening-tisty strong {
   color: var(--tisty-ink);
-  white-space: nowrap;
+  font-weight: 600;
+}
+
+.opening-tisty .opening-tisty-ways {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 8px;
+}
+
+.opening-tisty-ways a,
+.opening-tisty-again {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--tisty-ink);
+  font: inherit;
   font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.opening-tisty-again {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.opening-tisty .opening-tisty-get {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  background: var(--tisty-ink);
+  border-radius: 999px;
+  color: var(--tisty-sheet);
+  text-decoration: none;
+}
+
+.opening-tisty-get[hidden],
+.opening-tisty-again[hidden] {
+  display: none;
 }
 
 .action {

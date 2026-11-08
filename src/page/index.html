@@ -201,10 +201,14 @@
 
     <p class="said-aloud" id="file-said" role="status"></p>
     <div class="opening-tisty" id="opening-tisty" role="status" hidden>
-      <p>
-        <span data-say="openingTisty">Opening Tisty… Don't have it?</span>
-        <a data-say="meetAndInstall" href="https://www.tisty.app/" data-say-href="site" target="_blank" rel="noopener noreferrer">Meet it and install it</a>
-      </p>
+      <div class="opening-tisty-words">
+        <p><strong id="opening-said" data-say="openingTisty">Opening Tisty…</strong> <span id="not-opened"></span></p>
+        <p class="opening-tisty-ways">
+          <a class="opening-tisty-get" id="get-tisty" href="https://www.tisty.app/#install" target="_blank" rel="noopener noreferrer" hidden>Download Tisty</a>
+          <a id="other-ways" data-say="otherWays" href="https://www.tisty.app/#install" data-say-href="install" target="_blank" rel="noopener noreferrer">Other ways to install it</a>
+          <button class="opening-tisty-again" id="open-again" type="button" data-say="openAgain">I have it, open it again</button>
+        </p>
+      </div>
       <button class="tool" id="opening-tisty-close" type="button" aria-label="Close" data-say-label="close" title="Close" data-say-title="close">
         <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg>
       </button>
