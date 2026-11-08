@@ -79,4 +79,14 @@ describe("the page's words", () => {
     expect(linkSaying("Privacy")?.href).toContain("/docs/PRIVACY.md");
     expect(linkSaying("Security")?.href).toContain("/docs/SECURITY.md");
   });
+
+  it("invite to install Tisty from the site in the language spoken", () => {
+    speak("es");
+    expect(linkSaying("Descargar Tisty")?.href).toBe("https://www.tisty.app/es/#install");
+    expect(linkSaying("Conoce Tisty")?.href).toBe("https://www.tisty.app/es/");
+    expect(page.querySelector(".page-foot-free")?.textContent).toBe("Gratis y de código abierto · Windows y macOS");
+    speak("en");
+    expect(linkSaying("Download Tisty")?.href).toBe("https://www.tisty.app/#install");
+    expect(linkSaying("Meet Tisty")?.href).toBe("https://www.tisty.app/");
+  });
 });

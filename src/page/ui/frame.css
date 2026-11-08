@@ -1097,6 +1097,55 @@ body::before {
   font-weight: 600;
 }
 
+.page-foot-papers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin-top: 4px;
+}
+
+.page-foot-papers a {
+  color: inherit;
+  text-underline-offset: 2px;
+}
+
+.page-foot-papers a:hover {
+  color: var(--tisty-ink);
+}
+
+/* Last on the page and quieter than the document, so it is there for whoever finished reading. */
+.page-foot-go {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.page-foot-free {
+  flex-basis: 100%;
+  margin: 0;
+  text-align: right;
+}
+
+.page-foot-download {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  background: var(--tisty-ink);
+  border-radius: 999px;
+  color: var(--tisty-sheet);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity var(--quick);
+}
+
+.page-foot-download:hover {
+  opacity: 0.86;
+}
+
 .page-foot-link {
   display: flex;
   align-items: center;
@@ -1358,6 +1407,18 @@ body::before {
   .page-foot {
     grid-template-columns: 1fr;
     justify-items: center;
+    text-align: center;
+  }
+
+  .page-foot-papers {
+    justify-content: center;
+  }
+
+  .page-foot-go {
+    justify-content: center;
+  }
+
+  .page-foot-free {
     text-align: center;
   }
 }
