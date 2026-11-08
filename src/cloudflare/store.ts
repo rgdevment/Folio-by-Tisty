@@ -520,8 +520,8 @@ export class Cloud implements Store {
     if (forgotten.meta.changes > 0) await this.#giveQuotaBack(net, 1, 0, today);
   }
 
-  async #takeRoom(net: string, bytes: number, today: number, newKey = false): Promise<Uploaded> {
-    if (!(await this.#takeQuota(net, 0, bytes, today, 1))) return "quota";
+  async #takeRoom(net: string, bytes: number, today: number, newKey = false, uploads = 1): Promise<Uploaded> {
+    if (!(await this.#takeQuota(net, 0, bytes, today, uploads))) return "quota";
     if (!newKey) return "stored";
     const taken = await this.#db
       .prepare(
@@ -532,12 +532,12 @@ export class Cloud implements Store {
       .bind(today, NEW_KEYS_NET, bytes, this.#limits.newKeysBytesADay, net, this.#limits.newKeysNetBytesADay)
       .run();
     if (taken.meta.changes > 0) return "stored";
-    await this.#giveQuotaBack(net, 0, bytes, today, 1);
+    await this.#giveQuotaBack(net, 0, bytes, today, uploads);
     return "new_keys_full";
   }
 
-  async #giveRoomBack(net: string, bytes: number, today: number, newKey = false): Promise<void> {
-    await this.#giveQuotaBack(net, 0, bytes, today, 1);
+  async #giveRoomBack(net: string, bytes: number, today: number, newKey = false, uploads = 1): Promise<void> {
+    await this.#giveQuotaBack(net, 0, bytes, today, uploads);
     if (newKey) await this.#giveQuotaBack(NEW_KEYS_NET, 0, bytes, today);
   }
 
@@ -693,13 +693,14 @@ export class Cloud implements Store {
     { id, hash, body, net, newKey, roomAtMost }: KeptFiles,
     today: number,
   ): Promise<"stored" | "quota" | "new_keys_full" | "room_full" | "behind"> {
-    const room = await this.#takeRoom(net, body.length, today, newKey);
+    // Attachments are part of the version already counted as an upload.
+    const room = await this.#takeRoom(net, body.length, today, newKey, 0);
     if (room !== "stored") return room === "new_keys_full" ? room : "quota";
     const key = filesKey(id, hash);
     try {
       await this.#envelopes.put(key, body);
     } catch (error) {
-      await this.#giveRoomBack(net, body.length, today, newKey);
+      await this.#giveRoomBack(net, body.length, today, newKey, 0);
       throw error;
     }
     const kept = await this.#db
@@ -713,7 +714,7 @@ export class Cloud implements Store {
       .run();
     if (kept.meta.changes > 0) return "stored";
     await this.#envelopes.delete(key);
-    await this.#giveRoomBack(net, body.length, today, newKey);
+    await this.#giveRoomBack(net, body.length, today, newKey, 0);
     const named = await this.#db
       .prepare("SELECT 1 FROM docs WHERE id = ? AND json_extract(versions, '$[#-1].files') = ?")
       .bind(id, hash)
@@ -1066,19 +1067,27 @@ export class Cloud implements Store {
       const kept = await this.#withEvidence(row.id, today, all, trimmed);
       if (kept.length === all.length) continue;
       const dropped = all.filter((one) => !kept.includes(one));
-      const stillNamed = new Set(filesKeysOf(row.id, kept));
-      const filesGone = filesKeysOf(row.id, dropped).filter((key) => !stillNamed.has(key));
-      // Storage first, as forgetting does: a row left listing them is put right on a later run, an object left is not.
-      await this.#envelopes.delete([...dropped.map((one) => objectKey(row.id, one)), ...filesGone]);
-      await this.#db
-        .prepare("UPDATE docs SET versions = ?1, bytes = ?2 WHERE id = ?3 AND versions = ?4")
+      // Checked again in the write: a report or an order that arrived meanwhile keeps what it is about.
+      const moved = await this.#db
+        .prepare(
+          `UPDATE docs SET versions = ?1, bytes = ?2
+           WHERE id = ?3 AND versions = ?4 AND COALESCE(legal_until, 0) < ?6
+             AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = ?3
+               AND r.version IN (SELECT value FROM json_each(?5)) AND ${REPORT_AS_EVIDENCE})`,
+        )
         .bind(
           JSON.stringify(kept),
           kept.reduce((sum, one) => sum + one.bytes, 0),
           row.id,
           row.versions,
+          JSON.stringify(dropped.map((one) => one.n)),
+          today,
         )
         .run();
+      if (moved.meta.changes === 0) continue;
+      const stillNamed = new Set(filesKeysOf(row.id, kept));
+      const filesGone = filesKeysOf(row.id, dropped).filter((key) => !stillNamed.has(key));
+      await this.#envelopes.delete([...dropped.map((one) => objectKey(row.id, one)), ...filesGone]);
     }
     const next = rows.results.length < TRIMMED_AT_ONCE ? "" : (rows.results.at(-1)?.id ?? "");
     // Written only when it moves, so an idle sweep still writes nothing.

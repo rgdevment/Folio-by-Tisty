@@ -906,7 +906,9 @@ components:
             diesOn: { type: integer, description: "The last day it lives, in days since 1970." }
             pausedAt: { type: [integer, "null"] }
             blockedAt: { type: [integer, "null"] }
-            appealedAt: { type: [integer, "null"] }
+            appealedAt:
+              type: [integer, "null"]
+              description: When the document's one appeal was sent. It stays after the block is lifted, since there is no second.
             mayCorrect:
               type: boolean
               description: An appeal was accepted, and a version signed by the owner, with no permit, lifts the block.
