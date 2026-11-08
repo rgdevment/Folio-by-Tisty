@@ -695,12 +695,6 @@ body::before {
   display: none;
 }
 
-.shared-by-another {
-  margin: 10px 0 0;
-  color: var(--warn);
-  font-size: 12.5px;
-}
-
 .paper {
   display: flex;
   align-items: center;

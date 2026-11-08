@@ -84,24 +84,34 @@ const told = (link: HTMLElement, said: string): void => {
 };
 
 const CONTROLS = /\p{C}/gu;
-const MAY_RUN_BY_NAME =
-  /\.(exe|msi|msp|msix|msixbundle|appx|appxbundle|application|bat|cmd|com|scr|pif|cpl|dll|msc|ps1|psm1|ps1xml|psc1|vb|vbs|vbe|js|jse|ws|wsf|wsh|hta|lnk|url|website|scf|inf|reg|chm|gadget|jar|apk|appimage|deb|rpm|dmg|pkg|app|command|sh|iso|img|vhdx?|html?|xhtml|mht|mhtml|svg|docm|dotm|xlsm|xltm|xlam|xll|pptm|potm|ppsm|ppam|sldm)[\s.]*$/i;
-const MAY_RUN_BY_START = [
+const INERT_BY_NAME =
+  /\.(pdf|png|jpe?g|gif|webp|avif|heic|bmp|txt|md|csv|tsv|mp3|m4a|aac|ogg|oga|opus|wav|flac|mp4|m4v|webm|mov|docx|xlsx|pptx|odt|ods|odp|epub)$/i;
+const ZIPPED_BY_NAME = /\.(docx|xlsx|pptx|odt|ods|odp|epub)$/i;
+const TRAILING = /[\s.]+$/;
+const RUNS_BY_START = [
   [0x4d, 0x5a],
   [0x7f, 0x45, 0x4c, 0x46],
   [0xcf, 0xfa, 0xed, 0xfe],
   [0xce, 0xfa, 0xed, 0xfe],
+  [0xfe, 0xed, 0xfa, 0xcf],
+  [0xfe, 0xed, 0xfa, 0xce],
   [0xca, 0xfe, 0xba, 0xbe],
   [0x23, 0x21],
 ];
+const ZIP = [0x50, 0x4b, 0x03, 0x04];
 const NOT_SAVED = "No se descargó.";
 
 const plainName = (name: string): string => name.replace(CONTROLS, "");
 
 // By what it starts with too, since a name can say anything.
-export const mayRun = ({ name }: Pick<Attachment, "name">, bytes: Bytes): boolean =>
-  MAY_RUN_BY_NAME.test(plainName(name)) ||
-  MAY_RUN_BY_START.some((start) => start.every((byte, at) => bytes[at] === byte));
+const startsWith = (bytes: Bytes, start: number[]): boolean => start.every((byte, at) => bytes[at] === byte);
+
+export const mayRun = ({ name }: Pick<Attachment, "name">, bytes: Bytes): boolean => {
+  const savedAs = plainName(name).replace(TRAILING, "");
+  if (RUNS_BY_START.some((start) => startsWith(bytes, start))) return true;
+  if (startsWith(bytes, ZIP)) return !ZIPPED_BY_NAME.test(savedAs);
+  return !INERT_BY_NAME.test(savedAs);
+};
 
 const agreedToSave = (file: Pick<Attachment, "name">, bytes: Bytes): boolean =>
   !mayRun(file, bytes) ||

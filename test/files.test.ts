@@ -180,13 +180,49 @@ describe("pressing a file", () => {
       ["a Windows program", [0x4d, 0x5a]],
       ["a Linux program", [0x7f, 0x45, 0x4c, 0x46]],
       ["a Mac program", [0xcf, 0xfa, 0xed, 0xfe]],
+      ["a Mac program written the other way round", [0xfe, 0xed, 0xfa, 0xcf]],
       ["a script", [0x23, 0x21]],
+      ["an archive, which can hold a program", [0x50, 0x4b, 0x03, 0x04]],
     ])("goes by what it starts with, for %s called a photo", (_, start) => {
       expect(named("foto.jpg", start)).toBe(true);
     });
 
-    it.each(["informe.pdf", "foto.jpg", "notas.txt", "exe", "datos.exe.txt"])("leaves %s alone", (name) => {
-      expect(named(name)).toBe(false);
+    it.each([
+      "x.xml",
+      "x.xht",
+      "x.svgz",
+      "x.desktop",
+      "x.py",
+      "x.pl",
+      "x.library-ms",
+      "x.settingcontent-ms",
+      "x.zip",
+      "x.7z",
+      "x.cab",
+      "x.diagcab",
+      "x.sct",
+      "x.wsc",
+      "x.xla",
+      "x.one",
+      "x.webloc",
+      "x.terminal",
+      "exe",
+      "informe.pdf.exe",
+    ])("asks for %j, since only a short list is known not to run", (name) => {
+      expect(named(name)).toBe(true);
+    });
+
+    it.each(["informe.pdf", "foto.jpg", "notas.txt", "datos.exe.txt", "voz.mp3", "paseo.mp4", "informe.pdf. "])(
+      "leaves %j alone",
+      (name) => {
+        expect(named(name)).toBe(false);
+      },
+    );
+
+    it("leaves a document that is an archive alone, and asks for one that only says it is a photo", () => {
+      const zipped = [0x50, 0x4b, 0x03, 0x04];
+      expect(named("informe.docx", zipped)).toBe(false);
+      expect(named("foto.jpg", zipped)).toBe(true);
     });
   });
 
