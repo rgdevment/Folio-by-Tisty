@@ -705,8 +705,8 @@ export class Cloud implements Store {
     }
     const kept = await this.#db
       .prepare(
-        `UPDATE docs SET files_bytes = ?1
-         WHERE id = ?2 AND json_extract(versions, '$[#-1].files') = ?3 AND files_bytes <> ?1
+        `UPDATE docs SET files_bytes = ?1, versions = json_set(versions, '$[#-1].filesKept', 1)
+         WHERE id = ?2 AND json_extract(versions, '$[#-1].files') = ?3 AND json_extract(versions, '$[#-1].filesKept') IS NULL
            AND ?1 + COALESCE(json_extract(versions, '$[#-1].bytes'), 0) + (SELECT COALESCE(SUM(${HELD_BYTES}), 0)
              FROM docs d WHERE d.owner = docs.owner AND d.id <> docs.id AND ${HOLDS_ROOM("?4")}) <= ?5`,
       )
@@ -715,11 +715,13 @@ export class Cloud implements Store {
     if (kept.meta.changes > 0) return "stored";
     await this.#giveRoomBack(net, body.length, today, newKey, 0);
     const named = await this.#db
-      .prepare("SELECT files_bytes FROM docs WHERE id = ? AND json_extract(versions, '$[#-1].files') = ?")
+      .prepare(
+        "SELECT json_extract(versions, '$[#-1].filesKept') AS kept FROM docs WHERE id = ? AND json_extract(versions, '$[#-1].files') = ?",
+      )
       .bind(id, hash)
-      .first<{ files_bytes: number }>();
-    // The same files sent at once: one write kept them, the object is theirs too, and they were charged once.
-    if (named?.files_bytes === body.length) return "stored";
+      .first<{ kept: number | null }>();
+    // The same files sent at once: one write kept them for this version, the object is theirs too, charged once.
+    if (named?.kept === 1) return "stored";
     await this.#envelopes.delete(key);
     return named ? "room_full" : "behind";
   }

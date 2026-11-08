@@ -362,8 +362,9 @@ class Panel {
     }
     // Redrawn first, so what the opening unlocks shows, and the steps go on the card as it is now.
     await this.#reload();
-    const card = this.#page.querySelector<HTMLElement>(`#reports .card[data-doc="${id}"]`) ?? where;
-    this.#handing(command, READING_SAID[reading], card);
+    const card = this.#page.querySelector<HTMLElement>(`#reports .card[data-doc="${id}"]`);
+    if (card) this.#handing(command, READING_SAID[reading], card);
+    else this.#copying(command, `Copiado. ${RUN_IT} ${READING_SAID[reading]}`);
   }
 
   async #acting(path: string, note?: string): Promise<boolean> {

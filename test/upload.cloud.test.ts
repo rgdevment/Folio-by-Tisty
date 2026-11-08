@@ -1262,6 +1262,21 @@ describe("what stops a version", () => {
       const answer = await uploadFiles({ id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => files }, tools);
       expect(answer).toEqual({ stored: true, hash });
       expect((await newKeysBytes())?.bytes).toBe(before + files.length);
+      const other = await sealedEnvelope({ id: first.id, version: 3, owner: mario, files: [16] });
+      expect(other.length).toBe(files.length);
+      const otherHash = await filesHashOf(first.id, other);
+      expect(otherHash).not.toBe(hash);
+      await testEnv.DB.prepare(
+        "UPDATE docs SET versions = json_insert(versions, '$[#]', json_object('n', 3, 'bytes', 1, 'files', ?)), latest = 3 WHERE id = ?",
+      )
+        .bind(otherHash, first.id)
+        .run();
+      expect(await uploadFiles({ id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => other }, tools)).toEqual(
+        { stored: true, hash: otherHash },
+      );
+      expect((await newKeysBytes())?.bytes, "new files of the same size are charged too").toBe(
+        before + files.length + other.length,
+      );
     });
 
     it("leaves no share behind when a first version is refused, so it holds nothing the next day", async () => {
