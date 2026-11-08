@@ -243,10 +243,13 @@ paths:
                   - $ref: "#/components/schemas/KeyBlocked"
         "404": { $ref: "#/components/responses/Missing" }
         "409":
-          description: Another version arrived first, or this person keeps as many documents, or as many languages of this one, as they may, or a key in its first 30 days already holds as many bytes as it may until something it shared expires.
+          description: Another version arrived first, or this person keeps as many documents, or as many languages of this one, as they may, or the key that owns the document would hold more than it may.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Behind" }
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Behind"
+                  - $ref: "#/components/schemas/RoomFull"
         "413":
           description: Past what a document may weigh.
           content:
@@ -339,10 +342,13 @@ paths:
                   - $ref: "#/components/schemas/Revoked"
         "404": { $ref: "#/components/responses/Missing" }
         "409":
-          description: The latest version does not name this envelope, or the key that owns the document already holds as much as it may.
+          description: The latest version does not name this envelope, or the key that owns the document would hold more than it may.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/FilesBehind" }
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/FilesBehind"
+                  - $ref: "#/components/schemas/RoomFull"
         "413":
           description: Past what a document's files may weigh, or more files than it may have.
           content:
@@ -777,7 +783,18 @@ components:
       type: object
       required: [refused]
       properties:
-        refused: { enum: [behind, room_full] }
+        refused: { const: behind }
+    RoomFull:
+      type: object
+      required: [refused, held, arriving, atMost]
+      description: >-
+        What the key that owns the document holds in its other open documents, counting the latest version of each
+        with its attachments, what this upload would add, and what the key may hold, all in bytes.
+      properties:
+        refused: { const: room_full }
+        held: { type: integer, minimum: 0 }
+        arriving: { type: integer, minimum: 0 }
+        atMost: { type: integer, minimum: 0 }
     Stored:
       type: object
       required: [stored, version]
@@ -805,7 +822,7 @@ components:
       type: object
       required: [refused]
       properties:
-        refused: { enum: [behind, shares_full, languages_full, room_full] }
+        refused: { enum: [behind, shares_full, languages_full] }
     MachinesFull:
       type: object
       required: [refused]

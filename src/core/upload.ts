@@ -196,8 +196,11 @@ const roomRefused = async (
   arriving: number,
   now: number,
   { store, limits }: ReadTools,
-): Promise<Refused | null> =>
-  (await store.heldByOwner(owner, dayOf(now), id)) + arriving > limits.keyBytesAtMost ? { refused: "room_full" } : null;
+): Promise<Refused | null> => {
+  const held = await store.heldByOwner(owner, dayOf(now), id);
+  const atMost = limits.keyBytesAtMost;
+  return held + arriving > atMost ? { refused: "room_full", held, arriving, atMost } : null;
+};
 
 const takeUploadHour = async (net: string, now: number, { store, limits }: ReadTools): Promise<Refused | null> =>
   (await store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour))

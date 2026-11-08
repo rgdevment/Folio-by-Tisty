@@ -16,7 +16,6 @@ export type Refused =
         | "not_yours"
         | "shares_full"
         | "languages_full"
-        | "room_full"
         | "machines_full"
         | "bad_upload"
         | "uploads_off"
@@ -26,6 +25,7 @@ export type Refused =
         | "bad_revocation";
     }
   | { refused: "envelope"; why: EnvelopeRefusal }
+  | { refused: "room_full"; held: number; arriving: number; atMost: number }
   | { refused: "terms"; version: string }
   | { refused: "slow" | "quota"; until: number }
   | { refused: "proof"; salt: string; bits: number };
