@@ -34,5 +34,7 @@ export const SAMPLE_SEAL = {
   verdict: "holds",
   fingerprint: "48213 90175 22640 31987",
   ownerFingerprint: null,
+  signerStanding: "plain",
+  ownerStanding: "plain",
   diesOn: 20_773,
 } as const;

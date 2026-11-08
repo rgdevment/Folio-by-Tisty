@@ -903,6 +903,20 @@ body::before {
   font-size: 11.5px;
 }
 
+.fact-note.is-warning {
+  color: var(--bad);
+}
+
+.name-tag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: var(--good);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .facts {
   display: flex;
   flex-direction: column;

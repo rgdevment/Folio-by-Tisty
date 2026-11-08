@@ -38,6 +38,8 @@ const SPANISH: Document = {
 const openedOf = (held: Document, fingerprint: string, ownerFingerprint: string | null = null): Opened => ({
   held,
   pictures: [],
+  signerStanding: "plain",
+  ownerStanding: "plain",
   verdict: "holds",
   fingerprint,
   ownerFingerprint,
