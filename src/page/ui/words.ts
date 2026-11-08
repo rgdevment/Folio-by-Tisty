@@ -54,7 +54,8 @@ const es = {
   toDark: "Usar el modo oscuro",
   close: "Cerrar",
 
-  tistyIs: "Notas, documentos y tareas. El historial de lo que aprendiste resolviendo.",
+  tistyIs:
+    "Notas, documentos y tareas en tu escritorio, gratis y de código abierto. El historial de lo que aprendiste resolviendo.",
   promise: "Este documento se abre en tu navegador: el servidor nunca recibe su llave. Sin cookies ni analítica.",
   meetTisty: "Conoce Tisty",
   freeAndOpen: "Gratis y de código abierto · Windows y macOS",
@@ -225,7 +226,8 @@ const en: Words = {
   toDark: "Use dark mode",
   close: "Close",
 
-  tistyIs: "Notes, documents and tasks. The record of what you learned solving them.",
+  tistyIs:
+    "Notes, documents and tasks on your desktop, free and open source. The record of what you learned solving them.",
   promise: "This document opens in your browser: the server never receives its key. No cookies, no analytics.",
   meetTisty: "Meet Tisty",
   freeAndOpen: "Free and open source · Windows and macOS",
