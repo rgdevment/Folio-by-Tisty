@@ -9,10 +9,10 @@ export interface Doing {
   reportWasFalse: (id: string, net: string) => void;
   forgetContact: (id: string, net: string) => void;
   networkWasFalse: (id: string, net: string) => void;
-  openReport: (id: string, command: string) => void;
+  openReport: (id: string, command: string, where: HTMLElement) => void;
   blockKey: (root: string) => void;
   unblockKey: (root: string) => void;
-  copy: (said: string) => void;
+  copy: (command: string, then: string, where: HTMLElement) => void;
   panic: (id: string, version: number) => void;
   purgeOwner: (id: string) => void;
   verifyLink: (id: string, version: number) => void;
@@ -178,8 +178,10 @@ const reportCard = (
   if (report.sealedLink) {
     const sealed = report.sealedLink;
     buttons.unshift(
-      button(page, "Abrir denuncia", () => doing.openReport(report.doc, openCommand(report.doc, sealed))),
-      button(page, "Comprobar sin abrir", () => doing.copy(checkCommand(report.doc, sealed))),
+      button(page, "Abrir denuncia", () => doing.openReport(report.doc, openCommand(report.doc, sealed), card)),
+      button(page, "Comprobar sin abrir", () =>
+        doing.copy(checkCommand(report.doc, sealed), "Dice si la llave abre ese documento, sin leer nada.", card),
+      ),
     );
   }
   if (report.sealedContact) {
@@ -193,7 +195,9 @@ const reportCard = (
       ),
     );
     buttons.unshift(
-      button(page, "Copiar para leer su correo", () => doing.copy(openCommand(report.doc, contact))),
+      button(page, "Copiar para leer su correo", () =>
+        doing.copy(openCommand(report.doc, contact), "Imprime el correo que dejó quien denunció.", card),
+      ),
       button(page, "Borrar su correo", () => doing.forgetContact(report.doc, report.net)),
     );
   }

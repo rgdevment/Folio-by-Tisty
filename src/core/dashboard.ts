@@ -66,6 +66,7 @@ export interface TopDoc {
   diesOn: number;
   blocked: boolean;
   paused: boolean;
+  stopped: boolean;
   signals: Signal[];
 }
 

@@ -42,6 +42,7 @@ const doc = (id: string, over: Partial<TopDoc> = {}): TopDoc => ({
   diesOn: TODAY + 3,
   blocked: false,
   paused: false,
+  stopped: false,
   signals: [],
   ...over,
 });
@@ -145,6 +146,25 @@ describe("the top documents", () => {
     expect(cells[10]).toBe("8 nov");
     expect(cells[11]).toBe("11 nov");
     expect(cells[12]).toBe("Bots: tope de lectores");
+  });
+
+  it("says which documents are no longer served, and which a report still holds", () => {
+    const docs = [
+      doc("StOpPeD1", { stopped: true, paused: true }),
+      doc("HeLdGrv1", { stopped: true, signals: [{ kind: "report", level: "grave" }] }),
+      doc("LiGhTrp1", { stopped: true, signals: [{ kind: "report", level: "light" }] }),
+      doc("PaUsEd01", { paused: true }),
+      doc("OpEnNow1"),
+    ];
+    drawTop(page, place("top"), { order: "readers", flaggedOnly: false, docs }, NOW, { showKey: vi.fn() });
+    const firsts = [...place("top").querySelectorAll("tbody tr")].map((one) => one.querySelector("td")?.textContent);
+    expect(firsts).toEqual([
+      "StOpPeD1 ya no se sirve · se borra en la próxima limpieza",
+      "HeLdGrv1 ya no se sirve · lo retiene su denuncia",
+      "LiGhTrp1 ya no se sirve · se borra en la próxima limpieza",
+      "PaUsEd01 en pausa",
+      "OpEnNow1",
+    ]);
   });
 
   it("says when nothing is flagged", () => {

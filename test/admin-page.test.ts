@@ -281,6 +281,8 @@ describe("checking a key", () => {
     pressing("reports", "Comprobar sin abrir");
     expect(doing.copy).toHaveBeenCalledWith(
       'node scripts/report-key.mjs check <llave> AbCdEfGh sealed1.opaque "<link para verificar>"',
+      "Dice si la llave abre ese documento, sin leer nada.",
+      expect.anything(),
     );
     const buttons = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
     expect(buttons.filter((one) => one.textContent === "Comprobar sin abrir")).toHaveLength(1);
@@ -406,7 +408,30 @@ describe("a case in the panel", () => {
     const noted = fetching.mock.calls.find(([path]) => path === "/api/docs/AbCdEfGh/opened");
     expect(JSON.parse(String(noted?.[1]?.body))).toEqual({ note: "verificar la denuncia" });
     expect(writeText).toHaveBeenCalledWith("node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque");
-    expect(page.getElementById("said")?.textContent).toContain("te da el link de la denuncia");
+    const card = (page.getElementById("reports") as Element).querySelector(".card") as Element;
+    await vi.waitFor(() => expect(card.querySelector(".card-steps")).not.toBeNull());
+    const steps = card.querySelector(".card-steps") as Element;
+    expect(steps.textContent).toContain("Copiado.");
+    expect(steps.textContent).toContain("Imprime el link de la denuncia");
+    expect(steps.querySelector("code")?.textContent).toBe(
+      "node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque",
+    );
+    expect(page.getElementById("said")?.textContent).toBe("");
+  });
+
+  it("shows the command on its card when the copy fails, once however many times it is asked", async () => {
+    const writeText = vi.fn(async () => {
+      throw new Error("denied");
+    });
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    await opened(answering(), "verificar");
+    pressing("reports", "Comprobar sin abrir");
+    pressing("reports", "Comprobar sin abrir");
+    const card = (page.getElementById("reports") as Element).querySelector(".card") as Element;
+    await vi.waitFor(() => expect(card.textContent).toContain("Dice si la llave abre"));
+    expect(card.querySelectorAll(".card-steps")).toHaveLength(1);
+    expect(card.querySelector(".card-steps")?.textContent).toContain("No se pudo copiar: cópialo de aquí.");
+    expect(card.querySelector(".card-steps code")?.textContent).toContain("report-key.mjs check");
   });
 
   it("copies nothing when the opening could not be noted, or had no reason", async () => {
@@ -510,6 +535,7 @@ describe("the panel", () => {
     expect(doing.openReport).toHaveBeenCalledWith(
       "AbCdEfGh",
       "node scripts/report-key.mjs open <llave> AbCdEfGh sealed1.opaque",
+      expect.anything(),
     );
     expect(page.getElementById("reports")?.textContent).not.toContain("sealed1.opaque");
   });
@@ -568,6 +594,8 @@ describe("the panel", () => {
     pressing("reports", "Copiar para leer su correo");
     expect(doing.copy).toHaveBeenCalledWith(
       expect.stringContaining("report-key.mjs open <llave> AbCdEfGh contact1.opaque"),
+      "Imprime el correo que dejó quien denunció.",
+      expect.anything(),
     );
     expect(page.getElementById("reports")?.textContent).not.toContain("contact1.opaque");
     const offered = [...(page.getElementById("reports") as Element).querySelectorAll("button")];

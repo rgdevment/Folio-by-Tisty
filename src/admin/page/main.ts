@@ -19,6 +19,8 @@ import { drawTop } from "./top";
 
 const COULD_NOT = "No se pudo. Recarga la página para ver cómo quedó.";
 const PART_FAILED = "No se pudo traer esta parte. Recarga la página.";
+const RUN_IT =
+  "Córrelo en una terminal, en la carpeta de Folio, con la ruta de tu llave de denuncias en vez de <llave>. Tu llave nunca pasa por el panel.";
 const DOWNLOAD_KEPT_MS = 60_000;
 
 const foundText = (answer: Found): string => {
@@ -92,10 +94,26 @@ class Panel {
   #copying(text: string, says: string): void {
     void navigator.clipboard.writeText(text).then(
       () => this.#say(says),
-      () => {
-        this.#say("No se pudo copiar. Es este:");
-        this.#said.append(" ", text);
-      },
+      () => this.#say("No se pudo copiar: selecciónalo y cópialo."),
+    );
+  }
+
+  // Shown on the card that asked, since the line at the top of the page is out of sight there.
+  #handing(command: string, then: string, where: HTMLElement): void {
+    const steps = (copied: boolean) => {
+      const box = this.#page.createElement("section");
+      box.className = "card-steps";
+      box.append(
+        piece(this.#page, "p", "", `${copied ? "Copiado." : "No se pudo copiar: cópialo de aquí."} ${RUN_IT} ${then}`),
+        piece(this.#page, "code", "sealed", command),
+      );
+      where.querySelector(".card-steps")?.remove();
+      where.append(box);
+      this.#say("");
+    };
+    void navigator.clipboard.writeText(command).then(
+      () => steps(true),
+      () => steps(false),
     );
   }
 
@@ -104,7 +122,9 @@ class Panel {
     if (!(await sent(`docs/${id}/case`, made.body))?.ok) return false;
     this.#place("case-link-said").textContent = says;
     this.#place("case-link-code").textContent = made.link;
-    this.#place("case-link").hidden = false;
+    const shown = this.#place("case-link");
+    shown.hidden = false;
+    shown.scrollIntoView?.({ block: "center" });
     return true;
   }
 
@@ -247,9 +267,9 @@ class Panel {
         ),
       reportWasFalse: (id, net) =>
         this.#confirmed("¿Esta denuncia era falsa? Esa red dejará de contar.", `docs/${id}/reports/${net}/false`),
-      openReport: (id, command) => {
+      openReport: (id, command, where) => {
         const reason = prompt(`¿Por qué abres la denuncia de ${id}? Queda anotado en el registro.`);
-        if (reason?.trim()) void this.#openingReport(id, reason, command);
+        if (reason?.trim()) void this.#openingReport(id, reason, command, where);
       },
       panic: (id, version) => {
         const note = prompt(`¿Por qué bloquear y retener ${id}? Dejará de servirse y se retiene 180 días.`);
@@ -268,8 +288,7 @@ class Panel {
           "¿Ya entregaste el link de caso y la llave a la autoridad? Se borran las llaves selladas de este documento, aunque siguen hasta 30 días en los respaldos cifrados.",
           `docs/${id}/handed_over`,
         ),
-      copy: (command) =>
-        this.#copying(command, "Copiado. Reemplaza <llave> por la ruta de tu llave y ábrelo en tu equipo."),
+      copy: (command, then, where) => this.#handing(command, then, where),
       showKey: (root) => void this.#showKey(root),
     };
   }
@@ -292,15 +311,16 @@ class Panel {
   }
 
   // Noted before the command is handed over, so no report is opened without its reason on record.
-  async #openingReport(id: string, reason: string, command: string): Promise<void> {
+  async #openingReport(id: string, reason: string, command: string, where: HTMLElement): Promise<void> {
     this.#say("Trabajando…");
     if (!(await asked(`docs/${id}/opened`, reason))) {
       this.#say(COULD_NOT);
       return;
     }
-    this.#copying(
+    this.#handing(
       command,
-      "Copiado. Pégalo en tu terminal, en la carpeta de Folio, con la ruta de tu llave en vez de <llave>: te da el link de la denuncia.",
+      "Anotado el motivo. Imprime el link de la denuncia: ábrelo en el navegador para leer la versión denunciada.",
+      where,
     );
     void this.#loadBoard();
   }
