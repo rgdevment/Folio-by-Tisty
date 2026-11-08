@@ -89,8 +89,10 @@ export const ago = (ms: number, now: number): string => {
   if (minutes < 60) return `hace ${minutes} min`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `hace ${hours} h`;
-  const days = Math.floor((now - ms) / DAY_MS);
-  return days === 1 ? "ayer" : shortDay(Math.floor(ms / DAY_MS));
+  const at = new Date(ms);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  return at.toDateString() === yesterday.toDateString() ? "ayer" : `${at.getDate()} ${MONTHS[at.getMonth()]}`;
 };
 
 // The clock is the browser's, so «hoy» and «ayer» are its days too, not UTC's.

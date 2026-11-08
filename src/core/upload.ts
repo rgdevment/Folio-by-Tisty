@@ -369,24 +369,11 @@ export const uploadDoc = async (uploading: Uploading, tools: UploadTools): Promi
 };
 
 export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promise<FilesUploadAnswer> => {
-  const open = await openTo(uploading, tools);
-  if ("refused" in open) return open;
-  const keys = keyAdmission(open.net, dayOf(uploading.now), tools);
-  try {
-    return await storeFiles(uploading, open, keys, tools);
-  } finally {
-    await keys.giveBack();
-  }
-};
-
-const storeFiles = async (
-  uploading: Uploading,
-  { net }: OpenTo,
-  keys: KeyAdmission,
-  tools: ReadTools,
-): Promise<FilesUploadAnswer> => {
   const { id, now } = uploading;
   const { store, limits } = tools;
+  const open = await openTo(uploading, tools);
+  if ("refused" in open) return open;
+  const { net } = open;
   const held = await store.held(id);
   if (!held) return { refused: "missing" };
   const stoppedHere = stopped(held);
@@ -408,8 +395,7 @@ const storeFiles = async (
   if ((await store.filesBytes(id, hash)) !== null) return { stored: true, hash };
   const newKey = (await newRootsOf(read, now, tools)).length > 0;
   // A blocked key uploads nothing more, attachments included, and neither does an edit link of its documents.
-  const refusedKey = await keys.admit([held.owner, signature.root], { root: signature.root, version: "0", hour: 0 });
-  if (refusedKey) return refusedKey;
+  if (await store.anyBlocked([held.owner, signature.root])) return { refused: "key_blocked" };
   const hourSpent = await takeUploadHour(net, now, tools);
   if (hourSpent) return hourSpent;
   const latestBytes = held.versions.at(-1)?.bytes ?? 0;

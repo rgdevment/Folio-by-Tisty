@@ -300,7 +300,7 @@ class Panel {
       },
       block: (id) => {
         const note = prompt(
-          `¿Por qué bloquear ${id}? Deja de servirse; no se retiene más allá de lo que pidan sus denuncias. ${ON_RECORD}`,
+          `¿Por qué bloquear ${id}? Deja de servirse y su copia se guarda 180 días; no se crea ningún link de caso. ${ON_RECORD}`,
         );
         if (note?.trim()) void this.#acting(`docs/${id}/block`, note);
       },

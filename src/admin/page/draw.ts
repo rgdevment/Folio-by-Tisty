@@ -1,6 +1,7 @@
 import type { Owner } from "../../core/dashboard";
 import { LEVEL_ONE } from "../../core/limits";
 import type { Queue, QueuedDoc, QueuedReport, QueuedWarning } from "../../core/queue";
+import { isSealedContact, isSealedLink } from "../../core/sealed-link";
 import { actions, button, daysText, dayText, megabytes, more, piece, shortKey } from "./say";
 
 export interface Doing {
@@ -66,10 +67,10 @@ const REPORTS_KEY = "~/folio-reports.key";
 const CHECKING =
   "Cambia <link para verificar> por uno del panel, entre las comillas. Dice si la llave abre ese documento, sin leer nada.";
 const SAFE_ID = /^[A-Za-z0-9]{8}$/;
-const SAFE_SEALED = /^(sealed1|contact1)\.[A-Za-z0-9_-]+$/;
 
-// What the panel hands to the operator's shell holds nothing but these characters, whatever got into the database.
-const isSafe = (doc: string, sealed: string): boolean => SAFE_ID.test(doc) && SAFE_SEALED.test(sealed);
+// What the panel hands to the operator's shell has the shape the server takes, whatever got into the database.
+const safeOrNull = (doc: string, sealed: string | null, shaped: (said: string) => boolean): string | null =>
+  sealed !== null && SAFE_ID.test(doc) && shaped(sealed) ? sealed : null;
 
 const openCommand = (doc: string, sealed: string): string =>
   `node scripts/report-key.mjs open ${REPORTS_KEY} ${doc} ${sealed}`;
@@ -184,9 +185,8 @@ const reportCard = (
     );
   if (report.fromFalseNet)
     card.append(piece(page, "p", "card-line", "Esta red ya tuvo una denuncia falsa: no cuenta para bloquear."));
-  const sealed = report.sealedLink !== null && isSafe(report.doc, report.sealedLink) ? report.sealedLink : null;
-  const contact =
-    report.sealedContact !== null && isSafe(report.doc, report.sealedContact) ? report.sealedContact : null;
+  const sealed = safeOrNull(report.doc, report.sealedLink, isSealedLink);
+  const contact = safeOrNull(report.doc, report.sealedContact, isSealedContact);
   if ((report.sealedLink !== null && !sealed) || (report.sealedContact !== null && !contact))
     card.append(piece(page, "p", "card-line", "Lo sellado no tiene la forma esperada: no se ofrece ningún comando."));
   if (contact)

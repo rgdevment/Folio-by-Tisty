@@ -164,6 +164,18 @@ describe("who may enter", () => {
     expect(await holds(await tokenBy(otherKeys.privateKey))).toBe(false);
   });
 
+  it("asks Access again when the kept certificates do not have the token's key yet", async () => {
+    const cert = (await crypto.subtle.exportKey("jwk", keys.publicKey)) as JsonWebKey;
+    const asked: boolean[] = [];
+    const rotating: Certs = async (fresh = false) => {
+      asked.push(fresh);
+      return fresh ? [{ ...cert, kid: "two" } as JsonWebKey] : [{ ...cert, kid: "one" } as JsonWebKey];
+    };
+    const token = await tokenBy(keys.privateKey, {}, { kid: "two" });
+    expect(await isOperator(token, ACCESS, rotating, NOW)).toBe(true);
+    expect(asked).toEqual([false, true]);
+  });
+
   it("refuses a token with no signature that says it needs none", async () => {
     const token = await tokenBy(keys.privateKey, {}, { alg: "none" });
     expect(await holds(token)).toBe(false);

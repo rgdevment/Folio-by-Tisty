@@ -124,6 +124,8 @@ const SIGNED_BY_OWNER = `COALESCE(
 
 const HOURS_IN_A_DAY = 24;
 const HOUR_MS = 3_600_000;
+// Two queries each, so with the rest of the sweep it stays far under D1's 1,000 per invocation; the next hour goes on.
+const TRIMMED_AT_ONCE = 100;
 
 const encoder = new TextEncoder();
 
@@ -390,11 +392,12 @@ export class Cloud implements Store {
     if (versions.some((one) => one.n === upload.n && one.hash === upload.hash)) return "same";
     await this.#envelopes.delete(key);
     if (!now || now.latest === CLAIMED) return "missing";
+    if (now.blocked_at !== null) return "blocked";
     if (now.latest === upload.n - 1 && upload.roomAtMost !== undefined) {
       const held = await this.heldByOwner(now.owner, today, upload.id);
       if (held + sizeOf(upload.body) + (upload.filesBytes ?? 0) > upload.roomAtMost) return "room_full";
     }
-    return now.blocked_at === null ? "behind" : "blocked";
+    return "behind";
   }
 
   // An order keeps them all, and a report keeps the version it was about (decision 152).
@@ -471,6 +474,14 @@ export class Cloud implements Store {
       .bind(today, net, this.#limits.newKeysADay)
       .run();
     return { said: taken.meta.changes === 0 ? "full" : "new", terms: null };
+  }
+
+  async anyBlocked(roots: string[]): Promise<boolean> {
+    const found = await this.#db
+      .prepare("SELECT 1 FROM keys WHERE root IN (SELECT value FROM json_each(?)) AND blocked_at IS NOT NULL LIMIT 1")
+      .bind(JSON.stringify(roots))
+      .first();
+    return found !== null;
   }
 
   async keepKeys(roots: string[], today: number, accepted?: AcceptedTerms): Promise<void> {
@@ -947,11 +958,16 @@ export class Cloud implements Store {
 
   async sweep(today: number, hour = today * HOURS_IN_A_DAY): Promise<Swept> {
     await this.#db.batch([this.#db.prepare(this.#createSeen(today)), this.#db.prepare(this.#createSeen(today + 1))]);
-    // Replaced here too, so a day with no reader does not leave yesterday's key in storage.
-    await this.dayKey(today);
     const { summed, failed: failedDays } = await this.#sumPastDays(today);
     let forgotten = 0;
     let failed = failedDays;
+    try {
+      // Replaced here too, so a day with no reader does not leave yesterday's key in storage.
+      await this.dayKey(today);
+    } catch (error) {
+      failed += 1;
+      console.error("the day's key could not be replaced", String(error));
+    }
     try {
       await this.#blockWhatWaited(today, hour);
     } catch (error) {
@@ -1014,7 +1030,7 @@ export class Cloud implements Store {
         `SELECT id, versions FROM docs
          WHERE latest > 0 AND json_array_length(versions) > ?1 AND json_extract(versions, '$[1].at') <= ?2 LIMIT ?3`,
       )
-      .bind(this.#limits.versionsKept, now - this.#limits.replacedKeptDays * DAY_MS, this.#limits.sweptAtOnce)
+      .bind(this.#limits.versionsKept, now - this.#limits.replacedKeptDays * DAY_MS, TRIMMED_AT_ONCE)
       .all<{ id: string; versions: string }>();
     for (const row of rows.results) {
       const all = JSON.parse(row.versions) as Version[];
