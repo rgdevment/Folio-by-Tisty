@@ -119,6 +119,7 @@ export const pastTheServer = (said: Record<string, unknown>, server: Published):
     terms: _terms,
     sharing_open: _open,
     sharing_closed_note: _note,
+    maker_root: _maker,
     ...numbers
   } = said;
   const unknown = Object.keys(numbers).filter((name) => !Object.hasOwn(held, name));
@@ -172,6 +173,7 @@ export const signLimits = (
     terms,
     sharing_open: sharingOpen = false,
     sharing_closed_note: note,
+    maker_root: maker,
     ...numbers
   } = current;
   const until = haltedUntil(haltedDays, kept, Math.floor(now / 1000));
@@ -182,6 +184,7 @@ export const signLimits = (
     terms: termsOf(files, terms as Terms | undefined),
     sharing_open: sharingOpen,
     ...(note === undefined ? {} : { sharing_closed_note: note }),
+    ...(maker === undefined ? {} : { maker_root: maker }),
     ...(until === null ? {} : { uploads_halted_until: until }),
   };
   const past = pastTheServer(next, server);

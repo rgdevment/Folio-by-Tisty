@@ -245,6 +245,16 @@ describe("signing the limits", () => {
     ).toBe(true);
   });
 
+  it("keeps the maker's root it was given, and refuses one that is not a root", () => {
+    signing();
+    const maker = "A".repeat(43);
+    writeFileSync(files.limits, JSON.stringify({ ...read(), maker_root: maker }));
+    signing();
+    expect(read().maker_root).toBe(maker);
+    writeFileSync(files.limits, JSON.stringify({ ...read(), maker_root: "not a root" }));
+    expect(() => signing()).toThrow("maker_root is not a root");
+  });
+
   it("names the terms by the hash of their exact bytes", () => {
     signing();
     expect(read().terms).toEqual({ version: "1", es: sha256("términos\n"), en: sha256("terms\n") });
