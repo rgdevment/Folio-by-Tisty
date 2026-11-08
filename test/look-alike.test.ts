@@ -19,16 +19,39 @@ describe("a name that imitates the maker's", () => {
     ["r\u0261devment"],
     ["rg\u0501evment"],
     ["r\u0261\u0501evment"],
+    ["rgdeevment"],
+    ["rgdvment"],
+    ["rgdevmnet"],
+    ["rgdevvment"],
+    ["rgdevments"],
+    ["xgdevment"],
   ])("catches %j", (alias) => {
     expect(imitates(alias, "rgdevment")).toBe(true);
   });
 
-  it.each([["Ana"], ["rgdev"], ["rgdevments"], ["devment"], [""], ["\u96e8".repeat(9)], ["\u0436\u0436\u0436devment"]])(
-    "lets %j be",
-    (alias) => {
-      expect(imitates(alias, "rgdevment")).toBe(false);
-    },
-  );
+  it.each([
+    ["Ana"],
+    ["rgdev"],
+    ["devment"],
+    ["rgdevmentor"],
+    [""],
+    ["\u96e8".repeat(9)],
+    ["\u0436\u0436\u0436devment"],
+    ["\u0410\u043d\u043d\u0430"],
+    ["\u041c\u0430\u0440\u0456\u044f"],
+  ])("lets %j be", (alias) => {
+    expect(imitates(alias, "rgdevment")).toBe(false);
+  });
+
+  it("lets two unknown letters stand in, never three", () => {
+    expect(imitates("r\u0261\u0501evment", "rgdevment")).toBe(true);
+    expect(imitates("r\u0261\u0501\u0436vment", "rgdevment")).toBe(false);
+  });
+
+  it("asks a short name to match whole, since one slip would catch too many", () => {
+    expect(imitates("anna", "ana")).toBe(false);
+    expect(imitates("ANA", "ana")).toBe(true);
+  });
 });
 
 describe("how a root stands", () => {
@@ -45,6 +68,12 @@ describe("how a root stands", () => {
     expect(standingOf(OTHER, "holds", "rgdevrnent", MAKER)).toBe("imitates");
     expect(standingOf(OTHER, "holds", "rgdevment.dev", MAKER)).toBe("imitates");
     expect(standingOf(OTHER, "holds", "RG-DEVMENT.DEV", MAKER)).toBe("imitates");
+  });
+
+  it("goes by the domain when the maker names no name", () => {
+    const nameless = { root: MAKER.root, domain: MAKER.domain };
+    expect(standingOf(MAKER.root, "holds", "anything", nameless)).toBe("verified");
+    expect(standingOf(OTHER, "holds", "rgdevment.dev", nameless)).toBe("imitates");
   });
 
   it("is plain for any other name, no name, or no named maker", () => {

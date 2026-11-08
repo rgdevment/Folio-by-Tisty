@@ -1,5 +1,5 @@
 import type { Document, Orientation, Page, Paper, Verdict } from "@tisty/contracts";
-import type { Standing } from "../../core/look-alike";
+import { type Standing, shownNameOf } from "../../core/look-alike";
 import { MAKER } from "../maker";
 import { cardsFor, referenceOf } from "./cards";
 import { bareUrl } from "./clean";
@@ -246,11 +246,11 @@ const drawDetails = (root: ShadowRoot, held: Document): void => {
 
 const drawName = (who: "signer" | "owner", alias: string | undefined, standing: Standing): void => {
   const verified = standing === "verified";
-  element(who).textContent = (verified ? MAKER?.name : alias) ?? said().noName;
+  element(who).textContent = (verified && MAKER ? shownNameOf(MAKER) : alias) ?? said().noName;
   element(`${who}-verified`).hidden = !verified;
   const note = element(`${who}-note`);
   const notes: Record<Standing, string> = {
-    verified: MAKER?.domain ?? "",
+    verified: MAKER?.name === undefined ? "" : (MAKER.domain ?? ""),
     imitates: said().anotherKey,
     takenBack: said().takenBack,
     plain: "",
