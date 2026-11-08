@@ -748,6 +748,9 @@ describe("widgets and files", () => {
     ["a style from elsewhere", "<style>@import url(https://evil.example/x.css);</style>"],
     ["a background from elsewhere", '<div style="background: url(https://evil.example/t.png)">x</div>'],
     ["an entity in an event's name", '<img src="x" o&#110;error="window.ran = true">'],
+    ["an old expression in a style", '<div style="width: expression(1)">x</div>'],
+    ["a binding in a style", "<style>div { -moz-binding: none; }</style>"],
+    ["a behavior in a style", '<div style="behavior: none">x</div>'],
   ])("draws nothing a fork could send as %s, and shows it as code", (_, body) => {
     draw(holding(widget("<figcaption>Paseos</figcaption>", escaped(body))));
     expect(root.querySelector("figure.widget, iframe, script, object, embed, form, base, meta")).toBeNull();
