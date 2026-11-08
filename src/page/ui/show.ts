@@ -1,17 +1,20 @@
+import type { Translation } from "@tisty/contracts";
 import { fromBase64Url, words } from "../../core/bytes";
 import { openRecords } from "../../core/case-records";
 import { type EnvelopeRefusal, EnvelopeRefused } from "../../rules/envelope";
+import { preferredTranslation } from "../languages";
 import type { CaseLink } from "../link";
 import { OPERATOR_KEY } from "../operator-key";
-import type { Arrived } from "../read";
+import type { Arrived, Opened } from "../read";
 import { openLink } from "../read";
 import { askFor, askForCase, asking, NOT_ARRIVED, type NotArrived } from "./ask";
 import { domPurifyCleaner } from "./clean";
 import { drawClosed } from "./closed";
 import { filePresser, saved } from "./files";
 import { finished, pictureAddresses } from "./finish";
-import { drawFrame } from "./frame";
-import { offerReport } from "./report";
+import { drawFrame, type Shown } from "./frame";
+import { offerLanguages } from "./language-switch";
+import { offerReport, type Reportable } from "./report";
 import { answeringProof } from "./solve";
 
 const DAY_MILLISECONDS = 86_400_000;
@@ -33,28 +36,101 @@ const REFUSED: Record<EnvelopeRefusal, string> = {
 const lastDay = (diesOn: number): string =>
   new Date(diesOn * DAY_MILLISECONDS).toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "UTC" });
 
-const shown = async (id: string, linkKey: string, arrived: Arrived, caseToken?: string): Promise<void> => {
-  const { held, pictures, verdict, fingerprint, ownerFingerprint, diesOn } = await openLink(id, linkKey, arrived);
+interface Showing {
+  id: string;
+  linkKey: string;
+  arrived: Arrived;
+  opened: Opened;
+}
+
+interface Language {
+  lang: string;
+  showing: Showing;
+  shown: Shown;
+}
+
+const opening = async (id: string, linkKey: string, arrived: Arrived): Promise<Showing> => ({
+  id,
+  linkKey,
+  arrived,
+  opened: await openLink(id, linkKey, arrived),
+});
+
+const ownerOf = ({ fingerprint, ownerFingerprint }: Opened): string => ownerFingerprint ?? fingerprint;
+
+const shownOf = ({ id, linkKey, opened }: Showing, anchor: Opened, caseToken?: string): Shown => {
+  const { held, pictures, verdict, fingerprint, ownerFingerprint, diesOn } = opened;
   const cleaner = domPurifyCleaner(window);
   const addresses = pictureAddresses(held.pictures ?? [], pictures);
-  drawFrame(
+  return {
     held,
-    (html) => finished(cleaner.clean(html), addresses),
-    {
+    wordsOf: (html) => finished(cleaner.clean(html), addresses),
+    seal: {
       verdict,
       fingerprint,
       ownerFingerprint,
       diesOn: lastDay(diesOn),
+      sharedByAnother: ownerOf(opened) !== ownerOf(anchor),
     },
-    filePresser({ id, linkKey, held, ...(caseToken === undefined ? {} : { caseToken }) }),
-  );
-  if (caseToken !== undefined) return;
-  offerReport({
-    id,
-    linkKey,
-    operatorKey: OPERATOR_KEY,
-    ...(arrived.version === undefined ? {} : { version: arrived.version }),
+    pressFile: filePresser({ id, linkKey, held, ...(caseToken === undefined ? {} : { caseToken }) }),
+  };
+};
+
+const reportableOf = ({ id, linkKey, arrived: { version } }: Showing): Reportable => ({
+  id,
+  linkKey,
+  operatorKey: OPERATOR_KEY,
+  ...(version === undefined ? {} : { version }),
+});
+
+// Whatever keeps a translation from opening, the reader stays on what was already checked.
+const translated = async ({ document: id, key = "" }: Translation): Promise<Showing | undefined> => {
+  try {
+    const answer = await answeringProof(await askFor(id), (proof) => askFor(id, proof));
+    return "refused" in answer ? undefined : await opening(id, key, answer);
+  } catch {
+    return undefined;
+  }
+};
+
+const shownInLanguages = async (anchor: Showing): Promise<void> => {
+  const { lang = "", languages = [] } = anchor.opened.held;
+  const anchorLanguage = { lang, showing: anchor, shown: shownOf(anchor, anchor.opened) };
+  const kept = new Map<string, Language>([[lang, anchorLanguage]]);
+  const languageOf = async (chosen: string): Promise<Language | undefined> => {
+    const known = kept.get(chosen);
+    const translation = languages.find((one) => one.lang === chosen);
+    if (known || !translation) return known;
+    const showing = await translated(translation);
+    if (!showing) return undefined;
+    const language = { lang: chosen, showing, shown: shownOf(showing, anchor.opened) };
+    kept.set(chosen, language);
+    return language;
+  };
+  const preferred = preferredTranslation(navigator.languages ?? [], anchor.opened.held.lang, languages);
+  const first = preferred && (await languageOf(preferred.lang));
+  let current = first ?? anchorLanguage;
+  const show = drawFrame(current.shown);
+  offerReport(() => reportableOf(current.showing));
+  if (languages.length === 0) return;
+  offerLanguages({
+    langs: [lang, ...languages.map((one) => one.lang)],
+    shown: current.lang,
+    missedTheReaders: preferred !== undefined && first === undefined,
+    choose: async (chosen) => {
+      const next = await languageOf(chosen);
+      if (!next) return false;
+      current = next;
+      show(next.shown);
+      return true;
+    },
   });
+};
+
+const shown = async (id: string, linkKey: string, arrived: Arrived, caseToken?: string): Promise<void> => {
+  const anchor = await opening(id, linkKey, arrived);
+  if (caseToken === undefined) await shownInLanguages(anchor);
+  else drawFrame(shownOf(anchor, anchor.opened, caseToken));
 };
 
 const opened = async (id: string, linkKey: string, arrived: Arrived, caseToken?: string): Promise<boolean> => {

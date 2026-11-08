@@ -16,7 +16,7 @@ const showSample = async (): Promise<void> => {
     import("./clean"),
   ]);
   const cleaner = domPurifyCleaner(window);
-  drawFrame(SAMPLE, (html) => cleaner.clean(html), SAMPLE_SEAL);
+  drawFrame({ held: SAMPLE, wordsOf: (html) => cleaner.clean(html), seal: SAMPLE_SEAL });
 };
 
 const showAsked = async (id: string): Promise<void> => {

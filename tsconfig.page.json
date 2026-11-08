@@ -26,6 +26,7 @@
     "test/report.test.ts",
     "test/theme.test.ts",
     "test/show.test.ts",
+    "test/show-languages.test.ts",
     "test/jsdom.d.ts"
   ]
 }

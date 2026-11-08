@@ -663,6 +663,44 @@ body::before {
   color: var(--tisty-sheet);
 }
 
+.language {
+  display: flex;
+  flex: 0 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+  color: var(--tisty-soft);
+  font-size: 12.5px;
+}
+
+.language select {
+  flex: 1 1 auto;
+  min-height: 30px;
+  padding: 0 8px;
+  background: var(--track);
+  border: 0;
+  border-radius: 8px;
+  color: var(--tisty-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.language-said {
+  flex: 0 0 100%;
+  margin: 0;
+}
+
+.language-said:empty {
+  display: none;
+}
+
+.shared-by-another {
+  margin: 10px 0 0;
+  color: var(--warn);
+  font-size: 12.5px;
+}
+
 .paper {
   display: flex;
   align-items: center;
@@ -1154,6 +1192,15 @@ body::before {
     min-height: 42px;
     border-radius: 11px;
     font-size: 14px;
+  }
+
+  .language {
+    font-size: 14px;
+  }
+
+  .language select {
+    min-height: 42px;
+    border-radius: 11px;
   }
 
   .panel:not(.panel-actions) {

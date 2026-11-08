@@ -47,7 +47,7 @@ beforeEach(async () => {
   vi.mocked(solved).mockClear();
   const pair = (await crypto.subtle.generateKey("X25519", true, ["deriveBits"])) as CryptoKeyPair;
   operatorKey = Buffer.from(await crypto.subtle.exportKey("raw", pair.publicKey)).toString("base64url");
-  offerReport({ id: ID, linkKey: LINK_KEY, operatorKey, version: 3 });
+  offerReport(() => ({ id: ID, linkKey: LINK_KEY, operatorKey, version: 3 }));
 });
 
 afterEach(() => vi.unstubAllGlobals());
