@@ -447,13 +447,15 @@ export class CloudModeration {
   }
 
   async opened(id: string, reason: string, now: number): Promise<Acted> {
-    const noted = await this.#db
-      .prepare(
-        "INSERT OR IGNORE INTO openings (doc, at, reason) SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM docs WHERE id = ?1)",
-      )
-      .bind(id, now, reason)
-      .run();
-    return noted.meta.changes > 0 ? "done" : "missing";
+    const [, here] = await this.#db.batch([
+      this.#db
+        .prepare(
+          "INSERT OR IGNORE INTO openings (doc, at, reason) SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM docs WHERE id = ?1)",
+        )
+        .bind(id, now, reason),
+      this.#db.prepare("SELECT 1 FROM docs WHERE id = ?").bind(id),
+    ]);
+    return (here?.results.length ?? 0) > 0 ? "done" : "missing";
   }
 
   async #actedAndLogged(acting: D1PreparedStatement[], log: D1PreparedStatement): Promise<Acted> {
