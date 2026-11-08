@@ -1,3 +1,4 @@
+import { Resolver } from "node:dns/promises";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,7 +7,8 @@ const ROOT = /^[A-Za-z0-9_-]{43}$/;
 const NAME = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
 const DOMAIN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/;
 const TXT_PREFIX = "tisty-root=";
-const RESOLVERS = ["https://cloudflare-dns.com/dns-query", "https://dns.google/resolve"];
+const RESOLVERS = ["1.1.1.1", "8.8.8.8"];
+const NO_RECORD = new Set(["ENOTFOUND", "ENODATA"]);
 const TRIES = 5;
 const BETWEEN_TRIES_MS = 60_000;
 
@@ -36,24 +38,14 @@ export const makerFaults = (maker: unknown): string[] => {
 
 export const recordName = (domain: string): string => `_tisty.${domain}`;
 
-export const textsOf = (answer: unknown): string[] => {
-  const records = (answer as { Answer?: { type?: number; data?: string }[] }).Answer ?? [];
-  return records
-    .filter((one) => one.type === 16 && typeof one.data === "string")
-    .map((one) => [...(one.data as string).matchAll(/"((?:[^"\\]|\\.)*)"/g)].map(([, piece]) => piece).join(""));
-};
-
-export const dohLookup: Lookup = async (resolver, name) => {
+// Straight to each resolver over UDP: a local filter that blocks DNS over HTTPS must not stop the signing.
+export const dnsLookup: Lookup = async (server, name) => {
+  const resolver = new Resolver({ timeout: 5000, tries: 2 });
+  resolver.setServers([server]);
   try {
-    const answer = await fetch(`${resolver}?name=${encodeURIComponent(name)}&type=TXT`, {
-      headers: { accept: "application/dns-json" },
-      redirect: "error",
-    });
-    if (!answer.ok) return null;
-    const said = (await answer.json()) as { Status?: number };
-    return said.Status === 0 || said.Status === 3 ? textsOf(said) : null;
-  } catch {
-    return null;
+    return (await resolver.resolveTxt(name)).map((pieces) => pieces.join(""));
+  } catch (error) {
+    return NO_RECORD.has((error as { code?: string }).code ?? "") ? [] : null;
   }
 };
 
@@ -65,7 +57,7 @@ export const domainFaults = async ({ root, domain }: Maker, lookup: Lookup): Pro
   if (domain === undefined) return [];
   const answers = await Promise.all(RESOLVERS.map((resolver) => lookup(resolver, recordName(domain))));
   return answers.flatMap((texts, at) => {
-    const asked = new URL(RESOLVERS[at] ?? "").host;
+    const asked = RESOLVERS[at];
     if (texts === null) return [`${asked} could not be asked about ${recordName(domain)}`];
     const roots = rootsIn(texts);
     if (roots.length === 1 && roots[0] === root) return [];
@@ -84,7 +76,7 @@ const watch = async (): Promise<void> => {
     return;
   }
   for (let attempt = 1; attempt <= TRIES; attempt += 1) {
-    const faults = await domainFaults(maker, dohLookup);
+    const faults = await domainFaults(maker, dnsLookup);
     if (faults.length === 0) {
       console.log(`ok ${recordName(maker.domain)} names the maker's root`);
       return;

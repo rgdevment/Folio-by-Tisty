@@ -11,7 +11,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEVEL_ONE, publishedLimits } from "../src/core/limits.ts";
-import { dohLookup, domainFaults, makerFaults, makerIn } from "./limits-maker.ts";
+import { dnsLookup, domainFaults, makerFaults, makerIn } from "./limits-maker.ts";
 import { sharingFaults } from "./limits-sharing.ts";
 
 type Published = ReturnType<typeof publishedLimits>;
@@ -199,7 +199,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (what === "new" && keyFile) {
     console.log(createKeys(keyFile));
   } else if (what === "sign" && keyFile) {
-    const unpublished = await domainFaults(makerIn(PUBLISHED.limits) ?? { root: "" }, dohLookup);
+    const unpublished = await domainFaults(makerIn(PUBLISHED.limits) ?? { root: "" }, dnsLookup);
     if (unpublished.length > 0) {
       console.error(`the maker's domain does not hold, so nothing was signed: ${unpublished.join("; ")}`);
       process.exitCode = 1;

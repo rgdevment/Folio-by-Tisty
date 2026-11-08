@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { domainFaults, type Lookup, makerFaults, recordName, textsOf } from "../scripts/limits-maker";
+import { domainFaults, type Lookup, makerFaults, recordName } from "../scripts/limits-maker";
 
 const ROOT = "A".repeat(43);
 const MAKER = { root: ROOT, name: "rgdevment", domain: "rgdevment.dev" };
 const answering =
   (texts: string[] | null, other: string[] | null = texts): Lookup =>
   async (resolver) =>
-    resolver.includes("cloudflare") ? texts : other;
+    resolver === "1.1.1.1" ? texts : other;
 
 describe("the maker in the limits", () => {
   it("may be missing, or say only its root", () => {
@@ -69,8 +69,8 @@ describe("the maker's domain", () => {
 
   it("does not hold when a resolver cannot be asked, or the two disagree", async () => {
     expect(await domainFaults(MAKER, answering(null))).toEqual([
-      `cloudflare-dns.com could not be asked about ${recordName("rgdevment.dev")}`,
-      `dns.google could not be asked about ${recordName("rgdevment.dev")}`,
+      `1.1.1.1 could not be asked about ${recordName("rgdevment.dev")}`,
+      `8.8.8.8 could not be asked about ${recordName("rgdevment.dev")}`,
     ]);
     expect(await domainFaults(MAKER, answering([`tisty-root=${ROOT}`], []))).toHaveLength(1);
   });
@@ -78,16 +78,5 @@ describe("the maker's domain", () => {
   it("never repeats what the record says", async () => {
     const faults = await domainFaults(MAKER, answering(["tisty-root=::error::injected"]));
     expect(faults.join(" ")).not.toContain("injected");
-  });
-
-  it("joins a record's quoted pieces and keeps only TXT answers", () => {
-    const answer = {
-      Answer: [
-        { type: 16, data: '"tisty-root=AAA" "BBB"' },
-        { type: 5, data: "elsewhere.example." },
-      ],
-    };
-    expect(textsOf(answer)).toEqual(["tisty-root=AAABBB"]);
-    expect(textsOf({})).toEqual([]);
   });
 });
