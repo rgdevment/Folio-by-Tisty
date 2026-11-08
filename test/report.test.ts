@@ -236,6 +236,11 @@ describe("what a report may say", () => {
     expect(saidOf({ category, detail: "x".repeat(10) }, LEVEL_ONE)).not.toBeNull();
   });
 
+  it("takes the address of a phishing site whose path runs long, which is no key", () => {
+    const detail = `copia el banco en https://phish.example/${"a".repeat(60)}`;
+    expect(saidOf({ category: "phishing", detail }, LEVEL_ONE)).not.toBeNull();
+  });
+
   it("does not ask a light report to say why", () => {
     expect(saidOf({ category: "offensive" }, LEVEL_ONE)).toEqual({ category: "offensive" });
   });
@@ -259,6 +264,7 @@ describe("what a report may say", () => {
     ["a link on a light report", { category: "spam", sealedLink: sealed }],
     ["a link in the detail", { category: "spam", detail: `mira https://tisty.cl/${ID}#${LINK_KEY}` }],
     ["a link with its token in the detail", { category: "spam", detail: `${ID}#${LINK_KEY}.token` }],
+    ["a bare key in the detail", { category: "spam", detail: `la llave es ${LINK_KEY} y nada más` }],
     ["a version that is not one", { category: "spam", version: 0 }],
     ["a version in words", { category: "spam", version: "1" }],
     ["a detail that is too long", { category: "spam", detail: "x".repeat(LEVEL_ONE.reportDetailAtMost + 1) }],

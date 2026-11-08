@@ -308,7 +308,7 @@ const storeVersion = async (
   }
 
   const owner = manifest.owner as Owner;
-  const uploaded = await store.upload(
+  const storing = store.upload(
     {
       id,
       n: manifest.version,
@@ -330,6 +330,13 @@ const storeVersion = async (
     today,
     held,
   );
+  // A first version that failed midway must not keep a share of its key for days.
+  const uploaded = sharing
+    ? await storing.catch(async (error: unknown) => {
+        await store.forgetUnsent(id, net, today);
+        throw error;
+      })
+    : await storing;
   // Checked again in the write itself, so uploads sent at once cannot each see the room empty.
   if (uploaded === "room_full") {
     if (sharing) await store.forgetUnsent(id, net, today);

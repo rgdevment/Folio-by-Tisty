@@ -645,6 +645,19 @@ describe("an appeal that says someone else uploaded it", () => {
     expect(await appeal(id, DAYS(6))).toEqual({ done: true, claim: "review" });
   });
 
+  it("lifts itself once per document: a second block by an editor's version goes to the operator", async () => {
+    const { id } = await editedByAna();
+    await reported(id, 2, THREE, LATER);
+    expect(await appeal(id, LATER)).toEqual({ done: true, claim: "accepted" });
+    await sendAt(id, await sealedEnvelope({ id, version: 3, owner: mario }), DAYS(5));
+    const { permit, pair } = await newToken();
+    await testEnv.DB.prepare("UPDATE docs SET permit = ? WHERE id = ?").bind(permit, id).run();
+    const again = await sealedEnvelope({ id, version: 4, owner: mario, signer: ana, permit, token: pair });
+    expect(await sendAt(id, again, DAYS(6))).toEqual({ stored: true, version: 4 });
+    await reported(id, 4, ["new1", "new2", "new3"], DAYS(6));
+    expect(await appeal(id, DAYS(6))).toEqual({ done: true, claim: "review" });
+  });
+
   it("goes to the operator when its owner signed a version reported", async () => {
     const { id, permit } = await editedByAna();
     await reported(id, 1, ["n1"], LATER);

@@ -172,6 +172,25 @@ describe("a day of readers, added up", () => {
     expect(await docDay("Dddddddd")).toBeNull();
   });
 
+  it("keeps no summary of a day for a document gone before that day was added up", async () => {
+    await shared("Dddddddd");
+    await read("Dddddddd", "r1");
+    await store.stop("Dddddddd", TODAY);
+    await store.sweep(TODAY);
+    expect(await testEnv.DB.prepare("SELECT 1 FROM docs WHERE id = 'Dddddddd'").first()).toBeNull();
+    await store.sweep(TODAY + 1);
+    expect(await docDay("Dddddddd")).toBeNull();
+  });
+
+  it("replaces the day's key in the sweep, even when nobody asked for it that day", async () => {
+    await testEnv.ENVELOPES.delete("~day-key");
+    const yesterday = await store.dayKey(TODAY);
+    await store.sweep(TODAY + 1);
+    const held = await testEnv.ENVELOPES.get("~day-key");
+    expect(JSON.parse((await held?.text()) ?? "{}")).toMatchObject({ period: TODAY + 1 });
+    expect(await store.dayKey(TODAY + 1)).not.toBe(yesterday);
+  });
+
   it("charts each day's readers and uploads, counting today as it goes", async () => {
     await shared("Dddddddd", ROOT, { day: TODAY - 1, versions: 2 });
     await read("Dddddddd", "r1", { day: TODAY - 1 });

@@ -5,7 +5,8 @@ export const SEALED_CONTACT_AT_MOST = 512;
 
 const SEALED_BODY = /^[A-Za-z0-9_-]{150,}$/;
 const SEALED_CONTACT_BODY = /^[A-Za-z0-9_-]{80,}$/;
-const KEY_IN_A_LINK = /#[A-Za-z0-9_-]{43}/;
+// A key alone counts too, with or without its #: one pasted bare would sit in the database in the clear just the same.
+const KEY_IN_A_LINK = /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/;
 
 export const isSealedLink = (said: string): boolean =>
   said.startsWith(SEALED_LINK_PREFIX) && SEALED_BODY.test(said.slice(SEALED_LINK_PREFIX.length));

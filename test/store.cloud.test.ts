@@ -187,6 +187,44 @@ beforeEach(async () => {
   }
 });
 
+describe("letting replaced versions go", () => {
+  const DAY_MS = 86_400_000;
+  const version = (n: number, at: number) => ({
+    n,
+    hash: `h${n}`,
+    bytes: 10 * n,
+    at,
+    signer: "o1",
+    machine: "m",
+    contract: "1",
+  });
+  const kept = async (versions: ReturnType<typeof version>[]) => {
+    await store.create(newDoc("d1", { ttlDays: 15 }), DAY);
+    await testEnv.DB.prepare("UPDATE docs SET latest = ?, versions = ? WHERE id = 'd1'")
+      .bind(versions.length, JSON.stringify(versions))
+      .run();
+    for (const one of versions) await testEnv.ENVELOPES.put(`d1/${one.n}.${one.hash}`, "x");
+  };
+
+  it("lets one go three days after it was replaced, with no upload needed, and keeps the latest", async () => {
+    await kept([version(1, DAY * DAY_MS), version(2, (DAY + 1) * DAY_MS)]);
+    await store.sweep(DAY + 3, (DAY + 4) * 24 - 1);
+    expect(JSON.parse((await row("d1"))?.versions ?? "[]")).toHaveLength(2);
+    await store.sweep(DAY + 4, (DAY + 4) * 24);
+    const after = await row("d1");
+    expect((JSON.parse(after?.versions ?? "[]") as { n: number }[]).map((one) => one.n)).toEqual([2]);
+    expect(after?.bytes).toBe(20);
+    expect(await objects("d1")).toEqual(["d1/2.h2"]);
+  });
+
+  it("keeps a replaced version a report is about", async () => {
+    await kept([version(1, DAY * DAY_MS), version(2, (DAY + 1) * DAY_MS)]);
+    await store.report({ doc: "d1", net: "n1", asn: 1, category: "phishing", version: 1 }, DAY + 1, 1);
+    await store.sweep(DAY + 5, (DAY + 5) * 24);
+    expect(await objects("d1")).toEqual(["d1/1.h1", "d1/2.h2"]);
+  });
+});
+
 describe("adding up the days", () => {
   it("counts every day it missed, and keeps the last activity", async () => {
     await store.create(newDoc("d1", { ttlDays: 3 }), DAY);
