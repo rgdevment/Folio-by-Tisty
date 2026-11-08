@@ -224,6 +224,8 @@ const answerOf = (uploaded: Uploaded, version: number, now: number): UploadAnswe
       return { refused: "uploads_off" };
     case "list_full":
       return { refused: "quota", until: now + DAY_MS };
+    case "room_full":
+      return { refused: "behind" };
   }
 };
 
@@ -306,7 +308,7 @@ const storeVersion = async (
   }
 
   const owner = manifest.owner as Owner;
-  const uploaded = await store.upload(
+  const storing = store.upload(
     {
       id,
       n: manifest.version,
@@ -323,10 +325,23 @@ const storeVersion = async (
       newKey,
       ...(files === undefined ? {} : { files }),
       filesBytes,
+      ...(correcting ? {} : { roomAtMost: limits.keyBytesAtMost }),
     },
     today,
     held,
   );
+  // A first version that failed midway must not keep a share of its key for days.
+  const uploaded = sharing
+    ? await storing.catch(async (error: unknown) => {
+        await store.forgetUnsent(id, net, today);
+        throw error;
+      })
+    : await storing;
+  // Checked again in the write itself, so uploads sent at once cannot each see the room empty.
+  if (uploaded === "room_full") {
+    if (sharing) await store.forgetUnsent(id, net, today);
+    return (await roomRefused(held.owner, id, bytes.length + filesBytes, now, tools)) ?? { refused: "behind" };
+  }
   if (sharing && uploaded !== "stored" && uploaded !== "same") await store.forgetUnsent(id, net, today);
   // Kept only once a version is, so a request that stores nothing leaves no key to age.
   if (uploaded === "stored") await keys.keep();
@@ -378,11 +393,14 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
   const hash = toBase64Url(await sha256(manifestBytes, index));
   if (held.versions.at(-1)?.files !== hash) return { refused: "behind" };
   if ((await store.filesBytes(id, hash)) !== null) return { stored: true, hash };
+  const newKey = (await newRootsOf(read, now, tools)).length > 0;
+  // A blocked key uploads nothing more, attachments included, and neither does an edit link of its documents.
+  if (await store.anyBlocked([held.owner, signature.root])) return { refused: "key_blocked" };
   const hourSpent = await takeUploadHour(net, now, tools);
   if (hourSpent) return hourSpent;
   const latestBytes = held.versions.at(-1)?.bytes ?? 0;
   const noRoom = await roomRefused(held.owner, id, latestBytes + bytes.length, now, tools);
   if (noRoom) return noRoom;
-  const kept = await store.keepFiles({ id, hash, body: bytes, net, latest: held.latest }, dayOf(now));
+  const kept = await store.keepFiles({ id, hash, body: bytes, net, latest: held.latest, newKey }, dayOf(now));
   return kept === "stored" ? { stored: true, hash } : { refused: "quota", until: now + DAY_MS };
 };

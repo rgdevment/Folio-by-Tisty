@@ -89,16 +89,20 @@ export const ago = (ms: number, now: number): string => {
   if (minutes < 60) return `hace ${minutes} min`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `hace ${hours} h`;
-  const days = Math.floor((now - ms) / DAY_MS);
-  return days === 1 ? "ayer" : shortDay(Math.floor(ms / DAY_MS));
+  const at = new Date(ms);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  return at.toDateString() === yesterday.toDateString() ? "ayer" : `${at.getDate()} ${MONTHS[at.getMonth()]}`;
 };
 
+// The clock is the browser's, so «hoy» and «ayer» are its days too, not UTC's.
 export const when = (ms: number, now: number): string => {
-  const day = Math.floor(ms / DAY_MS);
-  const today = Math.floor(now / DAY_MS);
-  if (day === today) return `hoy ${clock(ms)}`;
-  if (day === today - 1) return `ayer ${clock(ms)}`;
-  return `${shortDay(day)} ${clock(ms)}`;
+  const at = new Date(ms);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (at.toDateString() === new Date(now).toDateString()) return `hoy ${clock(ms)}`;
+  if (at.toDateString() === yesterday.toDateString()) return `ayer ${clock(ms)}`;
+  return `${at.getDate()} ${MONTHS[at.getMonth()]} ${clock(ms)}`;
 };
 
 export const daysText = (days: number): string => (days === 1 ? "1 día" : `${count(days)} días`);

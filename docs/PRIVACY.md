@@ -1,6 +1,6 @@
 # Folio by Tisty privacy policy
 
-**Version 2, in force since November 8, 2026.**
+**Version 3, in force since November 8, 2026.**
 
 ## The short version
 
@@ -25,22 +25,22 @@ as a non-profit. Contact: <rgdevment@tisty.app>.
 
 | What | Why | For how long |
 |---|---|---|
-| The encrypted document and its attached files, with its latest version and those replaced in the last 3 days | To serve it to whoever has the link, and so a report can reach what someone replaced | Until the time without activity you choose, 15 days at most, or until you stop sharing it. With a serious report or an order, it is no longer served and stays for up to 180 days, or for as long as an order or an authority asks |
+| The encrypted document and its attached files, with its latest version and those replaced in the last 3 days | To serve it to whoever has the link, and so a report can reach what someone replaced | Until the time without activity you choose, 15 days at most, or until you stop sharing it. If you pause it, it is not served and stays up to 30 days unless you resume it. With a serious report, an operator's block or an order, it is no longer served and stays for up to 180 days, or for as long as an order or an authority asks |
 | The manifest in the clear: how many parts, what each weighs, their kind and the version | To hold the limits without reading the content | As long as the document |
 | The manage link, kept as a digest (hash), and the public key of the edit link's token, which never reaches the server | To check who may change or delete it | As long as the document |
 | Your public key and its certificate, in what you share | So readers know it is yours | As long as the document |
 | Your public key on its own, the day Folio first saw it, which version of the terms it accepted and in what hour the server heard it, and whether the operator blocked it, tied to no network and no document | So limits and reputation stay with it, and a new key starts from the lowest | For good, even after your documents are gone |
-| How many times it was read, counted once a day per visitor | To show you the reads in Tisty | As long as the document |
+| How many times it was read, counted once a day per visitor, and in which hours on a day with 5 or more | To show you the reads in Tisty | As long as the document |
 | A line for each read served: the link's id (without its key, so it opens nothing), the country and the Cloudflare data center, never your IP | To know how much each document is read and where from, and size the service | Up to 7 days, in Cloudflare's Workers Logs |
 | A digest of your IP (an HMAC with a key that changes), also beside the document you uploaded that day | Per-IP limits and blocks against abuse, and so the operator sees when one network makes many keys or documents | As long as the quota or the block lasts, and up to a day more |
 | For each document and day: how many networks read it, how many with a proof of work, in how many hours and how many in its busiest hour, and whether the only one was the network that uploaded it, never which | So the operator can tell a group of readers from a farm of bots, or a document only its owner keeps alive | 31 days, or less if the document goes first |
-| A daily copy of the database, encrypted with a key kept offline, without the day's read digests, the quotas or the network that uploaded each document, and without the documents | To recover from a failure | 30 days, on GitHub |
-| What the operator did to a document or a key and why, opening it included: its id, the action and the reason | To answer for it later | 180 days, or while the document is held |
+| A daily copy of the database, encrypted with a key kept offline, without the day's read digests, the quotas or the network that uploaded each document, and without the documents | To recover from a failure | 30 days, on GitHub. While it is there anyone can download it, always encrypted with a post-quantum key kept offline |
+| What the operator did to a document or a key and why, opening it included: its id, the action and the reason | To answer for it later | 180 days, or while an order holds the document |
 | A case link, to verify a report or to hand to an authority: a digest of its token, the document and version it opens, each opening and, when it is for an authority, the document's records, encrypted with a key Folio does not keep and without the network or the email of whoever reported | So whoever verifies or investigates can read that version even once the document is blocked | 30 days; the openings, as above |
 | A summary by mail to the operator, up to four times a day: the id of the links reported, blocked or appealed, the category and how many networks reported, never a key, an IP or the content | To tell them what to review | Up to 180 days, or more if an order asks, in their Migadu mailbox |
 | What you write to the operator by mail, with your address | To answer you | Up to 180 days from the last message, or more if an order asks, in their Migadu mailbox |
 | Keys you took back, up to 64, as your root signed them: the key's public part and your root's | So readers learn that a stolen or retired key no longer speaks for you | For good, since a reader must always be able to tell |
-| Reports: category, detail and the version reported, in the clear; the link and an email if given, sealed so only the operator can open them; and a digest of the reporter's network (an HMAC with a key that changes every 180 days), so each network reports only once | To moderate and pass them where they belong | 180 days, or longer if an order or an authority asks for it. If the operator finds it false, that network's digest stays 180 days from then, so it stops counting |
+| Reports: category, detail and the version reported, in the clear; the link and an email if given, sealed so only the operator can open them; and a digest of the reporter's network (an HMAC with a key that changes every 180 days), so each network reports only once, with the number of its provider (ASN), so a block needs reports from different providers | To moderate and pass them where they belong | 180 days, or longer if an order or an authority asks for it. If the operator finds it false, that network's digest stays 180 days from then, so it stops counting |
 
 **About signing:** your public key lets anyone tell that two documents come from
 the same person, though not who you are.
@@ -48,9 +48,13 @@ the same person, though not who you are.
 **About reads:** they are counted without keeping who read. Not to count the
 same person twice on one day, a short-lived digest is used, which notes whether
 it came with a proof of work and is thrown away when the day ends. Its key
-changes every day and is not kept. The database keeps its own copy for up to 30
-days, to recover from a failure, and the digest stays there until then; it never
-goes into the backups.
+changes every day and is kept only for that day, outside the database and the
+backups.
+
+**About what is deleted:** the database keeps its own copy for up to 30 days at
+Cloudflare, to recover from a failure. Whatever is deleted from it, such as the
+read and network digests, an email or a key you asked to erase, or a document's
+record, stays there until then. The documents do not: they are deleted at once.
 
 ## Whose, from where and on what basis
 
@@ -79,7 +83,9 @@ never receives the key after the `#`, so it cannot read what you share either.
 
 The page at `folio.tisty.app` only explains what Folio is. It is fixed files: it
 keeps nothing about you, on the server or in your browser. Cloudflare also
-receives your IP and your requests when you visit it.
+receives your IP and your requests when you visit it. On tisty.cl, if you choose
+the light or dark mode, your browser remembers that choice; it never leaves your
+device.
 
 Three others take part, each with a policy of its own:
 
@@ -98,6 +104,10 @@ Healthchecks.io from Latvia, in the European Union. Chile's Personal Data
 Protection Agency has not yet declared which countries offer an adequate level
 of protection. Until it does, the safeguards are each provider's policy, linked
 above, and that what is shared reaches them encrypted.
+
+When the operator reports phishing or malware, Google Safe Browsing (United
+States) and Cloudflare receive the address of the deceiving site, never a
+document's key. What looks like a crime goes to the PDI or the prosecutor.
 
 ## The promise of encryption, said honestly
 
@@ -149,13 +159,15 @@ other copy it can read. Since there are no accounts, the most direct ways are:
   document's id and the operator erases it. It stays in the encrypted backups for
   up to 30 days.
 - **Anything else:** write to <rgdevment@tisty.app>. The digest of your IP does
-  not reveal who you are, so in general there is no data that can be tied to
-  you.
+  not say who you are, but given your IP the operator can find what is kept
+  under it while its key lasts: a day for quotas and reads, and up to 180 days
+  for reports.
 - **Your public key:** only you can show it is yours, so sign the request with
   it. It leaves the list of keys and starts over as a new one, with its
   reputation gone and no mark left. It stays for as long as these last: in the
   documents you still share and the versions you signed, in a key you took back,
-  in what a report keeps for up to 180 days, and in the backups for 30 days.
+  in what a report keeps for up to 180 days, in the operator's log for up to 180
+  days, and in the backups for 30 days. A key the operator blocked stays blocked.
 
 If the operator does not answer in time or turns your request down, you may
 complain to Chile's Personal Data Protection Agency.

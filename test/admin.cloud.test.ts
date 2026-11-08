@@ -164,6 +164,18 @@ describe("who may enter", () => {
     expect(await holds(await tokenBy(otherKeys.privateKey))).toBe(false);
   });
 
+  it("asks Access again when the kept certificates do not have the token's key yet", async () => {
+    const cert = (await crypto.subtle.exportKey("jwk", keys.publicKey)) as JsonWebKey;
+    const asked: boolean[] = [];
+    const rotating: Certs = async (fresh = false) => {
+      asked.push(fresh);
+      return fresh ? [{ ...cert, kid: "two" } as JsonWebKey] : [{ ...cert, kid: "one" } as JsonWebKey];
+    };
+    const token = await tokenBy(keys.privateKey, {}, { kid: "two" });
+    expect(await isOperator(token, ACCESS, rotating, NOW)).toBe(true);
+    expect(asked).toEqual([false, true]);
+  });
+
   it("refuses a token with no signature that says it needs none", async () => {
     const token = await tokenBy(keys.privateKey, {}, { alg: "none" });
     expect(await holds(token)).toBe(false);
@@ -451,6 +463,13 @@ describe("what it can do", () => {
     expect((await asked(`/api/docs/${ID}/reports/n1/false_network`, { method: "POST" })).status).toBe(403);
     expect((await acting(`/api/docs/${ID}/reports/n1/false_network`)).status).toBe(200);
     expect((await moderation.queue(NOW)).reportsTotal).toBe(0);
+    const rows = await testEnv.DB.prepare(
+      "SELECT doc, note FROM moderation WHERE action = 'false_network' ORDER BY doc",
+    ).all<{ doc: string; note: string | null }>();
+    expect(rows.results).toEqual([
+      { doc: ID, note: null },
+      { doc: "OtherDoc", note: ID },
+    ]);
     expect((await acting(`/api/docs/${ID}/reports/n1/false_network`)).status).toBe(404);
   });
 
@@ -672,6 +691,8 @@ describe("what it can do", () => {
       await acting(`/api/docs/${ID}/panic`, "looks real");
       await sendingCase(ID, { version: 1, tokenHash: HASH, sealedRecords: "case1.abc" });
       expect((await asked(`/api/docs/${ID}/handed_over`, { method: "POST" })).status).toBe(403);
+      expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(404);
+      await acting(`/api/docs/${ID}/opened`, "revisar antes de entregar");
       expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(200);
       expect((await acting(`/api/docs/${ID}/handed_over`)).status).toBe(404);
     });

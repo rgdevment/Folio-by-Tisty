@@ -331,7 +331,7 @@ describe("the admin link", () => {
     expect((await read()).status).toBe(404);
     expect((await admin("/admin", "GET")).status).toBe(404);
     expect((await store.sweep(TODAY)).forgotten).toBe(1);
-    expect((await testEnv.ENVELOPES.list()).objects).toEqual([]);
+    expect((await testEnv.ENVELOPES.list()).objects.filter((one) => !one.key.startsWith("~"))).toEqual([]);
   });
 
   it("stops what evidence keeps the same way to its owner, and keeps it unread", async () => {
@@ -342,7 +342,7 @@ describe("the admin link", () => {
     expect((await admin("/admin", "GET")).status).toBe(404);
     expect((await admin("/resume", "POST")).status).toBe(404);
     expect((await store.sweep(TODAY)).forgotten).toBe(0);
-    expect((await testEnv.ENVELOPES.list()).objects).toHaveLength(1);
+    expect((await testEnv.ENVELOPES.list()).objects.filter((one) => !one.key.startsWith("~"))).toHaveLength(1);
   });
 
   it("keeps what was reported after it was stopped and before the sweep", async () => {
@@ -350,7 +350,7 @@ describe("the admin link", () => {
     await admin("", "DELETE");
     await store.report({ doc: ID, net: "r", category: "phishing", asn: 1 }, TODAY, TODAY * 24);
     expect((await store.sweep(TODAY)).forgotten).toBe(0);
-    expect((await testEnv.ENVELOPES.list()).objects).toHaveLength(1);
+    expect((await testEnv.ENVELOPES.list()).objects.filter((one) => !one.key.startsWith("~"))).toHaveLength(1);
     expect((await read()).status).toBe(404);
   });
 

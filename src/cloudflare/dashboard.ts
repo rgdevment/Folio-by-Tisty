@@ -13,6 +13,7 @@ import { CAP_USD, STORED_GB_AT_MOST, STORED_GB_FOR_NEW_KEYS } from "../core/spen
 import { hourOf } from "../core/start";
 import type { Stage } from "../core/store";
 import { keyRecords, keyView, levelsOf, ownersOf } from "./key-view";
+import { SERVED } from "./room";
 import { NEW_KEYS_NET, seenOf } from "./seen";
 import { topDocs } from "./top";
 
@@ -48,9 +49,10 @@ export class CloudDashboard implements Dashboard {
       ),
       this.#db
         .prepare(
-          `SELECT COALESCE(SUM(anchor IS NULL), 0) AS open, COALESCE(SUM(anchor IS NULL AND first_day = ?1), 0) AS new_today,
-             COUNT(DISTINCT anchor) AS with_languages
-           FROM docs WHERE latest > 0 AND dies_on >= ?1 AND blocked_at IS NULL`,
+          `SELECT COALESCE(SUM(d.anchor IS NULL), 0) AS open,
+             COALESCE(SUM(d.anchor IS NULL AND d.first_day = ?1), 0) AS new_today,
+             COUNT(DISTINCT d.anchor) AS with_languages
+           FROM docs d WHERE d.latest > 0 AND d.blocked_at IS NULL AND ${SERVED("?1")}`,
         )
         .bind(today),
       this.#db.prepare("SELECT COUNT(*) AS n FROM keys"),

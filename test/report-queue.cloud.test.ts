@@ -270,8 +270,11 @@ describe("marking a report false", () => {
     expect(left.results).toEqual([{ doc: "Otherdoc", net: "clean" }]);
     const named = await testEnv.DB.prepare("SELECT net, at, since FROM false_reporters").all();
     expect(named.results).toEqual([{ net: "shared", at: DAY + 1, since: DAY + 1 }]);
-    const logged = await testEnv.DB.prepare("SELECT doc, action FROM moderation").all();
-    expect(logged.results).toEqual([{ doc: "Falsedoc", action: "false_network" }]);
+    const logged = await testEnv.DB.prepare("SELECT doc, action FROM moderation ORDER BY doc").all();
+    expect(logged.results).toEqual([
+      { doc: "Falsedoc", action: "false_network" },
+      { doc: "Otherdoc", action: "false_network" },
+    ]);
     expect(await moderation.networkWasFalse("Falsedoc", "shared", (DAY + 1) * DAY_MS)).toBe("missing");
   });
 
@@ -282,6 +285,20 @@ describe("marking a report false", () => {
     await moderation.reportWasFalse("Falsedoc", "shared", DAY * DAY_MS);
     await reportBy("Laterdoc", "shared", "phishing", DAY + 1);
     expect(await evidence("Laterdoc")).toBeNull();
+  });
+
+  it("tells the same day apart by the hour: what came after the mark holds nothing, what came before still does", async () => {
+    await shared("Falsedoc");
+    await shared("Beforedc");
+    await shared("Laterdoc");
+    const at = (doc: string, hour: number) =>
+      store.report({ doc, net: "shared", asn: 1, category: "phishing", version: 1 }, DAY, DAY * 24 + hour);
+    await at("Falsedoc", 2);
+    await at("Beforedc", 3);
+    await moderation.reportWasFalse("Falsedoc", "shared", (DAY * 24 + 5) * 3_600_000);
+    await at("Laterdoc", 9);
+    expect(await evidence("Laterdoc")).toBeNull();
+    expect(await testEnv.DB.prepare("SELECT id FROM docs WHERE id = 'Beforedc'").first()).not.toBeNull();
   });
 
   it("does not let an appeal lift itself over child abuse reported before", async () => {

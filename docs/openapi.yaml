@@ -6,13 +6,15 @@ info:
   summary: Keeps sealed documents and hands them to whoever has the link. It never opens one.
   description: |
     The rules here are Folio's, not part of the contract with Tisty, and the server is the one that
-    enforces them. Uploading is not here yet: it comes with the contract.
+    enforces them.
 
     **A network** is a whole IPv4 or the /48 of an IPv6. It is kept as a keyed digest, never in clear.
 
     **Refusals** answer JSON with `refused`, and `Retry-After` in seconds when `until` is there.
 
     **`failed`** means something broke on this side. Send it again: what was done stays done.
+
+    **A path or method not listed here** answers 404 with `refused: missing`.
 
     **`Folio-Worker`** carries the tag of the version that answered, on every answer once deployed.
 
@@ -566,8 +568,8 @@ paths:
         the same whether or not the document exists. Anything but a light report must bring `detail`, of at least 10 characters. A report on a document that no longer lives is not kept, and answers the same. Spam and offensive content are light: ten networks of two
         operators within 24 hours warn the author, who has three days to send a new version. Phishing, malware and scams block with three
         networks of two operators, and so do the grave ones, which must bring `sealedLink`: nobody could review
-        them without it. A network counts to block on up to 20 documents in 180 days and helps block up to 3 a day; past that its reports stay on record, and what waits is tried again each hour. Copyright is not reported here: its holder asks, and it comes down. If telling the operator fails the answer is `failed`, the report stays, and
-        sending it again tells again.
+        them without it. A network counts to block on up to 20 documents in 180 days and helps block up to 3 a day; past that its reports stay on record, and what waits is tried again each hour. Copyright is not reported here: its holder asks, and it comes down. The operator hears of it in the next mail summary, up to four times a day;
+        if storing it fails the answer is `failed`, and it can be sent again.
       parameters:
         - $ref: "#/components/parameters/Proof"
       requestBody:
@@ -667,8 +669,8 @@ paths:
 
         Anything else says `review`, and the operator is told, as does any block the operator placed. That
         block stays until the operator decides.
-        If telling fails the answer is `failed`, and the appeal can be sent again. Once it went, sending it
-        again answers 409.
+        The operator hears of it in the next mail summary. If storing it fails the answer is `failed`, and the
+        appeal can be sent again. Once it went, sending it again answers 409.
       parameters:
         - $ref: "#/components/parameters/Admin"
       responses:
@@ -910,7 +912,7 @@ components:
             fixBy:
               type: [integer, "null"]
               description: "With light reports, the last day to send a new version. Past it the document is not served until one arrives."
-            readTotal: { type: integer, description: "One per day and network." }
+            readTotal: { type: integer, description: "One per day and network, added when the day closes, so today's reads show tomorrow." }
             days:
               type: object
               description: "By day: `n`, the readers, and `h`, their hours, once they are enough not to single anyone out."

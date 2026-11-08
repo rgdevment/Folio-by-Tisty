@@ -38,6 +38,7 @@ export interface Upload {
   files?: string;
   filesBytes?: number;
   newKey?: boolean;
+  roomAtMost?: number;
 }
 
 export interface KeptFiles {
@@ -46,6 +47,7 @@ export interface KeptFiles {
   body: Uint8Array;
   net: string;
   latest: number;
+  newKey: boolean;
 }
 
 export type Appealed = "accepted" | "review";
@@ -152,7 +154,8 @@ export type Uploaded =
   | "paused"
   | "quota"
   | "list_full"
-  | "new_keys_full";
+  | "new_keys_full"
+  | "room_full";
 export type Admitted = "here" | "new" | "over" | "full";
 export type Stage = "open" | "warned" | "new_keys_off" | "no_uploads" | "blocked";
 
@@ -190,6 +193,7 @@ export interface Store {
   isRevoked(root: string, machine: string, now: number): Promise<boolean>;
   haveSigned(roots: string[]): Promise<boolean>;
   newRootsOf(roots: string[], day: number): Promise<string[]>;
+  anyBlocked(roots: string[]): Promise<boolean>;
   heldByOwner(owner: string, today: number, except: string): Promise<number>;
   admit(reading: Reading, today: number): Promise<Admitted>;
   note(reading: Reading, today: number): Promise<void>;

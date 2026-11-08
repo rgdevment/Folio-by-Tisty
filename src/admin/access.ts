@@ -6,7 +6,7 @@ export interface AccessSettings {
   email: string;
 }
 
-export type Certs = () => Promise<JsonWebKey[]>;
+export type Certs = (fresh?: boolean) => Promise<JsonWebKey[]>;
 
 interface Header {
   alg?: string;
@@ -21,6 +21,7 @@ interface Claims {
   email?: string;
 }
 
+const CERTS_KEPT_SECONDS = 600;
 const decoder = new TextDecoder();
 const jsonOf = <T>(part: string): T => JSON.parse(decoder.decode(fromBase64Url(part))) as T;
 
@@ -28,8 +29,12 @@ export const issuerOf = (team: string): string => `https://${team}.cloudflareacc
 
 export const certsFrom =
   (team: string, fetcher: typeof fetch = fetch): Certs =>
-  async () => {
-    const response = await fetcher(`${issuerOf(team)}/cdn-cgi/access/certs`);
+  async (fresh = false) => {
+    // Kept at the edge for a while, since every panel load makes several calls; a key it does not know asks again.
+    const response = await fetcher(
+      `${issuerOf(team)}/cdn-cgi/access/certs`,
+      fresh ? { cache: "no-store" } : { cf: { cacheTtl: CERTS_KEPT_SECONDS, cacheEverything: true } },
+    );
     if (!response.ok) throw new Error(`Access answered ${response.status}`);
     return ((await response.json()) as { keys: JsonWebKey[] }).keys;
   };
@@ -37,7 +42,8 @@ export const certsFrom =
 const signatureHolds = async (token: string, header: Header, certs: Certs): Promise<boolean> => {
   const [head, body, signature] = token.split(".");
   if (!head || !body || !signature || header.alg !== "RS256") return false;
-  const cert = (await certs()).find((one) => (one as JsonWebKey & { kid?: string }).kid === header.kid);
+  const ofKid = (keys: JsonWebKey[]) => keys.find((one) => (one as JsonWebKey & { kid?: string }).kid === header.kid);
+  const cert = ofKid(await certs()) ?? ofKid(await certs(true));
   if (!cert) return false;
   const key = await crypto.subtle.importKey("jwk", cert, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, [
     "verify",

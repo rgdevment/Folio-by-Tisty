@@ -68,8 +68,6 @@ interface DocRow {
   blocked_by_operator: number;
 }
 
-// A document being forgotten: nothing can move it on from here, and the sweep finishes it even after failing halfway.
-
 // Beside the envelopes, so D1 and its backups never hold both the digests and their key (decision 128).
 const KEY_OBJECTS = "~";
 const DAY_KEY_OBJECT = `${KEY_OBJECTS}day-key`;
@@ -83,7 +81,7 @@ const KEYS_AT_ONCE = 1000;
 const COUNTED_REPORT = "r.cleared = 0 AND r.over_cap = 0 AND r.net NOT IN (SELECT net FROM false_reporters)";
 // A network is often shared: finding one report false says nothing of what others on it reported before.
 const REPORT_AS_EVIDENCE =
-  "r.cleared = 0 AND (r.over_cap = 0 OR r.level = 'grave') AND r.level <> 'light' AND r.net NOT IN (SELECT f.net FROM false_reporters f WHERE COALESCE(f.since, f.at) < r.at)";
+  "r.cleared = 0 AND (r.over_cap = 0 OR r.level = 'grave') AND r.level <> 'light' AND r.net NOT IN (SELECT f.net FROM false_reporters f WHERE CASE WHEN f.since_hour IS NULL THEN COALESCE(f.since, f.at) < r.at ELSE f.since_hour <= r.at_hour END)";
 // The API now refuses a grave report without its link: this is for what was reported before it did (decision 153).
 const REPORT_THAT_BLOCKS = `${COUNTED_REPORT} AND (r.level = 'medium' OR (r.level = 'grave' AND r.sealed_link IS NOT NULL))`;
 const LIGHT_REPORT = `${COUNTED_REPORT} AND r.level = 'light'`;
@@ -125,6 +123,9 @@ const SIGNED_BY_OWNER = `COALESCE(
 ) = docs.owner`;
 
 const HOURS_IN_A_DAY = 24;
+const HOUR_MS = 3_600_000;
+// Two queries each, so with the rest of the sweep it stays far under D1's 1,000 per invocation; the next hour goes on.
+const TRIMMED_AT_ONCE = 100;
 
 const encoder = new TextEncoder();
 
@@ -247,7 +248,9 @@ export class Cloud implements Store {
              active_day = MAX(active_day, ?1),
              blocked_at = NULL, blocked_hour = NULL, appealed_at = NULL, appealed_hour = NULL
            WHERE id = ?5 AND latest = ?6 AND permit IS ?9
-             AND ((blocked_at IS NULL AND paused_at IS NULL) OR (?7 AND blocked_at IS NOT NULL AND blocked_by_operator = 0 AND counts_from = ?2))`,
+             AND ((blocked_at IS NULL AND paused_at IS NULL) OR (?7 AND blocked_at IS NOT NULL AND blocked_by_operator = 0 AND counts_from = ?2))
+             AND (?12 IS NULL OR ?13 + (SELECT COALESCE(SUM(${HELD_BYTES}), 0) FROM docs d
+               WHERE d.owner = docs.owner AND d.id <> docs.id AND ${HOLDS_ROOM("?1")}) <= ?12)`,
         )
         .bind(
           today,
@@ -261,6 +264,8 @@ export class Cloud implements Store {
           upload.permit,
           this.#limits.pausedDays,
           upload.filesBytes ?? 0,
+          upload.roomAtMost ?? null,
+          bytes + (upload.filesBytes ?? 0),
         ),
       // A new version of a language is activity of the whole group (decisions 50 and 69 bis).
       ...(held.anchor
@@ -299,7 +304,7 @@ export class Cloud implements Store {
     ]);
     if ((moved?.meta.changes ?? 0) === 0) {
       await this.#giveRoomBack(upload.net, bytes, today, upload.newKey);
-      return this.#lostTheRace(upload, key);
+      return this.#lostTheRace(upload, key, today);
     }
 
     const dropped = versions.filter((one) => !kept.includes(one));
@@ -380,14 +385,19 @@ export class Cloud implements Store {
     return found?.n === asked.length;
   }
 
-  async #lostTheRace(upload: Upload, key: string): Promise<Uploaded> {
+  async #lostTheRace(upload: Upload, key: string, today: number): Promise<Uploaded> {
     const now = await this.#row(upload.id);
     const versions = now ? (JSON.parse(now.versions) as Version[]) : [];
     // Two sends of the same bytes share one object, so the one that lost must not delete what the other kept.
     if (versions.some((one) => one.n === upload.n && one.hash === upload.hash)) return "same";
     await this.#envelopes.delete(key);
     if (!now || now.latest === CLAIMED) return "missing";
-    return now.blocked_at === null ? "behind" : "blocked";
+    if (now.blocked_at !== null) return "blocked";
+    if (now.latest === upload.n - 1 && upload.roomAtMost !== undefined) {
+      const held = await this.heldByOwner(now.owner, today, upload.id);
+      if (held + sizeOf(upload.body) + (upload.filesBytes ?? 0) > upload.roomAtMost) return "room_full";
+    }
+    return "behind";
   }
 
   // An order keeps them all, and a report keeps the version it was about (decision 152).
@@ -464,6 +474,14 @@ export class Cloud implements Store {
       .bind(today, net, this.#limits.newKeysADay)
       .run();
     return { said: taken.meta.changes === 0 ? "full" : "new", terms: null };
+  }
+
+  async anyBlocked(roots: string[]): Promise<boolean> {
+    const found = await this.#db
+      .prepare("SELECT 1 FROM keys WHERE root IN (SELECT value FROM json_each(?)) AND blocked_at IS NOT NULL LIMIT 1")
+      .bind(JSON.stringify(roots))
+      .first();
+    return found !== null;
   }
 
   async keepKeys(roots: string[], today: number, accepted?: AcceptedTerms): Promise<void> {
@@ -666,13 +684,23 @@ export class Cloud implements Store {
     return (await this.#envelopes.head(filesKey(id, hash)))?.size ?? null;
   }
 
-  async keepFiles({ id, hash, body, net, latest }: KeptFiles, today: number): Promise<"stored" | "quota"> {
+  // A version already kept is never left without its files, but a new key's still count against new keys' bytes.
+  async keepFiles({ id, hash, body, net, latest, newKey }: KeptFiles, today: number): Promise<"stored" | "quota"> {
     if (!(await this.#takeQuota(net, 0, body.length, today))) return "quota";
     try {
       await this.#envelopes.put(filesKey(id, hash), body);
     } catch (error) {
       await this.#giveQuotaBack(net, 0, body.length, today);
       throw error;
+    }
+    if (newKey) {
+      await this.#db
+        .prepare(
+          `INSERT INTO net_day (day, net, docs, bytes) VALUES (?1, ?2, 0, ?3)
+           ON CONFLICT (day, net) DO UPDATE SET bytes = bytes + excluded.bytes`,
+        )
+        .bind(today, NEW_KEYS_NET, body.length)
+        .run();
     }
     await this.#db
       .prepare("UPDATE docs SET files_bytes = ?1 WHERE id = ?2 AND latest = ?3")
@@ -747,7 +775,9 @@ export class Cloud implements Store {
              SET at = CASE WHEN reports.cleared = 1 THEN excluded.at
                    WHEN EXISTS (SELECT 1 FROM false_reporters f WHERE f.net = excluded.net) THEN reports.at
                    WHEN ${REPORT_MOVES} THEN excluded.at ELSE reports.at END,
-                 at_hour = CASE WHEN ${REPORT_MOVES} THEN excluded.at_hour ELSE reports.at_hour END,
+                 at_hour = CASE WHEN reports.cleared = 1 THEN excluded.at_hour
+                   WHEN EXISTS (SELECT 1 FROM false_reporters f WHERE f.net = excluded.net) THEN reports.at_hour
+                   WHEN ${REPORT_MOVES} THEN excluded.at_hour ELSE reports.at_hour END,
                  asn = CASE WHEN ${REPORT_MOVES} THEN excluded.asn ELSE reports.asn END,
                  category = CASE WHEN ${REPORT_REPLACES} THEN excluded.category ELSE reports.category END,
                  level = CASE WHEN ${REPORT_REPLACES} THEN excluded.level ELSE reports.level END,
@@ -863,7 +893,7 @@ export class Cloud implements Store {
     const cleared = await this.#db
       .prepare(
         `UPDATE docs SET appealed_at = ?2, permit = NULL, counts_from = latest + 1
-         WHERE id = ?1 AND blocked_at IS NOT NULL AND appealed_at IS NULL AND blocked_by_operator = 0
+         WHERE id = ?1 AND blocked_at IS NOT NULL AND appealed_at IS NULL AND blocked_by_operator = 0 AND counts_from = 0
            AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND r.category = 'csam' AND ${REPORT_AS_EVIDENCE})
            AND EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND ${COUNTS_NOW})
            AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = docs.id AND ${COUNTS_NOW} AND ${SIGNED_BY_OWNER})`,
@@ -920,9 +950,9 @@ export class Cloud implements Store {
       .prepare(
         `SELECT docs.id FROM docs JOIN reports r ON r.doc = docs.id
          WHERE docs.blocked_at IS NULL AND ${STILL_LIVES("docs", "?1")} AND ${COUNTS_NOW}
-         GROUP BY docs.id HAVING COUNT(*) >= ?2 LIMIT ?3`,
+         GROUP BY docs.id HAVING COUNT(*) >= ?2 AND COUNT(DISTINCT r.asn) >= ?4 ORDER BY MIN(r.at), docs.id LIMIT ?3`,
       )
-      .bind(today, this.#limits.reportsToBlock, this.#limits.sweptAtOnce)
+      .bind(today, this.#limits.reportsToBlock, this.#limits.sweptAtOnce, this.#limits.reportOperatorsToBlock)
       .all<{ id: string }>();
     if (waiting.results.length === 0) return;
     await this.#db.batch(waiting.results.map(({ id }) => this.#blockWhenItCounts(id, today, hour)));
@@ -933,6 +963,13 @@ export class Cloud implements Store {
     const { summed, failed: failedDays } = await this.#sumPastDays(today);
     let forgotten = 0;
     let failed = failedDays;
+    try {
+      // Replaced here too, so a day with no reader does not leave yesterday's key in storage.
+      await this.dayKey(today);
+    } catch (error) {
+      failed += 1;
+      console.error("the day's key could not be replaced", String(error));
+    }
     try {
       await this.#blockWhatWaited(today, hour);
     } catch (error) {
@@ -946,6 +983,12 @@ export class Cloud implements Store {
       } catch (error) {
         failed += 1;
         console.error("what expired could not be forgotten", String(error));
+      }
+      try {
+        await this.#trimReplaced(today, hour * HOUR_MS);
+      } catch (error) {
+        failed += 1;
+        console.error("replaced versions could not be let go", String(error));
       }
     }
     try {
@@ -980,6 +1023,39 @@ export class Cloud implements Store {
     // Once a day, when it adds the day up, so an hourly sweep with nothing to do still writes nothing.
     if (failed === 0 && summed > 0) await this.#noteSwept(hour);
     return { summed, forgotten, failed };
+  }
+
+  // A replaced version stays 3 days even with no upload after it, as the privacy policy says.
+  async #trimReplaced(today: number, now: number): Promise<void> {
+    const rows = await this.#db
+      .prepare(
+        `SELECT id, versions FROM docs
+         WHERE latest > 0 AND json_array_length(versions) > ?1 AND json_extract(versions, '$[1].at') <= ?2 LIMIT ?3`,
+      )
+      .bind(this.#limits.versionsKept, now - this.#limits.replacedKeptDays * DAY_MS, TRIMMED_AT_ONCE)
+      .all<{ id: string; versions: string }>();
+    for (const row of rows.results) {
+      const all = JSON.parse(row.versions) as Version[];
+      const trimmed = keptVersions(all, now, this.#limits);
+      if (trimmed.length === all.length) continue;
+      const kept = await this.#withEvidence(row.id, today, all, trimmed);
+      if (kept.length === all.length) continue;
+      // Only if no upload moved it meanwhile, or this would put back what that upload replaced.
+      const moved = await this.#db
+        .prepare("UPDATE docs SET versions = ?1, bytes = ?2 WHERE id = ?3 AND versions = ?4")
+        .bind(
+          JSON.stringify(kept),
+          kept.reduce((sum, one) => sum + one.bytes, 0),
+          row.id,
+          row.versions,
+        )
+        .run();
+      if (moved.meta.changes === 0) continue;
+      const dropped = all.filter((one) => !kept.includes(one));
+      const stillNamed = new Set(filesKeysOf(row.id, kept));
+      const filesGone = filesKeysOf(row.id, dropped).filter((key) => !stillNamed.has(key));
+      await this.#envelopes.delete([...dropped.map((one) => objectKey(row.id, one)), ...filesGone]);
+    }
   }
 
   async #noteSwept(hour: number): Promise<void> {
@@ -1083,6 +1159,7 @@ export class Cloud implements Store {
              SELECT 1 FROM ${table} s JOIN net_doc u ON u.day = ?1 AND u.doc = s.doc AND u.net = s.reader WHERE s.doc = h.doc
            )
          FROM (SELECT doc, hour, COUNT(*) AS n, SUM(${PROVED}) AS p FROM ${table} GROUP BY doc, hour) h
+         WHERE EXISTS (SELECT 1 FROM docs d WHERE d.id = h.doc)
          GROUP BY h.doc
          ON CONFLICT (doc, day) DO UPDATE SET nets = nets + excluded.nets, proved = proved + excluded.proved,
            hours = MAX(hours, excluded.hours), peak = MAX(peak, excluded.peak), by_uploader = 0`,

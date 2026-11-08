@@ -252,6 +252,8 @@ describe("saying it was handed over", () => {
     await sealedReport(OTHER);
     await moderation.panic(ID, "looks real", NOW);
     await madeCase(1, SEALED);
+    expect(await moderation.handedOver(ID, NOW)).toBe("missing");
+    await moderation.opened(ID, "to copy its key", NOW);
     expect(await moderation.handedOver(ID, NOW)).toBe("done");
     expect(await links()).toBeNull();
     const other = await testEnv.DB.prepare("SELECT sealed_link FROM reports WHERE doc = ?").bind(OTHER).first();
@@ -265,6 +267,7 @@ describe("saying it was handed over", () => {
     await moderation.panic(ID, "looks real", NOW);
     await madeCase(1, SEALED);
     await moderation.makeCase(ID, { version: 1, tokenHash: "V".repeat(43) }, NOW);
+    await moderation.opened(ID, "to copy its key", NOW);
     await moderation.handedOver(ID, NOW);
     const left = await testEnv.DB.prepare("SELECT token_hash FROM cases").all();
     expect(left.results).toEqual([{ token_hash: await tokenHash(TOKEN) }]);
@@ -368,6 +371,12 @@ describe("the queue of blocked documents", () => {
     await madeCase(1);
     expect((await blockedDoc())?.mayHandOver).toBe(false);
     await moderation.makeCase(ID, { version: 1, tokenHash: "V".repeat(43), sealedRecords: SEALED }, NOW);
+    expect((await blockedDoc())?.mayHandOver).toBe(false);
+    await testEnv.DB.prepare("INSERT INTO openings (doc, at, reason) VALUES (?, ?, ?)")
+      .bind(ID, NOW, "case AbCd")
+      .run();
+    expect((await blockedDoc())?.mayHandOver).toBe(false);
+    await moderation.opened(ID, "to copy its key", NOW + 1);
     expect((await blockedDoc())?.mayHandOver).toBe(true);
     await moderation.handedOver(ID, NOW);
     expect((await blockedDoc())?.mayHandOver).toBe(false);
@@ -447,7 +456,7 @@ describe("reading by a case link", () => {
 
   it("serves the files of that version alone", async () => {
     await store.keepFiles(
-      { id: ID, hash: FILES, body: new TextEncoder().encode("the files"), net: "n", latest: 2 },
+      { id: ID, hash: FILES, body: new TextEncoder().encode("the files"), net: "n", latest: 2, newKey: false },
       TODAY,
     );
     await testEnv.DB.prepare("UPDATE docs SET versions = json_set(versions, '$[0].files', ?) WHERE id = ?")
@@ -456,7 +465,7 @@ describe("reading by a case link", () => {
     await madeCase(1);
     expect(await (await send(`cases/${ID}/files/${FILES}`, TOKEN)).text()).toBe("the files");
     await store.keepFiles(
-      { id: ID, hash: "G".repeat(43), body: new TextEncoder().encode("others"), net: "n", latest: 2 },
+      { id: ID, hash: "G".repeat(43), body: new TextEncoder().encode("others"), net: "n", latest: 2, newKey: false },
       TODAY,
     );
     expect((await send(`cases/${ID}/files/${"G".repeat(43)}`, TOKEN)).status).toBe(404);

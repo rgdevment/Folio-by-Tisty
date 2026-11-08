@@ -74,7 +74,9 @@ input {
   display: flex;
   align-items: center;
   gap: 10px;
+  color: inherit;
   font-size: 15px;
+  text-decoration: none;
 }
 
 .logo {
@@ -349,8 +351,16 @@ code {
 
 .card-detail {
   margin: 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--edge);
   color: var(--body);
+  font-style: italic;
   overflow-wrap: anywhere;
+}
+
+.said-by {
+  color: var(--soft);
+  font-style: normal;
 }
 
 .card-line {

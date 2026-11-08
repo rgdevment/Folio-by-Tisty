@@ -261,6 +261,14 @@ describe("the files a version names", () => {
       expect(await sendFiles(id, bytes)).toEqual({ stored: true, hash });
     });
 
+    it("are refused once the owner's key is blocked, as a blocked key uploads nothing more", async () => {
+      const { id, bytes, hash } = await named();
+      await sendNaming(id, 2, hash, LATER);
+      await testEnv.DB.prepare("UPDATE keys SET blocked_at = 1").run();
+      expect(await sendFiles(id, bytes)).toEqual({ refused: "key_blocked" });
+      expect(await objects(id)).toEqual([]);
+    });
+
     it("are not taken when no version names them", async () => {
       const { id, bytes } = await named();
       await store.setStage("new_keys_off");
@@ -637,6 +645,19 @@ describe("an appeal that says someone else uploaded it", () => {
     expect(await appeal(id, DAYS(6))).toEqual({ done: true, claim: "review" });
   });
 
+  it("lifts itself once per document: a second block by an editor's version goes to the operator", async () => {
+    const { id } = await editedByAna();
+    await reported(id, 2, THREE, LATER);
+    expect(await appeal(id, LATER)).toEqual({ done: true, claim: "accepted" });
+    await sendAt(id, await sealedEnvelope({ id, version: 3, owner: mario }), DAYS(5));
+    const { permit, pair } = await newToken();
+    await testEnv.DB.prepare("UPDATE docs SET permit = ? WHERE id = ?").bind(permit, id).run();
+    const again = await sealedEnvelope({ id, version: 4, owner: mario, signer: ana, permit, token: pair });
+    expect(await sendAt(id, again, DAYS(6))).toEqual({ stored: true, version: 4 });
+    await reported(id, 4, ["new1", "new2", "new3"], DAYS(6));
+    expect(await appeal(id, DAYS(6))).toEqual({ done: true, claim: "review" });
+  });
+
   it("goes to the operator when its owner signed a version reported", async () => {
     const { id, permit } = await editedByAna();
     await reported(id, 1, ["n1"], LATER);
@@ -871,6 +892,18 @@ describe("what stops a version", () => {
       const plain = await sealedEnvelope({ id: one.id, version: 3, owner: fresh });
       expect(await sendTo(roomOf(holding), one.id, plain, LATER + DAY_MS)).toEqual({ stored: true, version: 3 });
       expect(await another(LATER + DAY_MS)).toEqual({ stored: true, version: 1 });
+    });
+
+    it("lets only what fits through when versions arrive at once, as each one is checked in its own write", async () => {
+      const fresh = await newPerson();
+      const { one, two, first, second } = await twoOf(fresh);
+      const room = roomOf(first.length + second.length - 1);
+      const answers = await Promise.all([
+        sendTo(room, one.id, first, NOW, one),
+        sendTo(room, two.id, second, NOW, two),
+      ]);
+      expect(answers.filter((one) => "stored" in one)).toHaveLength(1);
+      expect(answers.filter((one) => "refused" in one && one.refused === "room_full")).toHaveLength(1);
     });
 
     it("frees what stopped being shared", async () => {
@@ -1178,7 +1211,7 @@ describe("what stops a version", () => {
       expect((await newKeysBytes())?.bytes).toBe(before);
     });
 
-    it("does not count the files of a version already kept, so it never stays without them", async () => {
+    it("takes the files of a version already kept past the ceiling, so it never stays without them, and counts them", async () => {
       const first = await started();
       const main = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
       expect(await send(first.id, main, NOW, first)).toEqual({ stored: true, version: 1 });
@@ -1193,7 +1226,7 @@ describe("what stops a version", () => {
         limited(1),
       );
       expect(answer).toEqual({ stored: true, hash });
-      expect((await newKeysBytes())?.bytes).toBe(before);
+      expect((await newKeysBytes())?.bytes).toBe((before ?? 0) + files.length);
     });
 
     it("leaves no share behind when a first version is refused, so it holds nothing the next day", async () => {
