@@ -16,6 +16,9 @@ import {
 import { sharingFaults } from "../scripts/limits-sharing";
 import { LEVEL_ONE, publishedLimits } from "../src/core/limits";
 
+// The same key as KEY in Tisty's crates/tisty-carrier/src/folio_limits.rs: a key swapped in docs/limits.pub must not pass.
+const TISTY_LIMITS_KEY = "RWTBkOCJN2ITUeWMK6V3gXmiJGo2hT6mX+hgcjpQ9F6QBO9sWnO84Mak";
+
 const said = Buffer.from('{"serial":1}\n');
 const NOW = Date.UTC(2026, 10, 6);
 const NOW_SECONDS = NOW / 1000;
@@ -405,8 +408,8 @@ describe("the limits Folio publishes", () => {
 
   it("are signed with the key Tisty is built with", () => {
     const signature = readFileSync("docs/limits.json.minisig", "utf8");
-    const publicKey = readFileSync("docs/limits.pub", "utf8");
-    expect(holdsSignature(file, signature, publicKey, "limits.json")).toBe(true);
+    expect(readFileSync("docs/limits.pub", "utf8").trim()).toBe(TISTY_LIMITS_KEY);
+    expect(holdsSignature(file, signature, TISTY_LIMITS_KEY, "limits.json")).toBe(true);
   });
 
   it("name the terms exactly as they are published", () => {

@@ -25,6 +25,7 @@ interface Env extends Bindings, SpendBindings, MailBindings {
 
 const makerRootOf = (limits: object): string | null =>
   "maker_root" in limits && typeof limits.maker_root === "string" ? limits.maker_root : null;
+const MAKER_ROOT = makerRootOf(SIGNED_LIMITS);
 
 const WEEKLY = "0 4 * * SUN";
 const SPEND = "*/15 * * * *";
@@ -56,7 +57,7 @@ export default {
         limits: LEVEL_ONE,
         secret: env.FOLIO_SECRET,
         sharingOpen: env.SHARING_OPEN === "true",
-        makerRoot: makerRootOf(SIGNED_LIMITS),
+        makerRoot: MAKER_ROOT,
         termsVersion: SIGNED_LIMITS.terms.version,
         limiter: { allows: async (key) => (await env.READS.limit({ key })).success },
         syncLimiter: { allows: async (key) => (await env.SYNCS.limit({ key })).success },

@@ -45,7 +45,7 @@ runs Folio as a non-profit. Contact: <rgdevment@tisty.app>.
 **About signing:** your public key lets anyone tell that two documents come from
 the same person, though not who you are. The exception is the operator's key,
 which signs as rgdevment: its public part and that name are published in
-Folio's limits, and the page and Tisty show «verified» on what it signs.
+Folio's limits, and what it signs may be shown as «verified».
 
 **About reads:** they are counted without keeping who read. Not to count the
 same person twice on one day, a short-lived digest is used, which notes whether

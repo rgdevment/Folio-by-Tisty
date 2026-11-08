@@ -44,7 +44,7 @@ opera Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 **Sobre la firma:** tu llave pública permite saber que dos documentos son de la
 misma persona, aunque no quién eres. La excepción es la llave del operador, que
 firma como rgdevment: su parte pública y ese nombre están publicados en los
-límites de Folio, y la página y Tisty muestran «verificado» en lo que firma.
+límites de Folio, y lo que firma puede mostrarse como «verificado».
 
 **Sobre las lecturas:** se cuentan sin guardar quién leyó. Para no contar dos
 veces a la misma persona el mismo día se usa un resumen temporal, que anota si

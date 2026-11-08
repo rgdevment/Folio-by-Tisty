@@ -1207,6 +1207,26 @@ describe("what stops a version", () => {
         expect(await row(first.id)).toBeNull();
       });
 
+      it("takes only the maker's own versions of its documents, not an edit link's", async () => {
+        const { pair, permit } = await newToken();
+        const { first } = await firstOf({ owner: mario, permit });
+        const version = (n: number, over: object) =>
+          sealedEnvelope({ id: first.id, version: n, owner: mario, permit, ...over }).then((bytes) =>
+            uploadDoc({ id: first.id, now: LATER, ip: "203.0.113.9", bytes: async () => bytes }, forMaker()),
+          );
+        expect(await version(2, { signer: ana, token: pair })).toEqual({ refused: "uploads_off" });
+        expect(await version(2, {})).toEqual({ stored: true, version: 2 });
+      });
+
+      it("leaves others' documents shared before it closed to their own versions", async () => {
+        const first = await started();
+        const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: ana });
+        expect(await send(first.id, bytes, NOW, first)).toEqual({ stored: true, version: 1 });
+        const next = await sealedEnvelope({ id: first.id, version: 2, owner: ana });
+        const sent = uploadDoc({ id: first.id, now: LATER, ip: "203.0.113.9", bytes: async () => next }, forMaker());
+        expect(await sent).toEqual({ stored: true, version: 2 });
+      });
+
       it("takes everyone's once the service opens", async () => {
         const first = await started();
         const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: ana });
