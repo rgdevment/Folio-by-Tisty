@@ -295,6 +295,17 @@ const FILES: Scenario[] = [
   {
     method: "PUT",
     path: FILES_PATH,
+    status: 409,
+    refused: "room_full",
+    upload: filesEnvelope,
+    ready: async () => {
+      await shareNamingSentFiles();
+      LEVEL_ONE.keyBytesAtMost = 0;
+    },
+  },
+  {
+    method: "PUT",
+    path: FILES_PATH,
     status: 403,
     refused: "blocked",
     upload: filesEnvelope,
@@ -530,7 +541,7 @@ const UPLOADING: Scenario[] = [
     admin: TOKEN,
     solves: true,
     ready: async () => {
-      LEVEL_ONE.newKeyBytesAtMost = 0;
+      LEVEL_ONE.keyBytesAtMost = 0;
     },
   },
   {
@@ -716,7 +727,7 @@ beforeEach(async () => {
   LEVEL_ONE.oldestContractServed = null;
   LEVEL_ONE.revocationsAnHour = 30;
   LEVEL_ONE.uploadsAnHour = 60;
-  LEVEL_ONE.newKeyBytesAtMost = 25_000_000;
+  LEVEL_ONE.keyBytesAtMost = 25_000_000;
   for (const table of [
     "docs",
     "keys",

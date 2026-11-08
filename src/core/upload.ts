@@ -6,8 +6,8 @@ import { netDigest } from "./net";
 import type { ReadTools } from "./read";
 import { askForProof, type Refused, tooFast } from "./refused";
 import { hourEnds, hourOf, proofIsFresh, startHolds, toBase64Url, tokenHash } from "./start";
-import type { AcceptedTerms, Created, Held, Stage, Uploaded, Version } from "./store";
-import { keptVersions, listFreesAt, uploadAllowedAt } from "./versions";
+import type { AcceptedTerms, Created, Held, Stage, Uploaded } from "./store";
+import { listFreesAt, uploadAllowedAt } from "./versions";
 
 export interface FirstUpload {
   start: string;
@@ -189,23 +189,15 @@ const rootsOf = ({ manifest, signature }: ReadEnvelope): string[] => [(manifest.
 const newRootsOf = (read: ReadEnvelope, now: number, { store, limits }: ReadTools): Promise<string[]> =>
   store.newRootsOf(rootsOf(read), dayOf(now) - limits.daysAKeyIsNew);
 
-const weightOf = (versions: Version[], limits: Limits): number =>
-  versions.reduce((sum, one) => sum + one.bytes, 0) +
-  new Set(versions.flatMap((one) => (one.files === undefined ? [] : [one.files]))).size *
-    filesEnvelopeBytesAtMost(limits);
-
-// One key that moves from network to network holds only so much in its first days, until what it shared expires.
+// Until a key earns more, what it holds open is what limits it, however its documents spend it.
 const roomRefused = async (
   owner: string,
   id: string,
-  kept: Version[],
+  arriving: number,
   now: number,
   { store, limits }: ReadTools,
 ): Promise<Refused | null> =>
-  (await store.heldByOwner(owner, dayOf(now), id, filesEnvelopeBytesAtMost(limits))) + weightOf(kept, limits) >
-  limits.newKeyBytesAtMost
-    ? { refused: "room_full" }
-    : null;
+  (await store.heldByOwner(owner, dayOf(now), id)) + arriving > limits.keyBytesAtMost ? { refused: "room_full" } : null;
 
 const takeUploadHour = async (net: string, now: number, { store, limits }: ReadTools): Promise<Refused | null> =>
   (await store.takeHourly(net, "upload", hourOf(now), limits.uploadsAnHour))
@@ -274,16 +266,9 @@ const storeVersion = async (
   const correcting = held?.correctable && signature.root === held.owner;
   const fresh = correcting ? [] : await newRootsOf(read, now, tools);
   const newKey = fresh.length > 0;
-  const arriving: Version = {
-    n: manifest.version,
-    hash,
-    bytes: bytes.length,
-    at: now,
-    signer: signature.root,
-    machine: signature.machine,
-    contract: manifest.contract,
-    ...(files === undefined ? {} : { files }),
-  };
+  const sameFiles = files !== undefined && files === held?.versions.at(-1)?.files;
+  const filesBytes =
+    files === undefined ? 0 : sameFiles ? (held?.filesBytes ?? 0) : ((await store.filesBytes(id, files)) ?? 0);
   if (newKey && stage === "new_keys_off") return { refused: "uploads_off" };
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
@@ -292,8 +277,7 @@ const storeVersion = async (
     if (hourSpent) return hourSpent;
     const full = await keys.admit(roots, accepted);
     if (full) return full;
-    const ownerRoot = (manifest.owner as Owner).root;
-    const noRoom = fresh.includes(ownerRoot) ? await roomRefused(ownerRoot, id, [arriving], now, tools) : null;
+    const noRoom = await roomRefused((manifest.owner as Owner).root, id, bytes.length + filesBytes, now, tools);
     if (noRoom) return noRoom;
     const refused = await share(uploading, sharing, read, net, tools);
     if (refused) return refused;
@@ -314,8 +298,7 @@ const storeVersion = async (
     // Its owner's key too, or a blocked owner's documents would carry on through an edit link.
     const full = await keys.admit([held.owner, signature.root], accepted);
     if (full) return full;
-    const kept = keptVersions([...held.versions, arriving], now, limits);
-    const noRoom = fresh.includes(held.owner) ? await roomRefused(held.owner, id, kept, now, tools) : null;
+    const noRoom = correcting ? null : await roomRefused(held.owner, id, bytes.length + filesBytes, now, tools);
     if (noRoom) return noRoom;
   }
 
@@ -336,6 +319,7 @@ const storeVersion = async (
       ownerMark: ownerMarkOf(owner),
       newKey,
       ...(files === undefined ? {} : { files }),
+      filesBytes,
     },
     today,
     held,
@@ -362,7 +346,7 @@ const uploadVersion = async (uploading: Uploading, tools: UploadTools): Promise<
 export const uploadDoc = async (uploading: Uploading, tools: UploadTools): Promise<UploadAnswer> => {
   const answer = await uploadVersion(uploading, tools);
   if ("refused" in answer || uploading.files === undefined) return answer;
-  const arrived = await tools.store.hasFiles(uploading.id, uploading.files);
+  const arrived = (await tools.store.filesBytes(uploading.id, uploading.files)) !== null;
   return arrived ? answer : { ...answer, filesWanted: true };
 };
 
@@ -390,9 +374,12 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
 
   const hash = toBase64Url(await sha256(manifestBytes, index));
   if (held.versions.at(-1)?.files !== hash) return { refused: "behind" };
-  if (await store.hasFiles(id, hash)) return { stored: true, hash };
+  if ((await store.filesBytes(id, hash)) !== null) return { stored: true, hash };
   const hourSpent = await takeUploadHour(net, now, tools);
   if (hourSpent) return hourSpent;
-  const kept = await store.keepFiles({ id, hash, body: bytes, net }, dayOf(now));
+  const latestBytes = held.versions.at(-1)?.bytes ?? 0;
+  const noRoom = await roomRefused(held.owner, id, latestBytes + bytes.length, now, tools);
+  if (noRoom) return noRoom;
+  const kept = await store.keepFiles({ id, hash, body: bytes, net, latest: held.latest }, dayOf(now));
   return kept === "stored" ? { stored: true, hash } : { refused: "quota", until: now + DAY_MS };
 };

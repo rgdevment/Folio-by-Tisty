@@ -36,6 +36,7 @@ export interface Upload {
   permit: string | null;
   ownerMark: string;
   files?: string;
+  filesBytes?: number;
   newKey?: boolean;
 }
 
@@ -44,6 +45,7 @@ export interface KeptFiles {
   hash: string;
   body: Uint8Array;
   net: string;
+  latest: number;
 }
 
 export type Appealed = "accepted" | "review";
@@ -55,6 +57,7 @@ export interface Held {
   anchor: string | null;
   latest: number;
   versions: Version[];
+  filesBytes: number;
   blocked: boolean;
   paused: boolean;
   correctable: boolean;
@@ -181,13 +184,13 @@ export interface Store {
   isRevoked(root: string, machine: string, now: number): Promise<boolean>;
   haveSigned(roots: string[]): Promise<boolean>;
   newRootsOf(roots: string[], day: number): Promise<string[]>;
-  heldByOwner(owner: string, today: number, except: string, filesBytes: number): Promise<number>;
+  heldByOwner(owner: string, today: number, except: string): Promise<number>;
   admit(reading: Reading, today: number): Promise<Admitted>;
   note(reading: Reading, today: number): Promise<void>;
   shown(id: string, today: number): Promise<Shown | null>;
   openedCase(id: string, hash: string, today: number, now: number): Promise<OpenedCase | null>;
   envelope(id: string, version: Version): Promise<ReadableStream | null>;
-  hasFiles(id: string, hash: string): Promise<boolean>;
+  filesBytes(id: string, hash: string): Promise<number | null>;
   keepFiles(files: KeptFiles, today: number): Promise<"stored" | "quota">;
   filesOf(id: string, hash: string): Promise<ReadableStream | null>;
   dayKey(today: number): Promise<string>;

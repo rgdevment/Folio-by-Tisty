@@ -897,16 +897,16 @@ describe("uploading", () => {
     expect(versions.map((one) => one.at)).toEqual([12_345]);
   });
 
-  it("keeps the versions it says, and their objects", async () => {
+  it("keeps the latest, and the one it just replaced for its days, with their objects", async () => {
     await store.create(newDoc("d1"), DAY);
-    for (let n = 1; n <= LEVEL_ONE.versionsKept + 2; n += 1) {
+    for (let n = 1; n <= 3; n += 1) {
       expect(await store.upload({ ...upload("d1", n), at: n * WEEK_AND_A_DAY }, DAY)).toBe("stored");
     }
     const after = await row("d1");
     const versions = JSON.parse(after?.versions ?? "[]") as { n: number }[];
-    expect(versions.map((one) => one.n)).toEqual([3, 4, 5]);
-    expect(after?.bytes).toBe(10 * LEVEL_ONE.versionsKept);
-    expect((await objects("d1")).length).toBe(LEVEL_ONE.versionsKept);
+    expect(versions.map((one) => one.n)).toEqual([2, 3]);
+    expect(after?.bytes).toBe(20);
+    expect((await objects("d1")).length).toBe(2);
   });
 
   it("gives one winner to two uploads at once, whose object and sizes agree", async () => {
@@ -1572,9 +1572,9 @@ describe("what was reported", () => {
       await store.upload({ ...upload("d1", n), at: n * WEEK_AND_A_DAY }, DAY);
     }
     expect(await objects("d1")).toContain("d1/1.h1");
-    expect((await objects("d1")).length).toBe(LEVEL_ONE.versionsKept + 1);
     const versions = JSON.parse((await row("d1"))?.versions ?? "[]") as { n: number }[];
-    expect(versions.map((one) => one.n)).toEqual([1, 4, 5, 6]);
+    expect(versions.map((one) => one.n)).toEqual([1, LEVEL_ONE.versionsKept + 2, LEVEL_ONE.versionsKept + 3]);
+    expect((await objects("d1")).length).toBe(3);
   });
 
   it("does not keep a version for a light report, and an order keeps them all", async () => {
@@ -1586,11 +1586,12 @@ describe("what was reported", () => {
     };
     await more(2, 5);
     expect(await objects("d1")).not.toContain("d1/1.h1");
+    const before = (await objects("d1")).length;
     await testEnv.DB.prepare("UPDATE docs SET legal_until = ? WHERE id = 'd1'")
       .bind(DAY + 1)
       .run();
     await more(6, 7);
-    expect((await objects("d1")).length).toBe(LEVEL_ONE.versionsKept + 2);
+    expect((await objects("d1")).length).toBe(before + 2);
   });
 
   it("does not hold a document past its days for a light report", async () => {
