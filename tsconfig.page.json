@@ -18,6 +18,8 @@
     "src/admin/page",
     "test/admin-page.test.ts",
     "test/admin-board.test.ts",
+    "test/admin-page-gaps.test.ts",
+    "test/report-key-gaps.test.ts",
     "test/clean.test.ts",
     "test/ask.test.ts",
     "test/frame.test.ts",
@@ -28,6 +30,8 @@
     "test/theme.test.ts",
     "test/show.test.ts",
     "test/show-languages.test.ts",
+    "test/round2-panel.test.ts",
+    "test/round2-core.test.ts",
     "test/jsdom.d.ts"
   ]
 }

@@ -13,7 +13,7 @@ const MANIFEST_BYTES_AT_MOST = 16384;
 const CASE_TOKEN = /#caso\.([A-Za-z0-9_-]{43})/;
 const OWN_LINK = /^([A-Za-z0-9]{8})#([A-Za-z0-9_-]{43})$/;
 // PowerShell hands ~ over as it is, and the panel's command must work there too.
-const fileAt = (path) => (path.startsWith("~/") ? join(homedir(), path.slice(2)) : path);
+const fileAt = (path) => (/^~[/\\]/.test(path) ? join(homedir(), ...path.slice(2).split(/[/\\]/)) : path);
 const LABELS = { "sealed1.": "folio.report-link.v1", "contact1.": "folio.report-contact.v1" };
 
 const text = (bytes) => Buffer.from(bytes).toString("base64url");
@@ -105,7 +105,7 @@ const keyOpens = (key, { head, commitment }) => {
 };
 
 const check = async (file, id, sealedLink, caseLink) => {
-  const key = (await opened(file, id, sealedLink)).split("#")[1];
+  const key = /#([A-Za-z0-9_-]{43})/.exec(await opened(file, id, sealedLink))?.[1];
   if (!key) {
     console.log("It does not open it: what the seal brings is no key to this document.");
     process.exitCode = NOT_OPENED;

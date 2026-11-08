@@ -23,6 +23,7 @@ export interface AdminApi {
     | "clearWarning"
     | "blockKey"
     | "unblockKey"
+    | "forgetKey"
   >;
   dashboard: Dashboard;
   about: About;
@@ -42,7 +43,7 @@ const ON_REPORT = {
   false_network: "networkWasFalse",
   forget_contact: "forgetContact",
 } as const;
-const KEY_PATH = /^\/api\/keys\/([A-Za-z0-9_-]{43})\/(block|unblock)$/;
+const KEY_PATH = /^\/api\/keys\/([A-Za-z0-9_-]{43})\/(block|unblock|forget)$/;
 const KEY_VIEW_PATH = /^\/api\/keys\/([A-Za-z0-9_-]{43})(\/records)?$/;
 const TOP_ORDERS: readonly TopOrder[] = ["readers", "weight", "edits", "oldest"];
 const OWNERS_AT_MOST = 200;
@@ -61,6 +62,12 @@ const json = (status: number, said: unknown): Response =>
 
 const answerOf = (acted: Acted): Response =>
   acted === "done" ? json(200, { done: true }) : json(404, { refused: "missing" });
+
+// What the operator opened, so the hand-over never depends on the words of a reason.
+const openingKindOf = async (request: Request): Promise<"link" | "contact"> => {
+  const said = (await request.json().catch(() => null)) as { kind?: unknown } | null;
+  return said?.kind === "contact" ? "contact" : "link";
+};
 
 const noteOf = async (request: Request): Promise<string | null> => {
   const said = (await request.json().catch(() => null)) as { note?: unknown } | null;
@@ -88,7 +95,9 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
   if (root) {
     const reason = await noteOf(request);
     if (!reason) return json(400, { refused: "no_reason" });
-    return answerOf(await moderation.blockKey(root, reason, now));
+    return answerOf(
+      onKey === "forget" ? await moderation.forgetKey(root, reason, now) : await moderation.blockKey(root, reason, now),
+    );
   }
   const [, id, action] = ACTION_PATH.exec(path) ?? [];
   if (!id) return json(404, { refused: "missing" });
@@ -100,6 +109,7 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
     const made = await newCaseOf(request);
     return made ? answerOf(await moderation.makeCase(id, made, now)) : json(400, { refused: "bad_case" });
   }
+  const kind = action === "opened" ? await openingKindOf(request.clone()) : null;
   const note = await noteOf(request);
   if (!note) return json(400, { refused: "no_reason" });
   if (action === "purge_owner") {
@@ -110,7 +120,9 @@ const act = async (request: Request, path: string, { moderation, now }: AdminApi
     const records = await moderation.panic(id, note, now);
     return records ? json(200, { records }) : json(404, { refused: "missing" });
   }
-  return answerOf(action === "block" ? await moderation.block(id, note, now) : await moderation.opened(id, note, now));
+  return answerOf(
+    action === "block" ? await moderation.block(id, note, now) : await moderation.opened(id, note, now, kind ?? "link"),
+  );
 };
 
 const orderOf = (said: string | null): TopOrder => TOP_ORDERS.find((one) => one === said) ?? "readers";

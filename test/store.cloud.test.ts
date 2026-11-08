@@ -223,6 +223,38 @@ describe("letting replaced versions go", () => {
     await store.sweep(DAY + 5, (DAY + 5) * 24);
     expect(await objects("d1")).toEqual(["d1/1.h1", "d1/2.h2"]);
   });
+
+  it("goes on past a hundred documents that reports keep, on the next run", async () => {
+    const versions = JSON.stringify([version(1, DAY * DAY_MS), version(2, (DAY + 1) * DAY_MS)]);
+    await testEnv.DB.batch(
+      Array.from({ length: 100 }, (_, at) => {
+        const id = `a${String(at).padStart(7, "0")}`;
+        return [
+          testEnv.DB.prepare(
+            "INSERT INTO docs (id, owner, admin_hash, latest, versions, ttl_days, dies_on, active_day) VALUES (?, 'o1', 'a', 2, ?, 15, ?, ?)",
+          ).bind(id, versions, DAY + 30, DAY),
+          testEnv.DB.prepare(
+            "INSERT INTO reports (doc, net, at, at_hour, category, asn, level, version) VALUES (?, 'n1', ?, 0, 'phishing', 1, 'medium', 1)",
+          ).bind(id, DAY + 1),
+        ];
+      }).flat(),
+    );
+    await store.create(newDoc("zlast001", { owner: "o2", ttlDays: 15 }), DAY);
+    await testEnv.DB.prepare("UPDATE docs SET latest = 2, versions = ? WHERE id = 'zlast001'").bind(versions).run();
+    await store.sweep(DAY + 5, (DAY + 5) * 24);
+    expect(JSON.parse((await row("zlast001"))?.versions ?? "[]")).toHaveLength(2);
+    await store.sweep(DAY + 5, (DAY + 5) * 24 + 1);
+    expect(JSON.parse((await row("zlast001"))?.versions ?? "[]")).toHaveLength(1);
+  });
+
+  it("leaves alone what an order keeps", async () => {
+    await kept([version(1, DAY * DAY_MS), version(2, (DAY + 1) * DAY_MS)]);
+    await testEnv.DB.prepare("UPDATE docs SET legal_until = ? WHERE id = 'd1'")
+      .bind(DAY + 100)
+      .run();
+    await store.sweep(DAY + 5, (DAY + 5) * 24);
+    expect(await objects("d1")).toEqual(["d1/1.h1", "d1/2.h2"]);
+  });
 });
 
 describe("adding up the days", () => {

@@ -91,11 +91,19 @@ const REPORT_RISES = `${WEIGHT_OF("excluded.level")} > ${WEIGHT_OF("reports.leve
 // Cleared stays cleared for what it was about, so the same networks cannot undo an accepted appeal; a newer version is news.
 const AFTER_WHAT_WAS_ANSWERED =
   "excluded.version >= (SELECT d.counts_from FROM docs d WHERE d.id = excluded.doc) AND reports.version < (SELECT d.counts_from FROM docs d WHERE d.id = excluded.doc)";
-const REPORT_REPLACES = `(CASE WHEN reports.cleared = 1 THEN reports.level = 'light' OR excluded.version > reports.version ELSE ${REPORT_RISES} OR (${AFTER_WHAT_WAS_ANSWERED}) END)`;
-// A document stopped today waits for the sweep, and what is reported until then still reaches it.
+// A network found false keeps what it said before, and saying more cannot raise it into evidence it never was.
+const REPORT_REPLACES = `((reports.cleared = 1 OR NOT EXISTS (SELECT 1 FROM false_reporters f WHERE f.net = excluded.net))
+  AND CASE WHEN reports.cleared = 1 THEN reports.level = 'light' OR excluded.version > reports.version ELSE ${REPORT_RISES} OR (${AFTER_WHAT_WAS_ANSWERED}) END)`;
+// A document stopped today waits for the sweep, and what is reported until then still reaches it; one that expired does not.
+const STOPPED_BEFORE = (doc: string, today: string): string =>
+  `(${doc}.paused_at IS NOT NULL AND ${doc}.dies_on < ${today} - 1)`;
+const OWN_DAYS_LEFT = (doc: string, today: string): string =>
+  `(${doc}.dies_on >= ${today} OR (${doc}.paused_at IS NOT NULL AND ${doc}.dies_on >= ${today} - 1))`;
+// A language its owner stopped ends with its own days, though its anchor lives on, as SERVED says.
 const STILL_LIVES = (doc: string, today: string): string =>
-  `(${doc}.dies_on >= ${today} - 1 OR EXISTS (SELECT 1 FROM holds h WHERE h.held = ${doc}.id)
-    OR EXISTS (SELECT 1 FROM docs a WHERE a.id = ${doc}.anchor AND a.dies_on >= ${today} - 1))`;
+  `(${OWN_DAYS_LEFT(doc, today)} OR EXISTS (SELECT 1 FROM holds h WHERE h.held = ${doc}.id)
+    OR (NOT ${STOPPED_BEFORE(doc, today)}
+      AND EXISTS (SELECT 1 FROM docs a WHERE a.id = ${doc}.anchor AND ${OWN_DAYS_LEFT("a", today)})))`;
 const REPORT_MOVES = `(${REPORT_REPLACES} OR (reports.cleared = 0 AND reports.sealed_link IS NULL AND excluded.sealed_link IS NOT NULL))`;
 
 // What keeps a document past its days, not served and not deleted (decision 42). Reports leave once their days pass.
@@ -246,7 +254,7 @@ export class Cloud implements Store {
              owner_mark = CASE WHEN ?7 THEN ?8 ELSE owner_mark END, fix_by = NULL,
              dies_on = CASE WHEN blocked_at IS NULL THEN ${LIVES_ON} WHEN paused_at IS NULL THEN ?1 + ttl_days ELSE paused_at + ?10 END,
              active_day = MAX(active_day, ?1),
-             blocked_at = NULL, blocked_hour = NULL, appealed_at = NULL, appealed_hour = NULL
+             blocked_at = NULL, blocked_hour = NULL, appealed_hour = NULL
            WHERE id = ?5 AND latest = ?6 AND permit IS ?9
              AND ((blocked_at IS NULL AND paused_at IS NULL) OR (?7 AND blocked_at IS NOT NULL AND blocked_by_operator = 0 AND counts_from = ?2))
              AND (?12 IS NULL OR ?13 + (SELECT COALESCE(SUM(${HELD_BYTES}), 0) FROM docs d
@@ -516,8 +524,8 @@ export class Cloud implements Store {
     if (forgotten.meta.changes > 0) await this.#giveQuotaBack(net, 1, 0, today);
   }
 
-  async #takeRoom(net: string, bytes: number, today: number, newKey = false): Promise<Uploaded> {
-    if (!(await this.#takeQuota(net, 0, bytes, today, 1))) return "quota";
+  async #takeRoom(net: string, bytes: number, today: number, newKey = false, uploads = 1): Promise<Uploaded> {
+    if (!(await this.#takeQuota(net, 0, bytes, today, uploads))) return "quota";
     if (!newKey) return "stored";
     const taken = await this.#db
       .prepare(
@@ -528,12 +536,12 @@ export class Cloud implements Store {
       .bind(today, NEW_KEYS_NET, bytes, this.#limits.newKeysBytesADay, net, this.#limits.newKeysNetBytesADay)
       .run();
     if (taken.meta.changes > 0) return "stored";
-    await this.#giveQuotaBack(net, 0, bytes, today, 1);
+    await this.#giveQuotaBack(net, 0, bytes, today, uploads);
     return "new_keys_full";
   }
 
-  async #giveRoomBack(net: string, bytes: number, today: number, newKey = false): Promise<void> {
-    await this.#giveQuotaBack(net, 0, bytes, today, 1);
+  async #giveRoomBack(net: string, bytes: number, today: number, newKey = false, uploads = 1): Promise<void> {
+    await this.#giveQuotaBack(net, 0, bytes, today, uploads);
     if (newKey) await this.#giveQuotaBack(NEW_KEYS_NET, 0, bytes, today);
   }
 
@@ -661,8 +669,8 @@ export class Cloud implements Store {
         .bind(hash, id, today),
       this.#db
         .prepare(
-          `INSERT OR IGNORE INTO openings (doc, at, reason)
-           SELECT ?2, ?4, ?5 FROM cases WHERE token_hash = ?1 AND doc = ?2 AND until >= ?3`,
+          `INSERT OR IGNORE INTO openings (doc, at, reason, kind)
+           SELECT ?2, ?4, ?5, 'case' FROM cases WHERE token_hash = ?1 AND doc = ?2 AND until >= ?3`,
         )
         .bind(hash, id, today, now, `case ${caseNameOf(hash)}`),
     ]);
@@ -684,29 +692,43 @@ export class Cloud implements Store {
     return (await this.#envelopes.head(filesKey(id, hash)))?.size ?? null;
   }
 
-  // A version already kept is never left without its files, but a new key's still count against new keys' bytes.
-  async keepFiles({ id, hash, body, net, latest, newKey }: KeptFiles, today: number): Promise<"stored" | "quota"> {
-    if (!(await this.#takeQuota(net, 0, body.length, today))) return "quota";
+  // Checked in the write, as versions are, so attachments sent at once cannot each see the room empty.
+  async keepFiles(
+    { id, hash, body, net, newKey, roomAtMost }: KeptFiles,
+    today: number,
+  ): Promise<"stored" | "quota" | "new_keys_full" | "room_full" | "behind"> {
+    // Attachments are part of the version already counted as an upload.
+    const room = await this.#takeRoom(net, body.length, today, newKey, 0);
+    if (room !== "stored") return room === "new_keys_full" ? room : "quota";
+    const key = filesKey(id, hash);
     try {
-      await this.#envelopes.put(filesKey(id, hash), body);
+      await this.#envelopes.put(key, body);
     } catch (error) {
-      await this.#giveQuotaBack(net, 0, body.length, today);
+      await this.#giveRoomBack(net, body.length, today, newKey, 0);
       throw error;
     }
-    if (newKey) {
-      await this.#db
-        .prepare(
-          `INSERT INTO net_day (day, net, docs, bytes) VALUES (?1, ?2, 0, ?3)
-           ON CONFLICT (day, net) DO UPDATE SET bytes = bytes + excluded.bytes`,
-        )
-        .bind(today, NEW_KEYS_NET, body.length)
-        .run();
-    }
-    await this.#db
-      .prepare("UPDATE docs SET files_bytes = ?1 WHERE id = ?2 AND latest = ?3")
-      .bind(body.length, id, latest)
+    // A version that found these files in storage already counted them in its own checked write, so they stay its own.
+    const kept = await this.#db
+      .prepare(
+        `UPDATE docs SET files_bytes = ?1, versions = json_set(versions, '$[#-1].filesKept', 1)
+         WHERE id = ?2 AND json_extract(versions, '$[#-1].files') = ?3 AND json_extract(versions, '$[#-1].filesKept') IS NULL
+           AND (files_bytes = ?1 OR ?1 + COALESCE(json_extract(versions, '$[#-1].bytes'), 0) + (SELECT COALESCE(SUM(${HELD_BYTES}), 0)
+             FROM docs d WHERE d.owner = docs.owner AND d.id <> docs.id AND ${HOLDS_ROOM("?4")}) <= ?5)`,
+      )
+      .bind(body.length, id, hash, today, roomAtMost)
       .run();
-    return "stored";
+    if (kept.meta.changes > 0) return "stored";
+    await this.#giveRoomBack(net, body.length, today, newKey, 0);
+    const named = await this.#db
+      .prepare(
+        "SELECT json_extract(versions, '$[#-1].filesKept') AS kept FROM docs WHERE id = ? AND json_extract(versions, '$[#-1].files') = ?",
+      )
+      .bind(id, hash)
+      .first<{ kept: number | null }>();
+    // The same files sent at once: one write kept them for this version, the object is theirs too, charged once.
+    if (named?.kept === 1) return "stored";
+    await this.#envelopes.delete(key);
+    return named ? "room_full" : "behind";
   }
 
   async filesOf(id: string, hash: string): Promise<ReadableStream | null> {
@@ -964,8 +986,9 @@ export class Cloud implements Store {
     let forgotten = 0;
     let failed = failedDays;
     try {
-      // Replaced here too, so a day with no reader does not leave yesterday's key in storage.
+      // Replaced here too, so a quiet day or period does not leave an old key in storage.
       await this.dayKey(today);
+      await this.evidenceKey(today);
     } catch (error) {
       failed += 1;
       console.error("the day's key could not be replaced", String(error));
@@ -1027,12 +1050,24 @@ export class Cloud implements Store {
 
   // A replaced version stays 3 days even with no upload after it, as the privacy policy says.
   async #trimReplaced(today: number, now: number): Promise<void> {
+    const cursor = await this.#db
+      .prepare("SELECT trim_after FROM service_stage WHERE id = 1")
+      .first<{ trim_after: string }>();
+    // From where the last run stopped, so documents a report or an order keeps cannot hold the rest back.
     const rows = await this.#db
       .prepare(
         `SELECT id, versions FROM docs
-         WHERE latest > 0 AND json_array_length(versions) > ?1 AND json_extract(versions, '$[1].at') <= ?2 LIMIT ?3`,
+         WHERE id > ?4 AND latest > 0 AND COALESCE(legal_until, 0) < ?5
+           AND json_array_length(versions) > ?1 AND json_extract(versions, '$[1].at') <= ?2
+         ORDER BY id LIMIT ?3`,
       )
-      .bind(this.#limits.versionsKept, now - this.#limits.replacedKeptDays * DAY_MS, TRIMMED_AT_ONCE)
+      .bind(
+        this.#limits.versionsKept,
+        now - this.#limits.replacedKeptDays * DAY_MS,
+        TRIMMED_AT_ONCE,
+        cursor?.trim_after ?? "",
+        today,
+      )
       .all<{ id: string; versions: string }>();
     for (const row of rows.results) {
       const all = JSON.parse(row.versions) as Version[];
@@ -1040,22 +1075,39 @@ export class Cloud implements Store {
       if (trimmed.length === all.length) continue;
       const kept = await this.#withEvidence(row.id, today, all, trimmed);
       if (kept.length === all.length) continue;
-      // Only if no upload moved it meanwhile, or this would put back what that upload replaced.
+      const dropped = all.filter((one) => !kept.includes(one));
+      // Checked again in the write: a report or an order that arrived meanwhile keeps what it is about.
       const moved = await this.#db
-        .prepare("UPDATE docs SET versions = ?1, bytes = ?2 WHERE id = ?3 AND versions = ?4")
+        .prepare(
+          `UPDATE docs SET versions = ?1, bytes = ?2
+           WHERE id = ?3 AND versions = ?4 AND COALESCE(legal_until, 0) < ?6
+             AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.doc = ?3
+               AND r.version IN (SELECT value FROM json_each(?5)) AND ${REPORT_AS_EVIDENCE})`,
+        )
         .bind(
           JSON.stringify(kept),
           kept.reduce((sum, one) => sum + one.bytes, 0),
           row.id,
           row.versions,
+          JSON.stringify(dropped.map((one) => one.n)),
+          today,
         )
         .run();
       if (moved.meta.changes === 0) continue;
-      const dropped = all.filter((one) => !kept.includes(one));
       const stillNamed = new Set(filesKeysOf(row.id, kept));
       const filesGone = filesKeysOf(row.id, dropped).filter((key) => !stillNamed.has(key));
       await this.#envelopes.delete([...dropped.map((one) => objectKey(row.id, one)), ...filesGone]);
     }
+    const next = rows.results.length < TRIMMED_AT_ONCE ? "" : (rows.results.at(-1)?.id ?? "");
+    // Written only when it moves, so an idle sweep still writes nothing.
+    if (next === (cursor?.trim_after ?? "")) return;
+    await this.#db
+      .prepare(
+        `INSERT INTO service_stage (id, stage, trim_after) VALUES (1, 'open', ?1)
+         ON CONFLICT (id) DO UPDATE SET trim_after = excluded.trim_after`,
+      )
+      .bind(next)
+      .run();
   }
 
   async #noteSwept(hour: number): Promise<void> {
@@ -1352,13 +1404,23 @@ export class Cloud implements Store {
       const idOf = (key: string): string => key.split("/", 1)[0] ?? key;
       const ids = [...new Set(page.objects.map((one) => idOf(one.key)))];
       const held = await this.#db
-        .prepare("SELECT id FROM docs WHERE id IN (SELECT value FROM json_each(?))")
+        .prepare("SELECT id, versions FROM docs WHERE id IN (SELECT value FROM json_each(?))")
         .bind(JSON.stringify(ids))
-        .all<{ id: string }>();
+        .all<{ id: string; versions: string }>();
       const known = new Set(held.results.map((one) => one.id));
+      // What a document's versions still name; anything else under it is what a failed delete left.
+      const named = new Set(
+        held.results.flatMap(({ id, versions }) => {
+          const listed = JSON.parse(versions) as Version[];
+          return [...listed.map((one) => objectKey(id, one)), ...filesKeysOf(id, listed)];
+        }),
+      );
       const old = now - DAY_MS;
       const orphans = page.objects.filter(
-        (one) => !one.key.startsWith(KEY_OBJECTS) && !known.has(idOf(one.key)) && one.uploaded.getTime() < old,
+        (one) =>
+          !one.key.startsWith(KEY_OBJECTS) &&
+          one.uploaded.getTime() < old &&
+          (!known.has(idOf(one.key)) || !named.has(one.key)),
       );
       if (orphans.length > 0) await this.#envelopes.delete(orphans.map((one) => one.key));
       forgotten += orphans.length;

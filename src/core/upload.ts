@@ -271,9 +271,11 @@ const storeVersion = async (
   const correcting = held?.correctable && signature.root === held.owner;
   const fresh = correcting ? [] : await newRootsOf(read, now, tools);
   const newKey = fresh.length > 0;
-  const sameFiles = files !== undefined && files === held?.versions.at(-1)?.files;
+  const previous = held?.versions.at(-1);
+  // The row's size is trusted only once the same files were kept on it; before that, storage may already hold more.
+  const keptBefore = files !== undefined && previous?.files === files && previous.filesKept === 1;
   const filesBytes =
-    files === undefined ? 0 : sameFiles ? (held?.filesBytes ?? 0) : ((await store.filesBytes(id, files)) ?? 0);
+    files === undefined ? 0 : keptBefore ? (held?.filesBytes ?? 0) : ((await store.filesBytes(id, files)) ?? 0);
   if (newKey && stage === "new_keys_off") return { refused: "uploads_off" };
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
@@ -401,6 +403,20 @@ export const uploadFiles = async (uploading: Uploading, tools: ReadTools): Promi
   const latestBytes = held.versions.at(-1)?.bytes ?? 0;
   const noRoom = await roomRefused(held.owner, id, latestBytes + bytes.length, now, tools);
   if (noRoom) return noRoom;
-  const kept = await store.keepFiles({ id, hash, body: bytes, net, latest: held.latest, newKey }, dayOf(now));
-  return kept === "stored" ? { stored: true, hash } : { refused: "quota", until: now + DAY_MS };
+  const kept = await store.keepFiles(
+    { id, hash, body: bytes, net, newKey, roomAtMost: limits.keyBytesAtMost },
+    dayOf(now),
+  );
+  switch (kept) {
+    case "stored":
+      return { stored: true, hash };
+    case "room_full":
+      return (await roomRefused(held.owner, id, latestBytes + bytes.length, now, tools)) ?? { refused: "behind" };
+    case "behind":
+      return { refused: "behind" };
+    case "new_keys_full":
+      return { refused: "uploads_off" };
+    default:
+      return { refused: "quota", until: now + DAY_MS };
+  }
 };

@@ -9,6 +9,7 @@ export interface Version {
   machine: string;
   contract: string;
   files?: string;
+  filesKept?: number;
 }
 
 export interface NewDoc {
@@ -46,8 +47,8 @@ export interface KeptFiles {
   hash: string;
   body: Uint8Array;
   net: string;
-  latest: number;
   newKey: boolean;
+  roomAtMost: number;
 }
 
 export type Appealed = "accepted" | "review";
@@ -201,7 +202,7 @@ export interface Store {
   openedCase(id: string, hash: string, today: number, now: number): Promise<OpenedCase | null>;
   envelope(id: string, version: Version): Promise<ReadableStream | null>;
   filesBytes(id: string, hash: string): Promise<number | null>;
-  keepFiles(files: KeptFiles, today: number): Promise<"stored" | "quota">;
+  keepFiles(files: KeptFiles, today: number): Promise<"stored" | "quota" | "new_keys_full" | "room_full" | "behind">;
   filesOf(id: string, hash: string): Promise<ReadableStream | null>;
   dayKey(today: number): Promise<string>;
   evidenceKey(today: number): Promise<string>;

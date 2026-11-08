@@ -18,7 +18,7 @@ const REPORT_ROWS_AT_MOST = 1000;
 const REPORTS_BYTES_IN_RECORDS = 300_000;
 const CASE_FOR_THE_AUTHORITY = "c.doc = ?1 AND c.sealed_records IS NOT NULL AND c.until >= ?2";
 // Not a case link's opening, nor reading the reporter's email: only those hand the operator the document's key.
-const OPENED_THE_LINK = "o.reason NOT LIKE 'case %' AND o.reason NOT LIKE 'correo: %'";
+const OPENED_THE_LINK = "o.kind = 'link'";
 // Only after the report was opened: erasing the seal before that would leave nobody able to read the document.
 const READY_TO_HAND_OVER = `EXISTS (SELECT 1 FROM docs d WHERE d.id = ?1 AND d.blocked_by_operator = 1)
   AND EXISTS (SELECT 1 FROM cases c WHERE ${CASE_FOR_THE_AUTHORITY})
@@ -265,6 +265,21 @@ export class CloudModeration {
     return this.#actedAndLogged([blocking], this.#logIfChanged(root, "block_key", now, note));
   }
 
+  // Its holder asked, signing with it: it starts over as new, a block stays, and one batch lets a late block pick the write.
+  async forgetKey(root: string, note: string, now: number): Promise<Acted> {
+    const [restarted, , erased] = await this.#db.batch([
+      this.#db
+        .prepare(
+          "UPDATE keys SET first_day = ?1, terms_version = NULL, terms_hour = NULL WHERE root = ?2 AND blocked_at IS NOT NULL",
+        )
+        .bind(dayOf(now), root),
+      this.#logIfChanged(root, "forget_key", now, note),
+      this.#db.prepare("DELETE FROM keys WHERE root = ? AND blocked_at IS NULL").bind(root),
+      this.#logIfChanged(root, "forget_key", now, note),
+    ]);
+    return (restarted?.meta.changes ?? 0) + (erased?.meta.changes ?? 0) > 0 ? "done" : "missing";
+  }
+
   async unblockKey(root: string, now: number): Promise<Acted> {
     const lifting = this.#db
       .prepare("UPDATE keys SET blocked_at = NULL WHERE root = ? AND blocked_at IS NOT NULL")
@@ -436,7 +451,7 @@ export class CloudModeration {
     const logging = this.#db
       .prepare(
         `INSERT OR IGNORE INTO moderation (at, doc, action, note)
-         SELECT DISTINCT ?2, doc, 'false_network', ?3 FROM reports WHERE net = ?1 AND cleared = 0 AND doc <> ?3`,
+         SELECT DISTINCT ?2, doc, 'false_network', NULL FROM reports WHERE net = ?1 AND cleared = 0 AND doc <> ?3`,
       )
       .bind(net, now, id);
     const clearing = this.#db.prepare("UPDATE reports SET cleared = 1 WHERE net = ? AND cleared = 0").bind(net);
@@ -446,12 +461,16 @@ export class CloudModeration {
     );
   }
 
-  async opened(id: string, reason: string, now: number): Promise<Acted> {
-    await this.#db
-      .prepare("INSERT OR IGNORE INTO openings (doc, at, reason) VALUES (?, ?, ?)")
-      .bind(id, now, reason)
-      .run();
-    return "done";
+  async opened(id: string, reason: string, now: number, kind: "link" | "contact" = "link"): Promise<Acted> {
+    const [, here] = await this.#db.batch([
+      this.#db
+        .prepare(
+          "INSERT OR IGNORE INTO openings (doc, at, reason, kind) SELECT ?1, ?2, ?3, ?4 WHERE EXISTS (SELECT 1 FROM docs WHERE id = ?1)",
+        )
+        .bind(id, now, reason, kind),
+      this.#db.prepare("SELECT 1 FROM docs WHERE id = ?").bind(id),
+    ]);
+    return (here?.results.length ?? 0) > 0 ? "done" : "missing";
   }
 
   async #actedAndLogged(acting: D1PreparedStatement[], log: D1PreparedStatement): Promise<Acted> {

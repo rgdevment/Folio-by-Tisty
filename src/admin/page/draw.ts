@@ -162,6 +162,7 @@ const reportCard = (
   const card = page.createElement("article");
   card.className = report.level === "grave" ? "card is-grave" : report.level === "medium" ? "card is-medium" : "card";
   card.dataset.level = report.level;
+  card.dataset.doc = report.doc;
   card.append(
     head(
       page,

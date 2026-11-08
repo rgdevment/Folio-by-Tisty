@@ -423,7 +423,7 @@ describe("a case in the panel", () => {
     pressing("reports", "Abrir denuncia");
     await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
     const noted = fetching.mock.calls.find(([path]) => path === "/api/docs/AbCdEfGh/opened");
-    expect(JSON.parse(String(noted?.[1]?.body))).toEqual({ note: "verificar la denuncia" });
+    expect(JSON.parse(String(noted?.[1]?.body))).toEqual({ note: "verificar la denuncia", kind: "link" });
     expect(writeText).toHaveBeenCalledWith(
       "node scripts/report-key.mjs open ~/folio-reports.key AbCdEfGh sealed1.oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
     );

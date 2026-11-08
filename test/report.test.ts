@@ -56,6 +56,8 @@ describe("a link sealed for the operator", () => {
       const made = inHome("new", "~/folio-reports.key");
       expect(made).toMatch(/^[A-Za-z0-9_-]{43}$/);
       expect(() => inHome("new", join(home, "folio-reports.key"))).toThrow();
+      expect(() => inHome("new", "~\\folio-reports.key")).toThrow();
+      expect(inHome("new", "~\\other.key")).toMatch(/^[A-Za-z0-9_-]{43}$/);
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

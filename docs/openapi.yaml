@@ -334,7 +334,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/FilesStored" }
         "403":
-          description: It is paused or blocked, this signer may not send it, or its root took back the machine that signed it.
+          description: It is paused or blocked, this signer may not send it, its root took back the machine that signed it, or the operator blocked the owner's or the signer's key.
           content:
             application/json:
               schema:
@@ -342,6 +342,7 @@ paths:
                   - $ref: "#/components/schemas/PausedOrBlocked"
                   - $ref: "#/components/schemas/NotYours"
                   - $ref: "#/components/schemas/Revoked"
+                  - $ref: "#/components/schemas/KeyBlocked"
         "404": { $ref: "#/components/responses/Missing" }
         "409":
           description: The latest version does not name this envelope, or the key that owns the document would hold more than it may.
@@ -659,7 +660,7 @@ paths:
     post:
       tags: [Administering]
       operationId: appeal
-      summary: Appeals a block, once per block.
+      summary: Appeals a block, once per document.
       description: |
         When someone other than the owner signed every version that counts toward the block, and no report
         of child abuse stands, the appeal is accepted with nothing opened, and `claim` says `accepted`. The
@@ -878,7 +879,7 @@ components:
         detail:
           type: string
           maxLength: 2000
-          description: It is kept in the clear, so one holding a reading link is refused.
+          description: It is kept in the clear, so one holding a reading key, with or without its link around it, is refused.
         version:
           type: integer
           minimum: 1
@@ -905,7 +906,9 @@ components:
             diesOn: { type: integer, description: "The last day it lives, in days since 1970." }
             pausedAt: { type: [integer, "null"] }
             blockedAt: { type: [integer, "null"] }
-            appealedAt: { type: [integer, "null"] }
+            appealedAt:
+              type: [integer, "null"]
+              description: When the document's one appeal was sent. It stays after the block is lifted, since there is no second.
             mayCorrect:
               type: boolean
               description: An appeal was accepted, and a version signed by the owner, with no permit, lifts the block.

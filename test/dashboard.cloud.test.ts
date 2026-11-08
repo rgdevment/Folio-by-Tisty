@@ -391,6 +391,35 @@ describe("the top documents", () => {
     expect(top.docs.map((one) => one.id).sort()).toEqual(["Bbbbbbbb", "Eeeeeeee", "Kkkkkkkk", "Llllllll", "Rrrrrrrr"]);
   });
 
+  it("finds a flagged one ranked below hundreds of read ones that carry no signal", async () => {
+    const copyOf = async (table: string, key: string) => {
+      const columns = (await testEnv.DB.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>()).results.map(
+        (one) => one.name,
+      );
+      const picked = columns.map((one) => (one === key ? "?1" : one === "files_bytes" ? "1000000" : one)).join(", ");
+      return `INSERT INTO ${table} (${columns.join(", ")}) SELECT ${picked} FROM ${table} WHERE ${key} = 'Qqqqqqqq'`;
+    };
+    const docs = await copyOf("docs", "id");
+    const days = await copyOf("doc_day", "doc");
+    const ids = Array.from({ length: 520 }, (_, at) => `P${String(at).padStart(7, "0")}`);
+    await testEnv.DB.batch(ids.flatMap((id) => [testEnv.DB.prepare(docs).bind(id), testEnv.DB.prepare(days).bind(id)]));
+    const top = await dashboard.top(NOW, "weight", true);
+    expect(ofTop(top, "Rrrrrrrr")?.signals).toEqual([{ kind: "report", level: "medium" }]);
+    expect(top.docs.some((one) => one.id.startsWith("P"))).toBe(false);
+  }, 60_000);
+
+  it("still finds among the flagged what only yesterday's reading or edits mark", async () => {
+    await testEnv.DB.prepare(
+      "UPDATE doc_day SET nets = 2400, hours = 24, peak = 110 WHERE doc = 'Qqqqqqqq' AND day = ?",
+    )
+      .bind(TODAY - 1)
+      .run();
+    await shared("Yyyyyyyy", "Y".repeat(43), { day: TODAY - 1, versions: 21 });
+    const top = await dashboard.top(NOW, "weight", true);
+    expect(ofTop(top, "Qqqqqqqq")?.signals).toEqual([{ kind: "even" }]);
+    expect(ofTop(top, "Yyyyyyyy")?.signals).toEqual([{ kind: "edits", edits: 21 }]);
+  });
+
   it("says when each was first shared and when it was to expire", async () => {
     const top = await dashboard.top(NOW, "oldest", false);
     expect(ofTop(top, "Llllllll")).toMatchObject({ firstDay: TODAY - 40, ttlDays: 3, diesOn: TODAY + 3 });
