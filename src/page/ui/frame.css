@@ -950,7 +950,7 @@ body::before {
 }
 
 .facts dt {
-  flex: none;
+  flex: 0 1 auto;
   color: var(--tisty-soft);
 }
 
@@ -959,10 +959,11 @@ body::before {
   text-transform: uppercase;
 }
 
+/* Whole words keep their width, so in a narrow panel the label wraps before a name or a domain breaks. */
 .facts dd {
   margin: 0;
   text-align: right;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .facts .fingerprint {
