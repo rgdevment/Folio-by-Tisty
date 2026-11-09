@@ -26,8 +26,10 @@ describe.runIf(HAS_POSIX_BASH)("taking the limits from their branch", { timeout:
     return git(origin, "rev-parse", "HEAD");
   };
 
-  const fetching = (env: Record<string, string> = {}) =>
-    spawnSync("bash", ["scripts/limits-fetch.sh"], { cwd: work, encoding: "utf8", env: { ...process.env, ...env } });
+  const fetching = (env: Record<string, string> = {}) => {
+    const { LIMITS_SHA: _sha, GITHUB_ENV: _env, GITHUB_OUTPUT: _output, ...outside } = process.env;
+    return spawnSync("bash", ["scripts/limits-fetch.sh"], { cwd: work, encoding: "utf8", env: { ...outside, ...env } });
+  };
 
   beforeEach(() => {
     place = mkdtempSync(join(tmpdir(), "limits-fetch-"));
