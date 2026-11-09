@@ -4,13 +4,17 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 0
 
 pushed=$(cat)
-data_only=true
-while read -r _ _ where _; do
+data=false
+other=false
+while read -r _ mine where _; do
+  [ -n "${mine:-}" ] || continue
   case ${where:-} in
-    refs/heads/limits | refs/heads/domains | "") ;;
-    *) data_only=false ;;
+    refs/heads/limits | refs/heads/domains) data=true ;;
+    *) other=true ;;
   esac
 done <<< "$pushed"
+data_only=false
+if "$data" && ! "$other"; then data_only=true; fi
 # Judged by where each push lands, so a data worktree pushed anywhere else still runs every check.
 "$data_only" && exit 0
 

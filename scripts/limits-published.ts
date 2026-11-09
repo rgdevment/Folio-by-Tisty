@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { holdsSignature } from "./limits-key.ts";
+import { holdsSignature, WORKER_OPEN } from "./limits-key.ts";
 
 const LIMITS_AT = "https://raw.githubusercontent.com/rgdevment/Folio-by-Tisty/limits";
 const TERMS_AT = "https://raw.githubusercontent.com/rgdevment/Folio-by-Tisty/main/docs";
@@ -68,9 +68,13 @@ const here = (): void => {
     readFileSync("docs/limits.pub", "utf8"),
     0,
   );
+  const told = (parsed(readFileSync(".limits/limits.json")) as { sharing_open?: unknown } | null)?.sharing_open;
+  if (told === true && !WORKER_OPEN.test(readFileSync("wrangler.toml", "utf8"))) {
+    faults.push("the limits tell Tisty sharing is open, and this commit deploys the Worker with it off");
+  }
   for (const fault of faults) console.log(`::error::${fault}`);
   if (faults.length > 0) process.exitCode = 1;
-  else console.log("ok the limits fetched hold, and name the terms this commit carries");
+  else console.log("ok the limits fetched hold, name this commit's terms and agree with its Worker");
 };
 
 // A cache holds each file five minutes on its own, so a while of faults is expected; a quarter of an hour is not.

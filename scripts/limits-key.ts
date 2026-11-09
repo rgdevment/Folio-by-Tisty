@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   createHash,
   createPrivateKey,
@@ -22,7 +23,7 @@ export interface LimitsFiles {
   publicKey: string;
   termsEs: string;
   termsEn: string;
-  worker?: string;
+  workerSettings?: string;
 }
 
 interface Terms {
@@ -37,9 +38,8 @@ const KEY_AND_TERMS: Omit<LimitsFiles, "limits"> = {
   publicKey: inDocs("limits.pub"),
   termsEs: inDocs("TERMINOS.md"),
   termsEn: inDocs("TERMS.md"),
-  worker: resolve(fileURLToPath(new URL("../wrangler.toml", import.meta.url))),
 };
-const WORKER_OPEN = /^SHARING_OPEN = "true"$/m;
+export const WORKER_OPEN = /^SHARING_OPEN = "true"$/m;
 const USAGE =
   "node scripts/limits-key.ts new <file> | sign <file> <limits branch> [days uploads halt, 0 to lift a pause]";
 const SIGNED_BYTES_AT_MOST = 16 * 1024;
@@ -192,9 +192,9 @@ export const signLimits = (
   if (past.length > 0) throw new Error(`the server would not hold to these: ${past.join(", ")}`);
   const faults = [...sharingFaults(next), ...makerFaults(current.maker)];
   if (faults.length > 0) throw new Error(`Tisty would not take this: ${faults.join("; ")}`);
-  if (next.sharing_open === true && files.worker && !WORKER_OPEN.test(readFileSync(files.worker, "utf8"))) {
+  if (next.sharing_open === true && files.workerSettings !== undefined && !WORKER_OPEN.test(files.workerSettings)) {
     throw new Error(
-      `sharing_open is true while ${files.worker} keeps SHARING_OPEN off: open and deploy the Worker first`,
+      "sharing_open is true while main's wrangler.toml keeps SHARING_OPEN off: open and deploy the Worker first",
     );
   }
 
@@ -215,7 +215,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (what === "new" && keyFile) {
     console.log(createKeys(keyFile));
   } else if (what === "sign" && keyFile && branch) {
-    const files = { ...KEY_AND_TERMS, limits: join(branch, "limits.json") };
+    execFileSync("git", ["fetch", "--quiet", "origin", "main"]);
+    const workerSettings = execFileSync("git", ["show", "origin/main:wrangler.toml"], { encoding: "utf8" });
+    const files = { ...KEY_AND_TERMS, limits: join(branch, "limits.json"), workerSettings };
     const unpublished = await domainFaults(makerIn(files.limits) ?? { root: "" }, dnsLookup);
     if (unpublished.length > 0) {
       console.error(`the maker's domain does not hold, so nothing was signed: ${unpublished.join("; ")}`);
