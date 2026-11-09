@@ -78,7 +78,7 @@ export const LEVEL_ONE: Limits = {
   revocationsAnHour: 30,
   revocationsAtOnce: 8,
   uploadsOfARootAnHour: 10,
-  uploadWaitsMinutes: [1, 1, 1, 2, 4, 8, 15],
+  uploadWaitsMinutes: [5],
   uploadStreakResetMinutes: 30,
   oldestContractTaken: null,
   oldestContractServed: null,

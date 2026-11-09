@@ -1414,7 +1414,7 @@ describe("what stops a version", () => {
     expect(stored).toEqual({ stored: true, version: 1 });
     const next = await sealedEnvelope({ id: first.id, version: 2, owner: mario });
     const answer = await uploadDoc(
-      { id: first.id, now: NOW + 2 * 60_000, ip: "203.0.113.9", bytes: async () => next },
+      { id: first.id, now: NOW + 6 * 60_000, ip: "203.0.113.9", bytes: async () => next },
       oneAnHour,
     );
     expect(answer).toMatchObject({ refused: "quota" });
@@ -1514,9 +1514,10 @@ describe("what stops a version", () => {
     const id = await shared();
     const before = await row(id);
     const next = await sealedEnvelope({ id, version: 2, owner: mario });
-    expect(await send(id, next, NOW + 1000)).toEqual({ refused: "slow", until: NOW + 60_000 });
+    expect(await send(id, next, NOW + 1000)).toEqual({ refused: "slow", until: NOW + 5 * 60_000 });
+    expect(await send(id, next, NOW + 4 * 60_000)).toEqual({ refused: "slow", until: NOW + 5 * 60_000 });
     expect(await row(id)).toEqual(before);
-    expect(await send(id, next, NOW + 60_000)).toEqual({ stored: true, version: 2 });
+    expect(await send(id, next, NOW + 5 * 60_000)).toEqual({ stored: true, version: 2 });
   });
 });
 
@@ -1677,29 +1678,25 @@ describe("a machine its root took back", () => {
 });
 
 describe("the waits of the button", () => {
-  it("are the ones decided, in a row", () => {
-    const presses = [0, 1, 2, 3, 5, 9, 17].map((one) => one * MINUTE);
-    const expected = [1, 1, 1, 2, 4, 8, 15];
+  it("are five minutes after each version, however many come in a row", () => {
+    const presses = [0, 5, 10, 15, 20, 25].map((one) => one * MINUTE);
     presses.forEach((_, at) => {
       const made = versionsAt("a", ...presses.slice(0, at + 1));
       const last = presses[at] as number;
-      expect(uploadAllowedAt(made, "a", last, LEVEL_ONE)).toBe(last + (expected[at] as number) * MINUTE);
+      expect(uploadAllowedAt(made, "a", last, LEVEL_ONE)).toBe(last + 5 * MINUTE);
     });
   });
 
-  it("stay at the longest", () => {
-    const presses = [0, 1, 2, 3, 5, 9, 17, 32, 47].map((one) => one * MINUTE);
-    const last = presses.at(-1) as number;
-    expect(uploadAllowedAt(versionsAt("a", ...presses), "a", last, { ...LEVEL_ONE, uploadsOfARootAnHour: 100 })).toBe(
-      last + 15 * MINUTE,
-    );
+  it("refuse whatever comes sooner, however often it is tried", () => {
+    const made = versionsAt("a", 0);
+    for (const tried of [1, 10, 59, 299].map((one) => one * 1000)) {
+      expect(uploadAllowedAt(made, "a", tried, LEVEL_ONE)).toBe(5 * MINUTE);
+    }
   });
 
-  it("start over after half an hour with no press", () => {
-    const made = versionsAt("a", 0, MINUTE, 2 * MINUTE);
+  it("let the next one in once five minutes have passed", () => {
+    const made = versionsAt("a", 0, 5 * MINUTE);
     expect(uploadAllowedAt(made, "a", 40 * MINUTE, LEVEL_ONE)).toBe(40 * MINUTE);
-    const after = versionsAt("a", 0, MINUTE, 40 * MINUTE);
-    expect(uploadAllowedAt(after, "a", 40 * MINUTE, LEVEL_ONE)).toBe(41 * MINUTE);
   });
 
   it("are each person's, so a team does not wait on each other", () => {
@@ -1707,12 +1704,12 @@ describe("the waits of the button", () => {
     expect(uploadAllowedAt(made, "b", 2 * MINUTE, LEVEL_ONE)).toBe(2 * MINUTE);
   });
 
-  it("hold ten an hour even after half an hour with no press", () => {
-    const ten = Array.from({ length: 10 }, (_, at) => at * 2 * MINUTE);
+  it("hold ten an hour", () => {
+    const ten = Array.from({ length: 10 }, (_, at) => at * 5 * MINUTE);
     expect(uploadAllowedAt(versionsAt("a", ...ten), "a", 49 * MINUTE, LEVEL_ONE)).toBe(60 * MINUTE);
   });
 
-  it("hold ten an hour", () => {
+  it("hold ten an hour even with no wait between them", () => {
     const ten = Array.from({ length: 10 }, (_, at) => at * 2 * MINUTE);
     const made = versionsAt("a", ...ten);
     const quick = { ...LEVEL_ONE, uploadWaitsMinutes: [0] };
