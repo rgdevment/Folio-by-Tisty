@@ -210,9 +210,12 @@ paths:
 
         A root shares at most `new_shares_a_day` new documents a day, a document's languages and its retries
         aside, and one stopped since still counts. Past that a new document gets `shares_today` until the next
-        UTC day.
-        A document takes a new version at most every `upload_waits_minutes`; sooner, it gets `slow`, and
-        nothing is written.
+        UTC day. A first version refused gives its place in the day back.
+
+        After each version a document waits, whoever signs the next one: `upload_waits_minutes` lists the
+        minutes, the last one repeating for versions in a row. Each signer also sends at most
+        `uploads_of_a_root_an_hour` versions of it an hour. Sooner, it gets `slow` with `until`, and nothing is
+        written.
       parameters:
         - $ref: "#/components/parameters/Proof"
         - name: Folio-Files

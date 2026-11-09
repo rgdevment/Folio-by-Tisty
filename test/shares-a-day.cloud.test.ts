@@ -61,6 +61,20 @@ describe("new documents a key shares in a day", () => {
     expect(await make("Two6aaaa")).toBe("created");
   });
 
+  it("give the day's place back when a first version is refused", async () => {
+    for (const id of ["Day1aaaa", "Day2aaaa", "Day3aaaa"]) await create(id);
+    await store.forgetUnsent("Day3aaaa", "n", TODAY);
+    expect(await create("Day4aaaa")).toBe("created");
+    expect(await create("Day5aaaa")).toBe("day_full");
+  });
+
+  it("keep a language's refused first version out of the day", async () => {
+    for (const id of ["Day1aaaa", "Day2aaaa", "Day3aaaa"]) await create(id);
+    await create("Lang1aaa", { anchor: "Day1aaaa" });
+    await store.forgetUnsent("Lang1aaa", "n", TODAY);
+    expect(await create("Day4aaaa")).toBe("day_full");
+  });
+
   it("give back the network's share of the day when they refuse", async () => {
     for (const id of ["Day1aaaa", "Day2aaaa", "Day3aaaa"]) await create(id);
     const before = await testEnv.DB.prepare("SELECT docs FROM net_day WHERE net = 'n'").first<{ docs: number }>();

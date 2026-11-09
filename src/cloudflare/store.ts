@@ -139,6 +139,9 @@ const encoder = new TextEncoder();
 
 const DOC_DAYS_KEPT = 31;
 
+const SHARES_OF_A_DAY = "share";
+const sharesCounterOf = (owner: string): string => `root:${owner}`;
+
 const objectKey = (id: string, version: Pick<Version, "n" | "hash">): string => `${id}/${version.n}.${version.hash}`;
 const filesKey = (id: string, hash: string): string => `${id}/files.${hash}`;
 const filesKeysOf = (id: string, versions: Version[]): string[] => [
@@ -165,10 +168,7 @@ export class Cloud implements Store {
     if (held) return this.#retried(held, doc);
     if (!(await this.#takeQuota(doc.net, 1, 0, today))) return "quota";
     // Per key and day, so stopping one to share another never turns two at once into as many as anyone likes.
-    if (
-      doc.anchor === undefined &&
-      !(await this.takeHourly(`root:${doc.owner}`, "share", today * 24, this.#limits.newSharesADay))
-    ) {
+    if (doc.anchor === undefined && !(await this.#takeShare(doc.owner, today))) {
       await this.#giveQuotaBack(doc.net, 1, 0, today);
       return "day_full";
     }
@@ -529,8 +529,13 @@ export class Cloud implements Store {
 
   // A first version refused leaves nothing behind, or each try would hold a share until its days pass.
   async forgetUnsent(id: string, net: string, today: number): Promise<void> {
-    const forgotten = await this.#db.prepare("DELETE FROM docs WHERE id = ? AND latest = 0").bind(id).run();
-    if (forgotten.meta.changes > 0) await this.#giveQuotaBack(net, 1, 0, today);
+    const forgotten = await this.#db
+      .prepare("DELETE FROM docs WHERE id = ? AND latest = 0 RETURNING owner, anchor")
+      .bind(id)
+      .first<{ owner: string; anchor: string | null }>();
+    if (!forgotten) return;
+    await this.#giveQuotaBack(net, 1, 0, today);
+    if (forgotten.anchor === null) await this.#giveShareBack(forgotten.owner, today);
   }
 
   async #takeRoom(net: string, bytes: number, today: number, newKey = false, uploads = 1): Promise<Uploaded> {
@@ -780,10 +785,14 @@ export class Cloud implements Store {
     return taken.meta.changes > 0;
   }
 
+  #takeShare(owner: string, today: number): Promise<boolean> {
+    return this.takeHourly(sharesCounterOf(owner), SHARES_OF_A_DAY, today * HOURS_IN_A_DAY, this.#limits.newSharesADay);
+  }
+
   async #giveShareBack(owner: string, today: number): Promise<void> {
     await this.#db
-      .prepare("UPDATE net_hour SET n = n - 1 WHERE net = ?1 AND action = 'share' AND hour = ?2 AND n > 0")
-      .bind(`root:${owner}`, today * 24)
+      .prepare("UPDATE net_hour SET n = n - 1 WHERE net = ?1 AND action = ?2 AND hour = ?3 AND n > 0")
+      .bind(sharesCounterOf(owner), SHARES_OF_A_DAY, today * HOURS_IN_A_DAY)
       .run();
   }
 
