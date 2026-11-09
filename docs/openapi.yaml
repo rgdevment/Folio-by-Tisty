@@ -24,7 +24,7 @@ info:
     document and network.
 
     **The limits** are published at
-    `https://raw.githubusercontent.com/rgdevment/Folio-by-Tisty/main/docs/limits.json`, so reading them spends no
+    `https://raw.githubusercontent.com/rgdevment/Folio-by-Tisty/limits/limits.json`, so reading them spends no
     request here. Read it at most once an hour, up to 16 KiB and following no redirect. Beside it,
     `limits.json.minisig` signs it with minisign, under a key kept off CI whose public part is `docs/limits.pub`.
     Check the signature on the bytes as they came, with `file:limits.json` in its trusted comment, before believing
@@ -290,7 +290,7 @@ paths:
           description: |
             Whoever signs has not accepted the terms in force: its manifest's `terms` is missing, more than one
             behind, or more than one ahead. The version just before is still taken, so nobody waits for a cached
-            `docs/limits.json` to catch up. Nothing was kept. Accept the version it names, as `docs/limits.json` says it, and send it again.
+            `limits.json` to catch up. Nothing was kept. Accept the version it names, as `limits.json` says it, and send it again.
             A files envelope is not asked: the version that names it already answered for them.
           content:
             application/json:

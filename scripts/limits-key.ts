@@ -8,7 +8,7 @@ import {
   verify,
 } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEVEL_ONE, publishedLimits } from "../src/core/limits.ts";
 import { dnsLookup } from "./dns.ts";
@@ -37,7 +37,9 @@ const PUBLISHED: LimitsFiles = {
   termsEs: inDocs("TERMINOS.md"),
   termsEn: inDocs("TERMS.md"),
 };
-const USAGE = "node scripts/limits-key.ts new <file> | sign <file> [days uploads halt, 0 to lift a pause]";
+const USAGE =
+  "node scripts/limits-key.ts new <file> | sign <file> <limits branch> [days uploads halt, 0 to lift a pause]";
+const SIGNED_BYTES_AT_MOST = 16 * 1024;
 const SECONDS_IN_A_DAY = 86_400;
 const HALTED_DAYS_AT_MOST = 7;
 const KEY_ID_BYTES = 8;
@@ -186,6 +188,8 @@ export const signLimits = (
   if (faults.length > 0) throw new Error(`Tisty would not take this: ${faults.join("; ")}`);
 
   const said = Buffer.from(`${JSON.stringify(next, null, 2)}\n`);
+  // Tisty reads no signed file past this, so a bigger one would leave every reader without limits.
+  if (said.length > SIGNED_BYTES_AT_MOST) throw new Error(`limits.json would be ${said.length} bytes, past 16 KiB`);
   const name = basename(files.limits);
   const signature = signedFile(said, name, readFileSync(keyFile, "utf8").trim(), now);
   if (!holdsSignature(said, signature, readFileSync(files.publicKey, "utf8"), name)) {
@@ -196,17 +200,18 @@ export const signLimits = (
 };
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [what, keyFile, haltedDays] = process.argv.slice(2);
+  const [what, keyFile, branch, haltedDays] = process.argv.slice(2);
   if (what === "new" && keyFile) {
     console.log(createKeys(keyFile));
-  } else if (what === "sign" && keyFile) {
-    const unpublished = await domainFaults(makerIn(PUBLISHED.limits) ?? { root: "" }, dnsLookup);
+  } else if (what === "sign" && keyFile && branch) {
+    const files = { ...PUBLISHED, limits: join(branch, "limits.json") };
+    const unpublished = await domainFaults(makerIn(files.limits) ?? { root: "" }, dnsLookup);
     if (unpublished.length > 0) {
       console.error(`the maker's domain does not hold, so nothing was signed: ${unpublished.join("; ")}`);
       process.exitCode = 1;
     } else {
-      signLimits(keyFile, haltedDays, Date.now());
-      console.log(`signed ${PUBLISHED.limits}`);
+      signLimits(keyFile, haltedDays, Date.now(), publishedLimits(LEVEL_ONE), files);
+      console.log(`signed ${files.limits}: commit it on the limits branch and push it`);
     }
   } else {
     console.error(USAGE);

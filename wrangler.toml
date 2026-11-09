@@ -43,7 +43,7 @@ namespace_id = "1003"
 simple = { limit = 10, period = 60 }
 
 # BILLING_DAY is the plan's renewal day, or 28 if it falls later (decision 118).
-# SHARING_OPEN goes to "true" before sharing_open in docs/limits.json, which only asks clients and reaches them late.
+# SHARING_OPEN goes to "true" before sharing_open in the limits branch, which only asks clients and reaches them late.
 [vars]
 ADMIN_URL = "https://panel.tisty.cl"
 BILLING_DAY = "24"

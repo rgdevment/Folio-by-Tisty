@@ -4,7 +4,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { holdsSignature } from "./limits-key.ts";
 
-const PUBLISHED_AT = "https://raw.githubusercontent.com/rgdevment/Folio-by-Tisty/main/docs";
+const LIMITS_AT = "https://raw.githubusercontent.com/rgdevment/Folio-by-Tisty/limits";
+const TERMS_AT = "https://raw.githubusercontent.com/rgdevment/Folio-by-Tisty/main/docs";
 const TRIES = 15;
 const BETWEEN_TRIES_MS = 60_000;
 
@@ -33,24 +34,24 @@ export const publishedFaults = (published: Published, publicKey: string, serialH
     ...(holdsSignature(published.limits, published.signature, publicKey, "limits.json")
       ? []
       : ["limits.json does not hold to its signature under docs/limits.pub"]),
-    ...(serial >= serialHere ? [] : [`limits.json says serial ${serial}, and main has ${serialHere}`]),
+    ...(serial >= serialHere ? [] : [`limits.json says serial ${serial}, and the limits branch has ${serialHere}`]),
     ...(said.terms?.es === sha256(published.es) ? [] : ["TERMINOS.md is not the text limits.json names"]),
     ...(said.terms?.en === sha256(published.en) ? [] : ["TERMS.md is not the text limits.json names"]),
   ];
 };
 
-const fetched = async (name: string): Promise<Buffer> => {
-  const answer = await fetch(`${PUBLISHED_AT}/${name}`, { redirect: "error" });
+const fetched = async (at: string, name: string): Promise<Buffer> => {
+  const answer = await fetch(`${at}/${name}`, { redirect: "error" });
   if (!answer.ok) throw new Error(`${name} answered ${answer.status}`);
   return Buffer.from(await answer.arrayBuffer());
 };
 
 const publishedNow = async (): Promise<Published> => {
   const [limits, signature, es, en] = await Promise.all([
-    fetched("limits.json"),
-    fetched("limits.json.minisig"),
-    fetched("TERMINOS.md"),
-    fetched("TERMS.md"),
+    fetched(LIMITS_AT, "limits.json"),
+    fetched(LIMITS_AT, "limits.json.minisig"),
+    fetched(TERMS_AT, "TERMINOS.md"),
+    fetched(TERMS_AT, "TERMS.md"),
   ]);
   return { limits, signature: signature.toString(), es, en };
 };

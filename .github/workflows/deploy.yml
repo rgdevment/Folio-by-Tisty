@@ -79,6 +79,8 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      limits_sha: ${{ steps.limits.outputs.limits_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -88,6 +90,9 @@ jobs:
           node-version: 22
           package-manager-cache: false
       - run: npm ci --ignore-scripts
+      # Taken once here, so the page, the Worker and the panel are all built with the same signed limits.
+      - id: limits
+        run: npm run limits
       # Kept on their own branch, as Tisty keeps its manifest, and absent until a first domain is approved.
       - name: Take the domains from their branch
         run: |
@@ -168,6 +173,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       TAG: ${{ github.ref_name }}
+      LIMITS_SHA: ${{ needs.page.outputs.limits_sha }}
     steps:
       - name: The account and its token are there
         run: |
@@ -199,6 +205,7 @@ jobs:
           package-manager-cache: false
       # From the lockfile and with no scripts, so nothing runs by surprise with the token in reach.
       - run: npm ci --ignore-scripts
+      - run: npm run limits
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: page
@@ -242,7 +249,7 @@ jobs:
 
       - name: Deploy
         id: deploy
-        run: npx --no-install wrangler deploy --var "FOLIO_TAG:$TAG" --tag "$TAG" --message "$TAG ${GITHUB_SHA:0:8}"
+        run: npx --no-install wrangler deploy --var "FOLIO_TAG:$TAG" --tag "$TAG" --message "$TAG ${GITHUB_SHA:0:8} limits ${LIMITS_SHA:0:8}"
 
       # The tag it says proves the new version answers, and a document asked for proves it reaches D1 and R2.
       - name: It answers as it should
@@ -305,6 +312,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       TAG: ${{ github.ref_name }}
+      LIMITS_SHA: ${{ needs.page.outputs.limits_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -314,6 +322,7 @@ jobs:
           node-version: 22
           package-manager-cache: false
       - run: npm ci --ignore-scripts
+      - run: npm run limits
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: panel
@@ -329,7 +338,7 @@ jobs:
           jq -e 'any(.[]; .name == "OPERATOR_EMAIL")' "$RUNNER_TEMP/secrets.json" > /dev/null \
             || { echo "::error::folio-admin has no OPERATOR_EMAIL secret, and without it the panel refuses everyone"; exit 1; }
       - name: Deploy
-        run: npx --no-install wrangler deploy --config wrangler.admin.toml --tag "$TAG" --message "$TAG ${GITHUB_SHA:0:8}"
+        run: npx --no-install wrangler deploy --config wrangler.admin.toml --tag "$TAG" --message "$TAG ${GITHUB_SHA:0:8} limits ${LIMITS_SHA:0:8}"
       # A domain's first certificate takes minutes, and without Access its token is all that guards the panel.
       - name: Access stands in front of it
         run: |
@@ -470,9 +479,15 @@ jobs:
           set -euo pipefail
           said=$(npx --no-install wrangler versions view "$BACK_TO" --json | jq -r '.annotations["workers/message"] // empty')
           commit=$(printf '%s' "$said" | awk '{print $2}')
+          limits=$(printf '%s' "$said" | awk '$3 == "limits" {print $4}')
           [[ "$commit" =~ ^[0-9a-f]{8}$ ]]             || { echo "::error::$BACK_TO was not deployed by a tag, so its maker cannot be told: put it back by hand"; exit 1; }
-          then_maker=$(git show "$commit:docs/limits.json" | jq -c '.maker // null')
-          now_maker=$(jq -c '.maker // null' docs/limits.json)
+          git fetch --quiet origin limits
+          if [[ "$limits" =~ ^[0-9a-f]{8}$ ]]; then
+            then_maker=$(git show "$limits:limits.json" | jq -c '.maker // null')
+          else
+            then_maker=$(git show "$commit:docs/limits.json" | jq -c '.maker // null')
+          fi
+          now_maker=$(git show FETCH_HEAD:limits.json | jq -c '.maker // null')
           [ "$then_maker" = "$now_maker" ]             || { echo "::error::$BACK_TO was built with another maker; sign and deploy a fix instead"; exit 1; }
       # Migrations stay as they are: the tables only ever grow, so an older version still reads them.
       - name: Put it back

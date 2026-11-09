@@ -2,39 +2,39 @@
 set -uo pipefail
 
 # A reader never takes an older file than the one it holds, so a serial that does not grow reaches nobody.
-cd "$(dirname "$0")/.." || exit 2
-base=${1:?the commit to compare with}
-head=${2:-HEAD}
-# Against where the branch left main, or a branch would answer for what main signed after it left.
-base=$(git merge-base "$base" "$head") || exit 2
-file=docs/limits.json
+older=${1:?the commit of the limits branch before}
+newer=${2:?the commit of the limits branch after}
+file=limits.json
 
 serial_at() {
   git show "$1:$file" 2>/dev/null | grep -m1 '"serial"' | grep -oE '[0-9]+'
 }
 
-terms_version_at() {
-  git show "$1:$file" 2>/dev/null | grep -A1 '"terms"' | grep -oE '"version": "[0-9]+"' | grep -oE '[0-9]+'
+terms_at() {
+  git show "$1:$file" 2>/dev/null | jq -c '.terms // null'
 }
 
-before=$(serial_at "$base")
+terms_version_at() {
+  git show "$1:$file" 2>/dev/null | jq -r '.terms.version // empty'
+}
+
+before=$(serial_at "$older")
 [ -n "$before" ] || exit 0
+git diff --quiet "$older" "$newer" -- "$file" "$file.minisig" && exit 0
 
-if ! git diff --quiet "$base" "$head" -- docs/TERMINOS.md docs/TERMS.md; then
-  was=$(terms_version_at "$base")
-  now=$(terms_version_at "$head")
-  if [ -z "$now" ] || [ "${was:-0}" -ge "$now" ]; then
-    echo "x  the terms changed and their version in $file went from ${was:-none} to ${now:-none}: sign it again in this same change"
-    exit 1
-  fi
-  echo "ok the terms changed and their version grew from ${was:-none} to $now"
-fi
-
-git diff --quiet "$base" "$head" -- "$file" "$file.minisig" && exit 0
-
-after=$(serial_at "$head")
+after=$(serial_at "$newer")
 if [ -z "$after" ] || [ "$after" -le "$before" ]; then
   echo "x  $file went from serial $before to ${after:-none}: sign it again, since readers keep the newest they saw"
   exit 1
 fi
 echo "ok the serial of $file grew from $before to $after"
+
+if [ "$(terms_at "$older")" != "$(terms_at "$newer")" ]; then
+  was=$(terms_version_at "$older")
+  now=$(terms_version_at "$newer")
+  if [ -z "$now" ] || [ "${was:-0}" -ge "$now" ]; then
+    echo "x  the terms it names changed and their version went from ${was:-none} to ${now:-none}: raise it"
+    exit 1
+  fi
+  echo "ok the terms it names changed and their version grew from ${was:-none} to $now"
+fi

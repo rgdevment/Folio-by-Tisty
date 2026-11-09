@@ -41,6 +41,7 @@ jobs:
           node-version: 22
           package-manager-cache: false
       - run: npm ci --ignore-scripts
+      - run: npm run limits
       - run: npm run typecheck
       - run: npm run lint
       # Before the tests, since the Worker they run serves what this leaves.

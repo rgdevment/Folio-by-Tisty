@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - docs/limits.json
-      - docs/limits.json.minisig
       - docs/limits.pub
       - docs/TERMINOS.md
       - docs/TERMS.md
@@ -36,6 +34,14 @@ jobs:
           node-version: 22
           package-manager-cache: false
       - run: npm ci --ignore-scripts
+      - run: npm run limits
+
+      - name: The limits branch only moves forward
+        run: |
+          git fetch --quiet --depth 2 origin limits
+          if git rev-parse --quiet --verify FETCH_HEAD~1 > /dev/null; then
+            bash scripts/limits-serial.sh FETCH_HEAD~1 FETCH_HEAD
+          fi
 
       - run: node scripts/limits-published.ts
 
@@ -52,4 +58,5 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
+      - run: npm run limits
       - run: node scripts/limits-maker.ts

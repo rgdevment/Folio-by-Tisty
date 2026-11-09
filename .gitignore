@@ -6,5 +6,8 @@ coverage/
 .env*
 *.key
 
+docs/limits.json
+docs/limits.json.minisig
+
 .DS_Store
 Thumbs.db
