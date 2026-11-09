@@ -877,32 +877,114 @@ body::before {
   padding-left: 36px;
 }
 
-.trust {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  background: var(--track);
-  border-radius: 8px;
-  color: var(--tisty-ink);
-  font-size: 12.5px;
-  line-height: 1.45;
+/* Both tongues travel in the page here, so the longer explanation costs the scripts nothing. */
+html:not([lang="es"]) .in-two [lang="es"],
+html[lang="es"] .in-two [lang="en"] {
+  display: none;
 }
 
-.trust .icon {
+.assurances {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.assurance {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.assurance .icon {
   flex: none;
   width: 16px;
   height: 16px;
-  margin-top: 1px;
-  color: var(--tisty-accent);
+  margin-top: 2px;
+  color: var(--good);
 }
 
-.trust a {
+.assurance:last-child .icon {
+  color: var(--tisty-soft);
+}
+
+.assurance-title {
+  margin: 0;
+  color: var(--tisty-ink);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.assurance-said {
+  margin: 1px 0 0;
+  color: var(--tisty-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+#signed:has(#signer-verified:not([hidden]), #signer-note:not([hidden])) .alias-note {
+  display: none;
+}
+
+.print-box {
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--tisty-hair);
+  border-radius: 8px;
+}
+
+.print-label {
+  margin: 0;
+  color: var(--tisty-soft);
+  font-size: 11.5px;
+}
+
+.print-box .fingerprint {
+  margin: 2px 0 0;
+  color: var(--tisty-ink);
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  user-select: all;
+}
+
+.protect dl {
+  margin: 4px 0 0;
+}
+
+.protect dt {
+  margin-top: 8px;
+  color: var(--tisty-ink);
+  font-weight: 600;
+}
+
+.protect dd {
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+
+.protect a {
+  display: inline-block;
+  margin-top: 10px;
   color: inherit;
   font-weight: 550;
   text-underline-offset: 2px;
-  white-space: nowrap;
+}
+
+.about {
+  margin: 16px 0 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tisty-hair);
+  color: var(--tisty-soft);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.about:has(+ #details[hidden]) {
+  display: none;
 }
 
 .dies-on {
@@ -1438,9 +1520,25 @@ body::before {
     font-size: 13px;
   }
 
+  .assurance-title {
+    font-size: 15px;
+  }
+
+  .assurance-said {
+    font-size: 13.5px;
+  }
+
+  .print-box .fingerprint {
+    font-size: 14px;
+  }
+
   .explain {
     margin-top: 10px;
     font-size: 14px;
+  }
+
+  .about {
+    font-size: 13px;
   }
 
   .foot {

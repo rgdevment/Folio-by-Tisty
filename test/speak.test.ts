@@ -81,15 +81,19 @@ describe("the page's words", () => {
     expect(linkSaying("Security")?.href).toContain("/docs/SECURITY.md");
   });
 
-  it("say in the details how the document is kept, and where to read how it works", () => {
-    speak("es");
-    expect(page.querySelector(".trust")?.textContent).toContain(
-      "Cifrado de extremo a extremo (AES-256-GCM): el servidor guarda bytes que no puede leer.",
+  it("say in the details how the document is kept, in both tongues, and where to read how it works", () => {
+    const said = (tongue: string) =>
+      [...page.querySelectorAll(`#panel-details .in-two [lang="${tongue}"]`)].map((one) => one.textContent).join(" ");
+    expect(said("es")).toContain("Folio lo guarda cifrado y no puede abrirlo");
+    expect(said("es")).toContain("AES-256-GCM");
+    expect(said("en")).toContain("Folio keeps it encrypted and cannot open it");
+    expect(page.querySelectorAll('#panel-details .in-two [lang="es"]').length).toBe(
+      page.querySelectorAll('#panel-details .in-two [lang="en"]').length,
     );
+    speak("es");
     expect(linkSaying("Cómo funciona")?.href).toContain("/docs/SEGURIDAD.md");
-    expect(page.querySelector("#panel-details .facts")?.textContent).toContain("Se borra solo el");
+    expect(page.querySelector("#panel-details .assurances")?.textContent).toContain("Se borra solo el");
     speak("en");
-    expect(page.querySelector(".trust")?.textContent).toContain("End-to-end encrypted (AES-256-GCM)");
     expect(linkSaying("How it works")?.href).toContain("/docs/SECURITY.md");
   });
 
