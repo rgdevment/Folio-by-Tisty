@@ -74,7 +74,7 @@ export interface SpendTools {
   setBlocked: (blocked: boolean) => Promise<void>;
 }
 
-export const UNREVIEWED_MS_TO_CLOSE = 15 * 60_000;
+export const UNREVIEWED_MS_TO_CLOSE = 90 * 60_000;
 const OPEN_TO_UPLOADS: Stage[] = ["open", "warned", "new_keys_off"];
 
 // Without a review nothing cuts the bill, so once reviews stop arriving for a while uploads stop until one does.

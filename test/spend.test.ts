@@ -169,14 +169,14 @@ describe("checking", () => {
     return { set, steps };
   };
 
-  it("stops uploads once no review has gone through for fifteen minutes", async () => {
-    const { set, steps } = unreviewed("open", NOW - 15 * MINUTE);
+  it("stops uploads once no review has gone through for an hour and a half", async () => {
+    const { set, steps } = unreviewed("open", NOW - 90 * MINUTE);
     await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
     expect(steps).toEqual(["stage:no_uploads"]);
   });
 
   it("lets one missed review pass", async () => {
-    const { set, steps } = unreviewed("open", NOW - 5 * MINUTE);
+    const { set, steps } = unreviewed("open", NOW - 31 * MINUTE);
     await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
     expect(steps).toEqual([]);
   });
