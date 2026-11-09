@@ -134,8 +134,11 @@ const documentFrom = ({ manifest, opened }: OpenEnvelope): Document => {
   if ("body" in first || "pages" in first) refuse("damaged", "the first part holds more than it should");
   if (Object.keys(rest).some((one) => Object.hasOwn(first, one))) refuse("damaged", "the rest repeats the first part");
   const { body, pages: restPages } = rest;
+  const { editors } = first as { editors?: unknown[] };
+  // An entry answers for itself alone, so one out of shape is left aside like one whose signature fails.
   const held = {
     ...first,
+    ...(editors && { editors: editors.filter((one) => !check("editor", one).length) }),
     ...(body === undefined ? {} : { body }),
     ...(restPages === undefined ? {} : { pages: restPages }),
   } as unknown as Document;

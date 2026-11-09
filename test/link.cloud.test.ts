@@ -60,6 +60,11 @@ describe("opening a link", () => {
     expect((await openLink(ID, SAMPLES.link_key, { ...MAIN, revocations: [forged] })).verdict).toBe("holds");
   });
 
+  it("names who edited it, from the entries that hold for this document", async () => {
+    const { editors } = await openLink(ID, SAMPLES.link_key, MAIN);
+    expect(editors).toEqual([{ name: "Mario", standing: "plain" }]);
+  });
+
   it("names no owner apart when the owner signed this version", async () => {
     const { ownerFingerprint } = await openLink(ID, SAMPLES.link_key, MAIN);
     expect(ownerFingerprint).toBeNull();

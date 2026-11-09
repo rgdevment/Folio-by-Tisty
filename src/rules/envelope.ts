@@ -1,4 +1,4 @@
-import type { Envelope, EnvelopeKind, Opening, Owner, Signature } from "@tisty/contracts";
+import type { Editor, Envelope, EnvelopeKind, Opening, Owner, Signature } from "@tisty/contracts";
 import { check, VERSION } from "@tisty/contracts/check";
 import { type Bytes, bigEndian, fromBase64Url, joined, sameBytes, sha256, words } from "../core/bytes";
 
@@ -110,7 +110,12 @@ const verified = async (key: Bytes, signature: Bytes, ...signed: Bytes[]): Promi
 
 const secondsOf = (moment: string): Bytes => bigEndian(Date.parse(moment) / 1000);
 
-const certified = ({ root, machine, certificate, since }: Signature | Owner): Promise<boolean> => {
+const certified = ({
+  root,
+  machine,
+  certificate,
+  since,
+}: Pick<Signature, "root" | "machine" | "certificate" | "since">): Promise<boolean> => {
   const rootKey = fromBase64Url(root);
   return verified(
     rootKey,
@@ -122,24 +127,31 @@ const certified = ({ root, machine, certificate, since }: Signature | Owner): Pr
   );
 };
 
+const sized = (said: string): Bytes[] => {
+  const bytes = words(said);
+  return [bigEndian(bytes.length), bytes];
+};
+
+const machineSigned = (
+  { root, machine, signed }: Pick<Signature, "root" | "machine" | "signed">,
+  about: string,
+  ...rest: Bytes[]
+): Promise<boolean> =>
+  verified(
+    fromBase64Url(machine),
+    fromBase64Url(signed),
+    words("tisty-share.signed.v1\0"),
+    fromBase64Url(root),
+    fromBase64Url(machine),
+    ...sized(about),
+    ...rest,
+  );
+
 const holdsSignature = async (signature: Signature, manifestBytes: Bytes, index: Bytes): Promise<void> => {
   const amiss = check("signature", signature);
   if (amiss.length > 0) refuse("unsigned", `its signature: ${amiss[0]}`);
-  const root = fromBase64Url(signature.root);
-  const machine = fromBase64Url(signature.machine);
   if (!(await certified(signature))) refuse("unsigned", "its root does not answer for its machine");
-  const about = words("envelope");
-  const signed = await verified(
-    machine,
-    fromBase64Url(signature.signed),
-    words("tisty-share.signed.v1\0"),
-    root,
-    machine,
-    bigEndian(about.length),
-    about,
-    await sha256(manifestBytes),
-    index,
-  );
+  const signed = await machineSigned(signature, "envelope", await sha256(manifestBytes), index);
   if (!signed) refuse("unsigned", "its machine did not sign it");
 };
 
@@ -152,24 +164,10 @@ const holdsOwner = async (
   manifestBytes: Bytes,
   index: Bytes,
 ): Promise<void> => {
-  const { root, machine, permit, name_tag: nameTag, signed } = owner as Owner;
+  const { root, permit, name_tag: nameTag } = owner as Owner;
   if (!(await certified(owner as Owner))) refuse("unsigned", "its owner's root does not answer for its machine");
-  const about = words("owner");
-  const idBytes = words(id);
   const permitKey = permit ? fromBase64Url(permit) : NO_PERMIT;
-  const owned = await verified(
-    fromBase64Url(machine),
-    fromBase64Url(signed),
-    words("tisty-share.signed.v1\0"),
-    fromBase64Url(root),
-    fromBase64Url(machine),
-    bigEndian(about.length),
-    about,
-    bigEndian(idBytes.length),
-    idBytes,
-    permitKey,
-    fromBase64Url(nameTag),
-  );
+  const owned = await machineSigned(owner as Owner, "owner", ...sized(id), permitKey, fromBase64Url(nameTag));
   if (!owned) refuse("unsigned", "its owner did not sign who owns it");
   if (root === signature.root) return;
   if (!permit || !signature.permit_signed) return refuse("unsigned", "another root needs its owner's permit");
@@ -183,6 +181,23 @@ const holdsOwner = async (
     index,
   );
   if (!allowed) refuse("unsigned", "its token did not sign it");
+};
+
+export const editorHolds = async (editor: Editor): Promise<boolean> => {
+  try {
+    return (
+      (await certified(editor)) &&
+      (await machineSigned(
+        editor,
+        "editor",
+        ...sized(editor.in),
+        Uint8Array.of(editor.owned ? 1 : 0),
+        ...sized(editor.name),
+      ))
+    );
+  } catch {
+    return false;
+  }
 };
 
 const readBytes = async (bytes: Bytes, asked: Asked): Promise<ReadEnvelope> => {

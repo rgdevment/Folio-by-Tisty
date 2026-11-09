@@ -36,5 +36,6 @@ export const SAMPLE_SEAL = {
   ownerFingerprint: null,
   signerStanding: "plain",
   ownerStanding: "plain",
+  editors: [],
   diesOn: 20_773,
 } as const;

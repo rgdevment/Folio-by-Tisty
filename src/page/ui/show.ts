@@ -43,20 +43,13 @@ const opening = async (id: string, linkKey: string, arrived: Arrived): Promise<S
 const ownerOf = ({ fingerprint, ownerFingerprint }: Opened): string => ownerFingerprint ?? fingerprint;
 
 const shownOf = ({ id, linkKey, opened }: Showing, caseToken?: string): Shown => {
-  const { held, pictures, verdict, fingerprint, ownerFingerprint, signerStanding, ownerStanding, diesOn } = opened;
+  const { held, pictures } = opened;
   const cleaner = domPurifyCleaner(window);
   const addresses = pictureAddresses(held.pictures ?? [], pictures);
   return {
     held,
     wordsOf: (html) => finished(cleaner.clean(html), addresses),
-    seal: {
-      verdict,
-      fingerprint,
-      ownerFingerprint,
-      signerStanding,
-      ownerStanding,
-      diesOn,
-    },
+    seal: opened,
     pressFile: filePresser({ id, linkKey, held, ...(caseToken === undefined ? {} : { caseToken }) }),
   };
 };

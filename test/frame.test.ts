@@ -13,6 +13,7 @@ const SEAL = {
   ownerFingerprint: null,
   signerStanding: "plain",
   ownerStanding: "plain",
+  editors: [],
   diesOn: 20_773,
 } as const;
 const ADDRESS = "https://tisty.cl/k7Qm2xPa#THEKEY";
@@ -547,6 +548,53 @@ describe("who signed it", () => {
     expect(place.document.getElementById("signer")?.textContent).toBe("Ana");
     expect(place.document.getElementById("owner")?.textContent).toBe("Mario");
     expect(place.document.getElementById("owner-fingerprint")?.textContent).toBe("2");
+  });
+});
+
+describe("who edited it", () => {
+  const facts = () => place.document.getElementById("editors-facts") as HTMLElement;
+  const items = () => [...(place.document.getElementById("editors")?.children ?? [])] as HTMLElement[];
+  const shownWith = (editors: Seal["editors"]) => {
+    const cleaner = domPurifyCleaner(place);
+    return { held: HELD, wordsOf: (html: string) => finished(cleaner.clean(html), []), seal: { ...SEAL, editors } };
+  };
+  const drawEditors = (editors: Seal["editors"]) => drawFrame(shownWith(editors));
+
+  it("says nothing when no entry held", () => {
+    drawEditors([]);
+    expect(facts().hidden).toBe(true);
+  });
+
+  it("names each one as words, by the name it signed, with its standing for the page's styles", () => {
+    drawEditors([
+      { name: "Mario", standing: "verified" },
+      { name: "<b>Ana</b>", standing: "plain" },
+    ]);
+    expect(facts().hidden).toBe(false);
+    const [maker, ana] = items() as [HTMLElement, HTMLElement];
+    expect(maker.querySelector("bdi")?.textContent).toBe("Mario");
+    expect(maker.dataset.standing).toBe("verified");
+    expect(maker.querySelector('.name-tag [lang="es"]')?.textContent).toBe("verificado");
+    expect(ana.querySelector("bdi")?.textContent).toBe("<b>Ana</b>");
+    expect(ana.querySelector("b")).toBeNull();
+    expect(ana.dataset.standing).toBe("plain");
+  });
+
+  it("carries the warning for a name that imitates the maker's, in both tongues", () => {
+    drawEditors([{ name: "rgdevrnent", standing: "imitates" }]);
+    const [item] = items() as [HTMLElement];
+    expect(item.dataset.standing).toBe("imitates");
+    const note = item.querySelector(".fact-note") as HTMLElement;
+    expect(note.classList.contains("is-warning")).toBe(true);
+    expect(note.querySelector('[lang="es"]')?.textContent).toBe("Ese nombre es de otra llave");
+    expect(note.querySelector('[lang="en"]')?.textContent).toBe("That name belongs to another key");
+  });
+
+  it("draws the list again, not on top of the last one", () => {
+    vi.stubGlobal("innerHeight", 900);
+    const redraw = drawEditors([{ name: "Ana", standing: "plain" }]);
+    redraw(shownWith([{ name: "Luis", standing: "plain" }]));
+    expect(items().map((one) => one.querySelector("bdi")?.textContent)).toEqual(["Luis"]);
   });
 });
 

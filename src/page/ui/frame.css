@@ -1054,6 +1054,17 @@ html[lang="es"] .in-two [lang="en"] {
   line-height: 1.6;
 }
 
+.editors {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editors li:not([data-standing="verified"]) .name-tag,
+.editors li:not([data-standing="imitates"]) .fact-note {
+  display: none;
+}
+
 .explain {
   margin: 6px 0 0;
   color: var(--tisty-soft);

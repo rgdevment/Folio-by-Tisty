@@ -1,6 +1,7 @@
 import type { Document, Orientation, Page, Paper, Verdict } from "@tisty/contracts";
 import { type Standing, shownNameOf } from "../../core/look-alike";
 import { MAKER } from "../maker";
+import type { ShownEditor } from "../read";
 import { cardsFor, referenceOf } from "./cards";
 import { bareUrl } from "./clean";
 import { element } from "./element";
@@ -39,6 +40,7 @@ export interface Seal {
   ownerFingerprint: string | null;
   signerStanding: Standing;
   ownerStanding: Standing;
+  editors: readonly ShownEditor[];
   diesOn: number;
 }
 
@@ -268,6 +270,19 @@ const drawOwner = (held: Document, { ownerFingerprint, ownerStanding }: Seal): v
   element("owner-fingerprint").textContent = ownerFingerprint ?? "";
 };
 
+// Its tag and its warning travel in both tongues in the HTML, so they cost the scripts nothing; frame.css picks by standing.
+const editorItem = ({ name, standing }: ShownEditor): Node => {
+  const item = element<HTMLTemplateElement>("editor").content.firstElementChild?.cloneNode(true) as HTMLElement;
+  item.dataset.standing = standing;
+  (item.firstElementChild as HTMLElement).textContent = name;
+  return item;
+};
+
+const drawEditors = ({ editors }: Seal): void => {
+  element("editors-facts").hidden = editors.length === 0;
+  element("editors").replaceChildren(...editors.map(editorItem));
+};
+
 const drawSeal = (held: Document, seal: Seal): void => {
   const { verdict, fingerprint, signerStanding, diesOn } = seal;
   const shown = element("seal");
@@ -277,6 +292,7 @@ const drawSeal = (held: Document, seal: Seal): void => {
   drawName("signer", held.signed_as, signerStanding);
   element("fingerprint").textContent = fingerprint;
   drawOwner(held, seal);
+  drawEditors(seal);
   element("dies-on").textContent = lastDay(diesOn);
 };
 
