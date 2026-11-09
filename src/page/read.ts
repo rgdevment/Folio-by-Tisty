@@ -62,6 +62,7 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived, lo
     standingFor(signature.root, signer, held.signed_as, load),
     standingFor(owner?.root ?? signature.root, ownerVerdict, held.owner_name, load),
   ]);
+  // held.editors goes unshown until each entry has its own check under signing.editor: unchecked, one could name someone who never edited it.
   return {
     held,
     pictures: open.opened.slice(FIRST_PICTURE_PART),
