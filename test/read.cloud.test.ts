@@ -62,10 +62,12 @@ const get = async (over: RequestInit = {}, ip = "203.0.113.7", url = API) => {
   return response;
 };
 
+// Under the day of the read, not of the run: a run that crosses midnight must still find them.
 const seen = async () => {
-  const table = await testEnv.DB.prepare("SELECT name FROM sqlite_master WHERE name = ?").bind(`seen_${TODAY}`).first();
+  const today = dayOf(Date.now());
+  const table = await testEnv.DB.prepare("SELECT name FROM sqlite_master WHERE name = ?").bind(`seen_${today}`).first();
   if (!table) return [];
-  const rows = await testEnv.DB.prepare(`SELECT * FROM seen_${TODAY}`).all<{ reader: string; hour: number }>();
+  const rows = await testEnv.DB.prepare(`SELECT * FROM seen_${today}`).all<{ reader: string; hour: number }>();
   return rows.results;
 };
 
