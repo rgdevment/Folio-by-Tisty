@@ -211,6 +211,7 @@ export interface Store {
   keepKeys(roots: string[], today: number, accepted?: AcceptedTerms): Promise<void>;
   giveKeysBack(count: number, net: string, today: number): Promise<void>;
   takeHourly(net: string, action: string, hour: number, atMost: number, taking?: number): Promise<boolean>;
+  sharedToday(owner: string, today: number): Promise<number>;
   report(report: Report, today: number, hour: number): Promise<Reported>;
   owned(id: string, today: number): Promise<Owned | null>;
   appeal(id: string, today: number, hour: number): Promise<Appealed>;

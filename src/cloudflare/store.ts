@@ -785,6 +785,14 @@ export class Cloud implements Store {
     return taken.meta.changes > 0;
   }
 
+  async sharedToday(owner: string, today: number): Promise<number> {
+    const counted = await this.#db
+      .prepare("SELECT n FROM net_hour WHERE net = ?1 AND action = ?2 AND hour = ?3")
+      .bind(sharesCounterOf(owner), SHARES_OF_A_DAY, today * HOURS_IN_A_DAY)
+      .first<{ n: number }>();
+    return counted?.n ?? 0;
+  }
+
   #takeShare(owner: string, today: number): Promise<boolean> {
     return this.takeHourly(sharesCounterOf(owner), SHARES_OF_A_DAY, today * HOURS_IN_A_DAY, this.#limits.newSharesADay);
   }

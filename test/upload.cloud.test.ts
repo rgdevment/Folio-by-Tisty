@@ -1566,7 +1566,7 @@ describe("a machine its root took back", () => {
     expect(await send(id, signed, LATER)).toEqual({ stored: true, version: 2 });
     expect(await take([await revocationBy(ana, AT)])).toEqual({ done: true });
     const stopped = await sealedEnvelope({ id, version: 3, owner: mario, signer: ana, permit, token: pair });
-    expect(await send(id, stopped, LATER)).toEqual({ refused: "revoked" });
+    expect(await send(id, stopped, LATER + 5 * MINUTE)).toEqual({ refused: "revoked" });
     expect(await send(id, await sealedEnvelope({ id, version: 3, owner: mario, permit }), LATER + 5 * MINUTE)).toEqual({
       stored: true,
       version: 3,
@@ -1690,6 +1690,17 @@ describe("new documents a key shares in a day", () => {
     expect(await share()).toEqual({ refused: "shares_today", until: (dayOf(NOW) + 1) * DAY_MS });
   });
 
+  it("refuse before the network's hour is spent", async () => {
+    const none = { ...LIMITS, newSharesADay: 0 };
+    const capped = { ...tools, store: new Cloud(testEnv, none), limits: none };
+    const first = await started();
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+    const sending = { id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => bytes, first };
+    expect(await uploadDoc(sending, capped)).toMatchObject({ refused: "shares_today" });
+    const uploads = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM net_hour WHERE action = 'upload'").first();
+    expect(uploads).toEqual({ n: 0 });
+  });
+
   it("leave a first version refused for another reason out of the day", async () => {
     const shareWith = async (limits: typeof LIMITS) => {
       const first = await started();
@@ -1718,6 +1729,14 @@ describe("the waits of the button", () => {
     for (const tried of [1, 10, 59, 299].map((one) => one * 1000)) {
       expect(uploadAllowedAt(made, "a", tried, LEVEL_ONE)).toBe(5 * MINUTE);
     }
+  });
+
+  it("refuse a new version before its envelope is opened", async () => {
+    const id = await shared();
+    expect(await send(id, new Uint8Array(64), NOW + MINUTE)).toEqual({
+      refused: "slow",
+      until: NOW + 5 * MINUTE,
+    });
   });
 
   it("let the next one in once five minutes have passed", () => {

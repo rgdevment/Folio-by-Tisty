@@ -32,17 +32,18 @@ export const listFreesAt = (versions: Version[], now: number, limits: Limits): n
   return (versions[oldest + 1] as Version).at + limits.replacedKeptDays * DAY_MS;
 };
 
-// The wait is the document's, so more signers bring no more versions; the hourly top is each signer's.
-export const uploadAllowedAt = (versions: Version[], signer: string, now: number, limits: Limits): number => {
+// The document's, whoever signs, so more signers bring no more versions and it is known before any body is read.
+export const waitEndsAt = (versions: Version[], now: number, limits: Limits): number => {
   const last = versions.at(-1);
-  if (!last) return now;
-
+  if (!last || now - last.at >= limits.uploadStreakResetMinutes * MINUTE_MS) return now;
   const waits = limits.uploadWaitsMinutes;
   const wait = waits[Math.min(streakOf(versions, limits) - 1, waits.length - 1)] ?? 0;
-  const startsOver = now - last.at >= limits.uploadStreakResetMinutes * MINUTE_MS;
-  const afterTheWait = startsOver ? now : last.at + wait * MINUTE_MS;
+  return Math.max(last.at + wait * MINUTE_MS, now);
+};
+
+export const uploadAllowedAt = (versions: Version[], signer: string, now: number, limits: Limits): number => {
   const inTheHour = versions.filter((one) => one.signer === signer && now - one.at < HOUR_MS);
   const oldest = inTheHour[0];
   const afterTheHour = oldest && inTheHour.length >= limits.uploadsOfARootAnHour ? oldest.at + HOUR_MS : now;
-  return Math.max(afterTheWait, afterTheHour, now);
+  return Math.max(waitEndsAt(versions, now, limits), afterTheHour);
 };
