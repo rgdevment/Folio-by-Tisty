@@ -1,6 +1,6 @@
 # Privacidad de Folio by Tisty
 
-**Versión 4, vigente desde el 8 de noviembre de 2026.**
+**Versión 5, vigente desde el 9 de noviembre de 2026.**
 
 ## En corto
 
@@ -82,10 +82,11 @@ las peticiones al conectarte, como cualquier servidor web, y las trata según su
 propia [política de privacidad](https://www.cloudflare.com/privacypolicy/).
 Nunca recibe la llave del `#`, así que tampoco puede leer lo que compartes.
 
-La página de `folio.tisty.app` solo explica qué es Folio. Son archivos fijos: no
-guarda nada de ti, ni en el servidor ni en tu navegador. Cloudflare también
-recibe tu IP y tus peticiones al visitarla. En tisty.cl, si eliges el modo claro
-u oscuro, tu navegador recuerda esa elección; no sale de tu equipo.
+La portada de tisty.cl, y la página que muestra cuando un link ya no está, solo
+explican qué es Folio. Son archivos fijos: no guardan nada de ti, ni en el
+servidor ni en tu navegador. Cloudflare también recibe tu IP y tus peticiones al
+visitarlas. En la página que lee un link, si eliges el modo claro u oscuro, tu
+navegador recuerda esa elección; no sale de tu equipo.
 
 También participan otros tres, cada uno con su propia política:
 
@@ -93,8 +94,8 @@ También participan otros tres, cada uno con su propia política:
   operador, con lo que dice la tabla de arriba.
 - **[GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)**
   guarda las copias de la base de datos, cifradas con una llave que no tiene.
-  Tisty también le pide los límites y los términos antes de compartir, así que
-  GitHub recibe la IP de quien va a compartir.
+  Tisty también le pide los límites, los términos y el dominio de sus links, así
+  que GitHub recibe la IP de quien va a compartir.
 - **[Healthchecks.io](https://healthchecks.io/privacy/)** recibe una señal cuando
   termina cada tarea programada, para avisar si deja de llegar. No lleva datos
   de nadie.

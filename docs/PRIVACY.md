@@ -1,6 +1,6 @@
 # Folio by Tisty privacy policy
 
-**Version 4, in force since November 8, 2026.**
+**Version 5, in force since November 9, 2026.**
 
 ## The short version
 
@@ -83,11 +83,11 @@ IP and your requests when you connect, as any web server does, and handles them
 under its own [privacy policy](https://www.cloudflare.com/privacypolicy/). It
 never receives the key after the `#`, so it cannot read what you share either.
 
-The page at `folio.tisty.app` only explains what Folio is. It is fixed files: it
-keeps nothing about you, on the server or in your browser. Cloudflare also
-receives your IP and your requests when you visit it. On tisty.cl, if you choose
-the light or dark mode, your browser remembers that choice; it never leaves your
-device.
+The home of tisty.cl, and the page it shows for a link that is gone, only
+explain what Folio is. They are fixed files: they keep nothing about you, on the
+server or in your browser. Cloudflare also receives your IP and your requests
+when you visit them. On the page that reads a link, if you choose the light or
+dark mode, your browser remembers that choice; it never leaves your device.
 
 Three others take part, each with a policy of its own:
 
@@ -95,8 +95,8 @@ Three others take part, each with a policy of its own:
   mail, with what the table above says.
 - **[GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)**
   keeps the copies of the database, encrypted with a key it does not have.
-  Tisty also asks it for the limits and the terms before sharing, so GitHub
-  receives the IP of whoever is about to share.
+  Tisty also asks it for the limits, the terms and the domain its links live
+  on, so GitHub receives the IP of whoever is about to share.
 - **[Healthchecks.io](https://healthchecks.io/privacy/)** gets a signal when each
   scheduled task ends, to warn if one stops arriving. It carries nobody's data.
 

@@ -87,6 +87,17 @@ describe("the home page", () => {
   it("is where the reader's name leads", () => {
     expect(read("src/page/index.html")).toContain('<a class="brand" href="/">');
   });
+
+  it("is named by both privacy policies", () => {
+    expect(read("docs/PRIVACY.md")).toContain("The home of tisty.cl");
+    expect(read("docs/PRIVACIDAD.md")).toContain("La portada de tisty.cl");
+  });
+
+  it("is no longer sent to folio.tisty.app by what the repository tells", () => {
+    for (const told of ["README.md", "README.es.md", "PRIVACY.md", "PRIVACIDAD.md", "SECURITY.md", "SEGURIDAD.md"]) {
+      expect(read(told.startsWith("README") ? told : `docs/${told}`)).not.toContain("folio.tisty.app");
+    }
+  });
 });
 
 describe("the page of a link that is gone", () => {
