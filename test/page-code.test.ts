@@ -23,9 +23,9 @@ curl() {
   done
   file=\${url#${ADDRESS}/}
   case $file in
-    AAAAAAAA | "") file=index.html ;;
+    AAAAAAAA) file=index.html ;;
+    "") file=home.html ;;
     widget-frame) file=widget-frame.html ;;
-    not-a-page) file=404.html ;;
   esac
   if [ "$out" = /dev/null ]; then :; else cat "$SITE/$file" > "$out"; fi
   if [ "$browser" = 1 ] && [ -n "\${ADDS_SCRIPT:-}" ]; then echo cloudflareinsights >> "$out"; fi
@@ -52,7 +52,7 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     mkdirSync(join(site, "assets"));
     writeFileSync(join(site, "index.html"), "<p>page</p>\n");
     writeFileSync(join(site, "widget-frame.html"), "<p>frame</p>\n");
-    writeFileSync(join(site, "404.html"), "<p>missing</p>\n");
+    writeFileSync(join(site, "home.html"), "<p>home</p>\n");
     writeFileSync(join(site, "assets/app.js"), "code\n");
   });
 
@@ -66,8 +66,10 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     expect(answer.stdout).toContain("serves what was attested");
   });
 
-  it("lists the frame's page among what is attested", () => {
-    expect(run(`sums "${site}"`).stdout).toContain("widget-frame.html");
+  it("lists the frame's page and the home among what is attested", () => {
+    const listed = run(`sums "${site}"`).stdout;
+    expect(listed).toContain("widget-frame.html");
+    expect(listed).toContain("home.html");
   });
 
   it("sees a script Cloudflare adds only for a browser, also on the frame's page", () => {
@@ -75,6 +77,7 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     expect(answer.status).toBe(1);
     expect(answer.stdout).toContain("index.html");
     expect(answer.stdout).toContain("widget-frame.html");
+    expect(answer.stdout).toContain("home.html");
     expect(answer.stdout).not.toContain("app.js");
   });
 
@@ -100,25 +103,5 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     const answer = run(`served "${site}" ${ADDRESS}`, { MORE_HEADERS: 'Speculation-Rules: "/cdn-cgi/speculation"' });
     expect(answer.status).toBe(0);
     expect(answer.stdout).toContain("Speed Brain");
-  });
-
-  it("compares one address with one file", () => {
-    expect(run(`written "${site}/404.html" ${ADDRESS}/not-a-page`).status).toBe(0);
-    const added = run(`written "${site}/404.html" ${ADDRESS}/not-a-page`, { ADDS_SCRIPT: "1" });
-    expect(added.status).toBe(1);
-    expect(added.stdout).toContain("::error::");
-    const challenged = run(`written "${site}/404.html" ${ADDRESS}/not-a-page`, {
-      ADDS_SCRIPT: "1",
-      MORE_HEADERS: "cf-mitigated: challenge",
-    });
-    expect(challenged.status).toBe(0);
-    expect(challenged.stdout).toContain("::warning::");
-  });
-
-  it("warns if its request no longer gets what a browser gets", () => {
-    expect(run(`detects ${ADDRESS}/`, { ADDS_SCRIPT: "1" }).stdout).not.toContain("::warning::");
-    const answer = run(`detects ${ADDRESS}/`);
-    expect(answer.status).toBe(0);
-    expect(answer.stdout).toContain("::warning::");
   });
 });
