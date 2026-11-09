@@ -1677,6 +1677,20 @@ describe("a machine its root took back", () => {
   });
 });
 
+describe("new documents a key shares in a day", () => {
+  it("answer shares_today until the next UTC day once the cap is reached", async () => {
+    const one = { ...LIMITS, newSharesADay: 1 };
+    const capped = { ...tools, store: new Cloud(testEnv, one), limits: one };
+    const share = async () => {
+      const first = await started();
+      const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+      return uploadDoc({ id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => bytes, first }, capped);
+    };
+    expect(await share()).toEqual({ stored: true, version: 1 });
+    expect(await share()).toEqual({ refused: "shares_today", until: (dayOf(NOW) + 1) * DAY_MS });
+  });
+});
+
 describe("the waits of the button", () => {
   it("are five minutes after each version, however many come in a row", () => {
     const presses = [0, 5, 10, 15, 20, 25].map((one) => one * MINUTE);

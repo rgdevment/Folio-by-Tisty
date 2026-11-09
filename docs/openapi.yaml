@@ -209,7 +209,8 @@ paths:
         that it answers `quota` until the next day, while a root it knows goes on.
 
         A root shares at most `new_shares_a_day` new documents a day, a document's languages and its retries
-        aside, and one stopped since still counts. Past that a new document gets `quota` until the next day.
+        aside, and one stopped since still counts. Past that a new document gets `shares_today` until the next
+        UTC day.
         A document takes a new version at most every `upload_waits_minutes`; sooner, it gets `slow`, and
         nothing is written.
       parameters:
@@ -297,7 +298,9 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Outdated" }
         "429":
-          description: Going too fast, or past a quota, or a proof of work is asked for.
+          description: |
+            Going too fast, past a quota, past the new documents a root may share today, or a proof of work is
+            asked for.
           headers:
             Retry-After: { $ref: "#/components/headers/RetryAfter" }
           content:
@@ -306,6 +309,7 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/Slow"
                   - $ref: "#/components/schemas/Quota"
+                  - $ref: "#/components/schemas/SharesToday"
                   - $ref: "#/components/schemas/Proof"
         "500": { $ref: "#/components/responses/Failed" }
         "503":
@@ -986,6 +990,12 @@ components:
       properties:
         refused: { const: quota }
         until: { type: integer, description: "Until when, in milliseconds." }
+    SharesToday:
+      type: object
+      required: [refused, until]
+      properties:
+        refused: { const: shares_today }
+        until: { type: integer, description: "The start of the next UTC day, in milliseconds." }
     Proof:
       type: object
       required: [refused, salt, bits]

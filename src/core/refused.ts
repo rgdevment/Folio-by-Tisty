@@ -27,7 +27,7 @@ export type Refused =
   | { refused: "envelope"; why: EnvelopeRefusal }
   | { refused: "room_full"; held: number; arriving: number; atMost: number }
   | { refused: "terms"; version: string }
-  | { refused: "slow" | "quota"; until: number }
+  | { refused: "slow" | "quota" | "shares_today"; until: number }
   | { refused: "proof"; salt: string; bits: number };
 
 const LIMITER_WINDOW_MS = 60_000;

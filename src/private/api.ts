@@ -31,6 +31,7 @@ export const STATUS: Record<Refused["refused"], number> = {
   blocked: 403,
   slow: 429,
   quota: 429,
+  shares_today: 429,
   proof: 429,
   bad_report: 400,
   too_big: 413,

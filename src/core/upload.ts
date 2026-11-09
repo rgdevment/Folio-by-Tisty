@@ -128,7 +128,7 @@ const share = async (
     dayOf(now),
   );
   if (created === "quota") return { refused: "quota", until: hourEnds(now) };
-  if (created === "day_full") return { refused: "quota", until: (dayOf(now) + 1) * DAY_MS };
+  if (created === "day_full") return { refused: "shares_today", until: (dayOf(now) + 1) * DAY_MS };
   const refused = REFUSAL_OF_CREATED[created];
   return refused ? ({ refused } as Refused) : null;
 };
