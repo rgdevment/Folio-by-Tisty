@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   createHash,
   createPrivateKey,
@@ -8,7 +9,7 @@ import {
   verify,
 } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEVEL_ONE, publishedLimits } from "../src/core/limits.ts";
 import { dnsLookup } from "./dns.ts";
@@ -22,6 +23,7 @@ export interface LimitsFiles {
   publicKey: string;
   termsEs: string;
   termsEn: string;
+  workerSettings?: string;
 }
 
 interface Terms {
@@ -31,13 +33,16 @@ interface Terms {
 }
 
 const inDocs = (name: string): string => resolve(fileURLToPath(new URL(`../docs/${name}`, import.meta.url)));
-const PUBLISHED: LimitsFiles = {
-  limits: inDocs("limits.json"),
+// No limits path here: they live on their own branch, and docs/limits.json is a notice nothing signs again.
+const KEY_AND_TERMS: Omit<LimitsFiles, "limits"> = {
   publicKey: inDocs("limits.pub"),
   termsEs: inDocs("TERMINOS.md"),
   termsEn: inDocs("TERMS.md"),
 };
-const USAGE = "node scripts/limits-key.ts new <file> | sign <file> [days uploads halt, 0 to lift a pause]";
+export const WORKER_OPEN = /^SHARING_OPEN = "true"$/m;
+const USAGE =
+  "node scripts/limits-key.ts new <file> | sign <file> <limits branch> [days uploads halt, 0 to lift a pause]";
+const SIGNED_BYTES_AT_MOST = 16 * 1024;
 const SECONDS_IN_A_DAY = 86_400;
 const HALTED_DAYS_AT_MOST = 7;
 const KEY_ID_BYTES = 8;
@@ -147,7 +152,10 @@ const termsOf = (files: LimitsFiles, held: Terms | undefined): Terms => {
   return { version: String(Number(held?.version ?? 0) + 1), es, en };
 };
 
-export const createKeys = (keyFile: string, files: LimitsFiles = PUBLISHED): string => {
+export const createKeys = (
+  keyFile: string,
+  files: Partial<LimitsFiles> & Pick<LimitsFiles, "publicKey"> = KEY_AND_TERMS,
+): string => {
   if (existsSync(files.publicKey)) {
     throw new Error(
       `${files.publicKey} is the key Tisty is built with. Every copy built with it would stop hearing the limits, so remove it by hand if that is what you want.`,
@@ -163,8 +171,8 @@ export const signLimits = (
   keyFile: string,
   haltedDays: string | undefined,
   now: number,
-  server: Published = publishedLimits(LEVEL_ONE),
-  files: LimitsFiles = PUBLISHED,
+  server: Published,
+  files: LimitsFiles,
 ): void => {
   const current = existsSync(files.limits)
     ? (JSON.parse(readFileSync(files.limits, "utf8")) as Record<string, unknown>)
@@ -184,8 +192,15 @@ export const signLimits = (
   if (past.length > 0) throw new Error(`the server would not hold to these: ${past.join(", ")}`);
   const faults = [...sharingFaults(next), ...makerFaults(current.maker)];
   if (faults.length > 0) throw new Error(`Tisty would not take this: ${faults.join("; ")}`);
+  if (next.sharing_open === true && files.workerSettings !== undefined && !WORKER_OPEN.test(files.workerSettings)) {
+    throw new Error(
+      "sharing_open is true while main's wrangler.toml keeps SHARING_OPEN off: open and deploy the Worker first",
+    );
+  }
 
   const said = Buffer.from(`${JSON.stringify(next, null, 2)}\n`);
+  // Tisty reads no signed file past this, so a bigger one would leave every reader without limits.
+  if (said.length > SIGNED_BYTES_AT_MOST) throw new Error(`limits.json would be ${said.length} bytes, past 16 KiB`);
   const name = basename(files.limits);
   const signature = signedFile(said, name, readFileSync(keyFile, "utf8").trim(), now);
   if (!holdsSignature(said, signature, readFileSync(files.publicKey, "utf8"), name)) {
@@ -196,17 +211,22 @@ export const signLimits = (
 };
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [what, keyFile, haltedDays] = process.argv.slice(2);
+  const [what, keyFile, branch, haltedDays] = process.argv.slice(2);
   if (what === "new" && keyFile) {
     console.log(createKeys(keyFile));
-  } else if (what === "sign" && keyFile) {
-    const unpublished = await domainFaults(makerIn(PUBLISHED.limits) ?? { root: "" }, dnsLookup);
+  } else if (what === "sign" && keyFile && branch) {
+    execFileSync("git", ["fetch", "--quiet", "origin", "main"]);
+    const workerSettings = execFileSync("git", ["show", "origin/main:wrangler.toml"], { encoding: "utf8" });
+    const files = { ...KEY_AND_TERMS, limits: join(branch, "limits.json"), workerSettings };
+    const unpublished = await domainFaults(makerIn(files.limits) ?? { root: "" }, dnsLookup);
     if (unpublished.length > 0) {
       console.error(`the maker's domain does not hold, so nothing was signed: ${unpublished.join("; ")}`);
       process.exitCode = 1;
     } else {
-      signLimits(keyFile, haltedDays, Date.now());
-      console.log(`signed ${PUBLISHED.limits}`);
+      signLimits(keyFile, haltedDays, Date.now(), publishedLimits(LEVEL_ONE), files);
+      console.log(
+        `signed ${files.limits}: commit it on the limits branch, push it, then check what Tisty reads with gh workflow run published.yml`,
+      );
     }
   } else {
     console.error(USAGE);

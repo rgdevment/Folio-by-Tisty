@@ -25,6 +25,7 @@
   },
   "scripts": {
     "prepare": "git config --get core.hooksPath || git config core.hooksPath hooks || echo the hooks are not set: this is not a git clone",
+    "limits": "bash scripts/limits-fetch.sh",
     "test": "vitest run",
     "typecheck": "tsc && tsc -p tsconfig.page.json",
     "dev": "vite",

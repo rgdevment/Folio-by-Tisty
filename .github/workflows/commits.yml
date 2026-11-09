@@ -61,12 +61,6 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: bash scripts/commits.sh "$BASE..$HEAD"
 
-      - name: Check that the signed limits only move forward
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
-        run: bash scripts/limits-serial.sh "$BASE" "$HEAD"
-
       # The squash keeps the pull request's title and throws every subject above away, so this
       # is the only one that reaches main. GitHub appends the number, and it counts.
       - name: Check the subject the squash will keep

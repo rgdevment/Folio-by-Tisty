@@ -23,7 +23,7 @@ describe("what Tisty reads from GitHub", () => {
 
   it("says an older serial, which a cache can still be serving", () => {
     expect(publishedFaults(publishing({ serial: 19 }), publicKey, 20)).toEqual([
-      "limits.json says serial 19, and main has 20",
+      "limits.json says serial 19, and the limits branch has 20",
     ]);
   });
 

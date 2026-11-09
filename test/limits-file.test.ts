@@ -231,6 +231,14 @@ describe("signing the limits", () => {
     rmSync(place, { recursive: true, force: true });
   });
 
+  it("refuses to open sharing while main's Worker keeps it off", () => {
+    writeFileSync(files.limits, `${JSON.stringify({ serial: 1, sharing_open: true })}\n`);
+    const opening = (workerSettings: string) => () =>
+      signLimits(keyFile, undefined, NOW, SERVER, { ...files, workerSettings });
+    expect(opening('SHARING_OPEN = "false"\n')).toThrow("open and deploy the Worker first");
+    expect(opening('SHARING_OPEN = "true"\n')).not.toThrow();
+  });
+
   it("writes what its public key answers for, and each signing grows the serial", () => {
     signing();
     signing();
@@ -365,8 +373,30 @@ describe("the command", () => {
   });
 });
 
-describe("the limits Folio publishes", () => {
+describe("the notice left where Tisty 1.43.0 and older read", () => {
   const file = readFileSync("docs/limits.json");
+  const notice = JSON.parse(file.toString()) as Record<string, unknown>;
+  const branch = JSON.parse(readFileSync(".limits/limits.json", "utf8")) as { serial: number };
+
+  it("closes sharing and asks for 1.43.1, in a way they take", () => {
+    expect(notice.sharing_open).toBe(false);
+    expect(JSON.stringify(notice.sharing_closed_note)).toContain("1.43.1");
+    expect(sharingFaults(notice)).toEqual([]);
+  });
+
+  it("is signed with the key Tisty is built with", () => {
+    expect(
+      holdsSignature(file, readFileSync("docs/limits.json.minisig", "utf8"), TISTY_LIMITS_KEY, "limits.json"),
+    ).toBe(true);
+  });
+
+  it("stays under the branch's serial, so a Tisty that saw it still takes the branch after updating", () => {
+    expect(notice.serial as number).toBeLessThan(branch.serial);
+  });
+});
+
+describe("the limits Folio publishes", () => {
+  const file = readFileSync(".limits/limits.json");
   const published = JSON.parse(file.toString()) as Record<string, unknown>;
 
   it("ask for nothing the server would refuse", () => {
@@ -379,7 +409,7 @@ describe("the limits Folio publishes", () => {
   });
 
   it("are signed with the key Tisty is built with", () => {
-    const signature = readFileSync("docs/limits.json.minisig", "utf8");
+    const signature = readFileSync(".limits/limits.json.minisig", "utf8");
     expect(readFileSync("docs/limits.pub", "utf8").trim()).toBe(TISTY_LIMITS_KEY);
     expect(holdsSignature(file, signature, TISTY_LIMITS_KEY, "limits.json")).toBe(true);
   });

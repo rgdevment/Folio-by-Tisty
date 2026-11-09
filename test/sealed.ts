@@ -1,5 +1,5 @@
 import { VERSION } from "@tisty/contracts";
-import SIGNED_LIMITS from "../docs/limits.json";
+import SIGNED_LIMITS from "../.limits/limits.json";
 import { type Bytes, bigEndian, joined, sha256, words } from "../src/core/bytes";
 import { toBase64Url } from "../src/core/start";
 import { readEnvelope } from "../src/rules/envelope";

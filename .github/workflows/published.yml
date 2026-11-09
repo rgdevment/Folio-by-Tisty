@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - docs/limits.json
-      - docs/limits.json.minisig
       - docs/limits.pub
       - docs/TERMINOS.md
       - docs/TERMS.md
@@ -37,7 +35,39 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts
 
+      # A reader keeps the highest serial it saw, so the tip must pass every earlier one, not only its parent.
+      - name: The limits branch only moves forward
+        run: |
+          git fetch --quiet origin limits
+          parent=$(git rev-parse --quiet --verify FETCH_HEAD~1) || exit 0
+          bash scripts/limits-serial.sh "$parent" FETCH_HEAD
+          tip=$(git show FETCH_HEAD:limits.json | jq .serial)
+          highest=$(git rev-list "$parent" | while read -r commit; do git show "$commit:limits.json" | jq .serial; done | sort -n | tail -1)
+          if [ "$tip" -le "$highest" ]; then
+            echo "::error::the limits branch is at serial $tip, and it already carried $highest: readers keep that one"
+            exit 1
+          fi
+
+      - run: npm run limits
+
       - run: node scripts/limits-published.ts
+
+  domains:
+    name: The published domains hold their signatures
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: |
+          git clone --quiet --depth 1 --branch domains "https://github.com/${GITHUB_REPOSITORY}.git" "$RUNNER_TEMP/domains"
+          node scripts/domains.ts verify "$RUNNER_TEMP/domains"
 
   # The domain's owner writes the record, so the job holds no secret and passes nothing of it on.
   maker-domain:
@@ -52,4 +82,5 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false
+      - run: npm run limits
       - run: node scripts/limits-maker.ts

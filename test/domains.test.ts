@@ -7,7 +7,6 @@ import {
   approvedIn,
   failingLines,
   listFaults,
-  SHARDS,
   shardFaults,
   shardsOf,
   signShards,
@@ -153,9 +152,14 @@ ana.dev ${OTHER}`),
   });
 });
 
-describe("the shards Folio publishes", () => {
-  it("hold, signed with the key Tisty is built with", () => {
-    expect(shardFaults(SHARDS)).toEqual([]);
+describe("the domains branch checked out", () => {
+  it("keeps its .git and anything else that is not a shard when the shards are written again", () => {
+    const dir = mkdtempSync(join(tmpdir(), "domains-branch-"));
+    writeFileSync(join(dir, ".git"), "gitdir: elsewhere");
+    writeShards(new Map([["3f", "[]"]]), dir);
+    expect(existsSync(join(dir, ".git"))).toBe(true);
+    expect(shardFaults(dir, "").some((fault) => fault.includes(".git"))).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 

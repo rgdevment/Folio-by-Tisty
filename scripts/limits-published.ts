@@ -2,9 +2,10 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { holdsSignature } from "./limits-key.ts";
+import { holdsSignature, WORKER_OPEN } from "./limits-key.ts";
 
-const PUBLISHED_AT = "https://raw.githubusercontent.com/rgdevment/Folio-by-Tisty/main/docs";
+const LIMITS_AT = "https://raw.githubusercontent.com/rgdevment/Folio-by-Tisty/limits";
+const TERMS_AT = "https://raw.githubusercontent.com/rgdevment/Folio-by-Tisty/main/docs";
 const TRIES = 15;
 const BETWEEN_TRIES_MS = 60_000;
 
@@ -33,32 +34,53 @@ export const publishedFaults = (published: Published, publicKey: string, serialH
     ...(holdsSignature(published.limits, published.signature, publicKey, "limits.json")
       ? []
       : ["limits.json does not hold to its signature under docs/limits.pub"]),
-    ...(serial >= serialHere ? [] : [`limits.json says serial ${serial}, and main has ${serialHere}`]),
+    ...(serial >= serialHere ? [] : [`limits.json says serial ${serial}, and the limits branch has ${serialHere}`]),
     ...(said.terms?.es === sha256(published.es) ? [] : ["TERMINOS.md is not the text limits.json names"]),
     ...(said.terms?.en === sha256(published.en) ? [] : ["TERMS.md is not the text limits.json names"]),
   ];
 };
 
-const fetched = async (name: string): Promise<Buffer> => {
-  const answer = await fetch(`${PUBLISHED_AT}/${name}`, { redirect: "error" });
+const fetched = async (at: string, name: string): Promise<Buffer> => {
+  const answer = await fetch(`${at}/${name}`, { redirect: "error" });
   if (!answer.ok) throw new Error(`${name} answered ${answer.status}`);
   return Buffer.from(await answer.arrayBuffer());
 };
 
 const publishedNow = async (): Promise<Published> => {
   const [limits, signature, es, en] = await Promise.all([
-    fetched("limits.json"),
-    fetched("limits.json.minisig"),
-    fetched("TERMINOS.md"),
-    fetched("TERMS.md"),
+    fetched(LIMITS_AT, "limits.json"),
+    fetched(LIMITS_AT, "limits.json.minisig"),
+    fetched(TERMS_AT, "TERMINOS.md"),
+    fetched(TERMS_AT, "TERMS.md"),
   ]);
   return { limits, signature: signature.toString(), es, en };
+};
+
+// What a deploy is about to build with, against the terms of the commit it builds, before anything goes out.
+const here = (): void => {
+  const faults = publishedFaults(
+    {
+      limits: readFileSync(".limits/limits.json"),
+      signature: readFileSync(".limits/limits.json.minisig", "utf8"),
+      es: readFileSync("docs/TERMINOS.md"),
+      en: readFileSync("docs/TERMS.md"),
+    },
+    readFileSync("docs/limits.pub", "utf8"),
+    0,
+  );
+  const told = (parsed(readFileSync(".limits/limits.json")) as { sharing_open?: unknown } | null)?.sharing_open;
+  if (told === true && !WORKER_OPEN.test(readFileSync("wrangler.toml", "utf8"))) {
+    faults.push("the limits tell Tisty sharing is open, and this commit deploys the Worker with it off");
+  }
+  for (const fault of faults) console.log(`::error::${fault}`);
+  if (faults.length > 0) process.exitCode = 1;
+  else console.log("ok the limits fetched hold, name this commit's terms and agree with its Worker");
 };
 
 // A cache holds each file five minutes on its own, so a while of faults is expected; a quarter of an hour is not.
 const watch = async (): Promise<void> => {
   const publicKey = readFileSync("docs/limits.pub", "utf8");
-  const serialHere = (parsed(readFileSync("docs/limits.json"))?.serial as number | undefined) ?? 0;
+  const serialHere = (parsed(readFileSync(".limits/limits.json"))?.serial as number | undefined) ?? 0;
   for (let attempt = 1; attempt <= TRIES; attempt += 1) {
     const faults = await publishedNow().then(
       (published) => publishedFaults(published, publicKey, serialHere),
@@ -77,4 +99,7 @@ const watch = async (): Promise<void> => {
   }
 };
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await watch();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv[2] === "here") here();
+  else await watch();
+}

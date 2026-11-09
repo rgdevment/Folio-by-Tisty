@@ -6,5 +6,7 @@ coverage/
 .env*
 *.key
 
+.limits/
+
 .DS_Store
 Thumbs.db
