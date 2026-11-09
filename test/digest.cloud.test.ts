@@ -15,7 +15,8 @@ const testEnv = env as unknown as {
   ENVELOPES: R2Bucket;
   TEST_MIGRATIONS: Parameters<typeof applyD1Migrations>[1];
 };
-const store = new Cloud(testEnv);
+// Many documents of one owner in one day, which the daily cap of new shares would otherwise stop.
+const store = new Cloud(testEnv, { ...LEVEL_ONE, newSharesADay: 1000 });
 const NOW = Date.UTC(2026, 10, 20, 12);
 const LATER = NOW + 12 * 3_600_000;
 const TODAY = dayOf(NOW);

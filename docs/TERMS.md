@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 16, in force since November 8, 2026.**
+**Version 17, in force since November 9, 2026.**
 
 ## The short version
 
@@ -66,8 +66,9 @@ but what you do with what you read is your responsibility.
   will not be told.
 - **There are limits** on size, pictures and attachments, languages, documents
   shared at once and uploads per hour, which the service can change. Today each
-  key may have two documents shared at once, and each document up to 20
-  languages. Tisty warns you before sharing if something does not fit.
+  key may have two documents shared at once, share up to 10 new documents a
+  day, and each document up to 20 languages. Tisty warns you before sharing if
+  something does not fit.
 - **If the service reaches its spending limit,** it may stop taking documents or
   answering for a while. While it is stopped, nothing expires.
 

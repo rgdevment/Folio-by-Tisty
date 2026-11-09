@@ -12,7 +12,8 @@ const testEnv = env as unknown as {
   ENVELOPES: R2Bucket;
   TEST_MIGRATIONS: Parameters<typeof applyD1Migrations>[1];
 };
-const store = new Cloud(testEnv);
+// Many documents of one owner in one day, which the daily cap of new shares would otherwise stop.
+const store = new Cloud(testEnv, { ...LEVEL_ONE, newSharesADay: 1000 });
 const DAY = 20_000;
 const TABLES = [
   "docs",
@@ -1742,9 +1743,9 @@ describe("what each event writes, from start to end", () => {
     const { spent, cloud } = counting();
     await cloud.create(newDoc("d1"), DAY);
     await cloud.upload(upload("d1", 1), DAY);
-    expect(spent.written).toBe(5);
+    expect(spent.written).toBe(6);
     await cloud.upload(upload("d1", 2), DAY);
-    expect(spent.written).toBe(7);
+    expect(spent.written).toBe(8);
   });
 
   it("a report and a rejected report write a row with its index and none", async () => {

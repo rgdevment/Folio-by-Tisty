@@ -7,7 +7,7 @@ import type { ReadTools } from "./read";
 import { askForProof, type Refused, tooFast } from "./refused";
 import { hourEnds, hourOf, proofIsFresh, startHolds, toBase64Url, tokenHash } from "./start";
 import type { AcceptedTerms, Created, Held, Stage, Uploaded } from "./store";
-import { listFreesAt, uploadAllowedAt } from "./versions";
+import { listFreesAt, uploadAllowedAt, waitEndsAt } from "./versions";
 
 export interface FirstUpload {
   start: string;
@@ -106,6 +106,12 @@ const mayShare = async (
   return proved ? null : askForProof(secret, id, limits.proofBits, now);
 };
 
+const sharesToday = (now: number): Refused => ({ refused: "shares_today", until: (dayOf(now) + 1) * DAY_MS });
+
+// Only read, so a key past its day is told before the network's hour is spent; the take in create settles races.
+const dayIsFull = async (owner: string, now: number, { store, limits }: ReadTools): Promise<Refused | null> =>
+  (await store.sharedToday(owner, dayOf(now))) >= limits.newSharesADay ? sharesToday(now) : null;
+
 const share = async (
   { id, now }: Uploading,
   first: FirstUpload,
@@ -128,6 +134,7 @@ const share = async (
     dayOf(now),
   );
   if (created === "quota") return { refused: "quota", until: hourEnds(now) };
+  if (created === "day_full") return sharesToday(now);
   const refused = REFUSAL_OF_CREATED[created];
   return refused ? ({ refused } as Refused) : null;
 };
@@ -257,6 +264,12 @@ const storeVersion = async (
   }
   const bytes = await uploading.bytes();
   if (!bytes || bytes.length > limits.envelopeBytesAtMost) return { refused: "too_big" };
+  const hash = toBase64Url(await sha256(bytes));
+  // Before the envelope is opened, so pressing faster than the wait costs no signature; the same bytes may still retry.
+  if (held && !sharing && !held.blocked && !held.paused && held.versions.at(-1)?.hash !== hash) {
+    const waitEnds = waitEndsAt(held.versions, now, limits);
+    if (waitEnds > now) return { refused: "slow", until: waitEnds };
+  }
 
   const read = await readOrRefuse(id, bytes);
   if ("refused" in read) return read;
@@ -266,7 +279,6 @@ const storeVersion = async (
   const floor = limits.oldestContractTaken;
   if (floor !== null && isBelowVersion(manifest.contract, floor)) return { refused: "outdated" };
 
-  const hash = toBase64Url(await sha256(bytes));
   const version = termsAccepted(manifest, tools);
   const roots = rootsOf(read);
   const accepted = { root: signature.root, version: version ?? "", hour: hourOf(now) };
@@ -289,6 +301,9 @@ const storeVersion = async (
   if (newKey && stage === "new_keys_off") return { refused: "uploads_off" };
   if (sharing) {
     if (manifest.version !== 1) return { refused: "behind" };
+    const dayFull =
+      !held && sharing.anchor === undefined ? await dayIsFull((manifest.owner as Owner).root, now, tools) : null;
+    if (dayFull) return dayFull;
     // Before anything is written, or a refused first version could be sent again for free.
     const hourSpent = await takeUploadHour(net, now, tools);
     if (hourSpent) return hourSpent;

@@ -535,6 +535,19 @@ const UPLOADING: Scenario[] = [
   {
     method: "PUT",
     path: UPLOAD_PATH,
+    status: 429,
+    refused: "shares_today",
+    upload: envelope(1),
+    first: true,
+    admin: TOKEN,
+    solves: true,
+    ready: async () => {
+      LEVEL_ONE.newSharesADay = 0;
+    },
+  },
+  {
+    method: "PUT",
+    path: UPLOAD_PATH,
     status: 409,
     refused: "shares_full",
     upload: envelope(1),
@@ -738,6 +751,7 @@ beforeEach(async () => {
   LEVEL_ONE.oldestContractTaken = null;
   LEVEL_ONE.oldestContractServed = null;
   LEVEL_ONE.revocationsAnHour = 30;
+  LEVEL_ONE.newSharesADay = 10;
   LEVEL_ONE.uploadsAnHour = 60;
   LEVEL_ONE.keyBytesAtMost = 25_000_000;
   for (const table of [

@@ -6,7 +6,7 @@ import { answer } from "../src/admin/api";
 import { CloudDashboard } from "../src/cloudflare/dashboard";
 import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
-import { dayOf } from "../src/core/limits";
+import { dayOf, LEVEL_ONE } from "../src/core/limits";
 import { toBase64Url } from "../src/core/start";
 
 const testEnv = env as unknown as {
@@ -20,7 +20,8 @@ const TODAY = dayOf(NOW);
 const HOUR = Math.floor(NOW / 3_600_000);
 const ID = "AbCdEfGh";
 const ACCESS: AccessSettings = { team: "rina", audience: "the-panel", email: "mario@example.test" };
-const store = new Cloud(testEnv);
+// Many documents of one owner in one day, which the daily cap of new shares would otherwise stop.
+const store = new Cloud(testEnv, { ...LEVEL_ONE, newSharesADay: 1000 });
 const moderation = new CloudModeration(testEnv.DB);
 const dashboard = new CloudDashboard(testEnv.DB);
 const DIGEST = "A".repeat(43);

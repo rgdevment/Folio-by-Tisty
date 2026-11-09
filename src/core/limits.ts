@@ -1,6 +1,7 @@
 export interface Limits {
   ttlChoices: number[];
   sharesAtMost: number;
+  newSharesADay: number;
   languagesAtMost: number;
   daysAKeyIsNew: number;
   keyBytesAtMost: number;
@@ -56,6 +57,7 @@ export interface Limits {
 export const LEVEL_ONE: Limits = {
   ttlChoices: [1, 3, 7, 15],
   sharesAtMost: 2,
+  newSharesADay: 10,
   languagesAtMost: 20,
   daysAKeyIsNew: 30,
   keyBytesAtMost: 25_000_000,
@@ -78,7 +80,7 @@ export const LEVEL_ONE: Limits = {
   revocationsAnHour: 30,
   revocationsAtOnce: 8,
   uploadsOfARootAnHour: 10,
-  uploadWaitsMinutes: [1, 1, 1, 2, 4, 8, 15],
+  uploadWaitsMinutes: [5],
   uploadStreakResetMinutes: 30,
   oldestContractTaken: null,
   oldestContractServed: null,
@@ -112,6 +114,7 @@ export const LEVEL_ONE: Limits = {
 export const publishedLimits = (limits: Limits) => ({
   ttl_days: limits.ttlChoices,
   shares_at_most: limits.sharesAtMost,
+  new_shares_a_day: limits.newSharesADay,
   languages_at_most: limits.languagesAtMost,
   days_a_key_is_new: limits.daysAKeyIsNew,
   key_bytes_at_most: limits.keyBytesAtMost,
