@@ -1,4 +1,4 @@
-import SIGNED_LIMITS from "../../docs/limits.json";
+import SIGNED_LIMITS from "../../.limits/limits.json";
 import { type MailBindings, sendMail } from "../cloudflare/mail";
 import { CloudSpend, type SpendBindings } from "../cloudflare/spend";
 import { type Bindings, Cloud } from "../cloudflare/store";

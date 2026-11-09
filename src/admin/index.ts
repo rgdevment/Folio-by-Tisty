@@ -1,4 +1,4 @@
-import SIGNED_LIMITS from "../../docs/limits.json";
+import SIGNED_LIMITS from "../../.limits/limits.json";
 import { CloudDashboard } from "../cloudflare/dashboard";
 import { CloudModeration } from "../cloudflare/moderation";
 import { certsFrom } from "./access";

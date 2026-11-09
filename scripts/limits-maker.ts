@@ -33,7 +33,7 @@ export const makerIn = (limitsFile: string): Maker | undefined =>
   (JSON.parse(readFileSync(limitsFile, "utf8")) as { maker?: Maker }).maker;
 
 const watch = async (): Promise<void> => {
-  const maker = makerIn("docs/limits.json");
+  const maker = makerIn(".limits/limits.json");
   if (maker?.domain === undefined) {
     console.log("ok the maker names no domain");
     return;

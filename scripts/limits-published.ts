@@ -59,7 +59,7 @@ const publishedNow = async (): Promise<Published> => {
 // A cache holds each file five minutes on its own, so a while of faults is expected; a quarter of an hour is not.
 const watch = async (): Promise<void> => {
   const publicKey = readFileSync("docs/limits.pub", "utf8");
-  const serialHere = (parsed(readFileSync("docs/limits.json"))?.serial as number | undefined) ?? 0;
+  const serialHere = (parsed(readFileSync(".limits/limits.json"))?.serial as number | undefined) ?? 0;
   for (let attempt = 1; attempt <= TRIES; attempt += 1) {
     const faults = await publishedNow().then(
       (published) => publishedFaults(published, publicKey, serialHere),
