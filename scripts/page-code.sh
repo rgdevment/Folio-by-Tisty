@@ -11,7 +11,7 @@ as_browser() {
 }
 
 code_files() {
-  (cd "$page" && find . -type f \( -name '*.js' -o -name '*.css' -o -name index.html -o -name home.html -o -name widget-frame.html \) | sed 's|^\./||' | LC_ALL=C sort)
+  (cd "$page" && find . -type f \( -name '*.js' -o -name '*.css' -o -name index.html -o -name home.html -o -name 404.html -o -name widget-frame.html \) | sed 's|^\./||' | LC_ALL=C sort)
 }
 
 sums() {
@@ -44,6 +44,7 @@ served() {
         grep -qi '^speculation-rules:' "$headers" && prefetches=1
         ;;
       home.html) compare "$file" as_browser "$address/" ;;
+      404.html) compare "$file" as_browser "$address/404" ;;
       widget-frame.html) compare "$file" as_browser "$address/widget-frame" ;;
       *) compare "$file" curl -s --max-time 10 "$address/$file" ;;
     esac

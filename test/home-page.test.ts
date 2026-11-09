@@ -4,10 +4,11 @@ import { describe, expect, it } from "vitest";
 
 const read = (name: string): string => readFileSync(name, "utf8");
 const PLACE = "src/page/public";
-const PAGES = ["home.html"];
+const PAGES = ["home.html", "404.html"];
 const HTML = read(`${PLACE}/home.html`);
 const REDIRECTS = read(`${PLACE}/_redirects`);
 const LANGUAGE = read(`${PLACE}/language.js`);
+const MISSING = read(`${PLACE}/404.html`);
 const flat = HTML.replace(/\s+/g, " ");
 
 const visit = (browser: string | undefined) => {
@@ -85,6 +86,35 @@ describe("the home page", () => {
 
   it("is where the reader's name leads", () => {
     expect(read("src/page/index.html")).toContain('<a class="brand" href="/">');
+  });
+});
+
+describe("the page of a link that is gone", () => {
+  it("is tisty.cl's own, where the reader sends a missing link", () => {
+    expect(read("src/page/ui/main.ts")).toContain('const NOT_FOUND = "/404";');
+  });
+
+  it("says what Tisty's site says when a shared link is gone", () => {
+    const words = MISSING.replace(/\s+/g, " ");
+    expect(words).toContain("Esta nota se fue a descansar.");
+    expect(words).toContain("This note has gone to rest.");
+    expect(words).toContain("pídele a quien te lo envió un enlace nuevo");
+    expect(words).toContain("ask whoever sent it for a fresh link");
+  });
+
+  it("leads to Tisty's site in either language", () => {
+    for (const address of [
+      "https://www.tisty.app/",
+      "https://www.tisty.app/es/",
+      "https://www.tisty.app/docs/",
+      "https://www.tisty.app/es/ayuda/",
+    ]) {
+      expect(MISSING).toContain(`href="${address}"`);
+    }
+  });
+
+  it("is kept out of every search", () => {
+    expect(MISSING).toContain('<meta name="robots" content="noindex" />');
   });
 });
 

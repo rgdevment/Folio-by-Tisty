@@ -25,6 +25,7 @@ curl() {
   case $file in
     AAAAAAAA) file=index.html ;;
     "") file=home.html ;;
+    404) file=404.html ;;
     widget-frame) file=widget-frame.html ;;
   esac
   if [ "$out" = /dev/null ]; then :; else cat "$SITE/$file" > "$out"; fi
@@ -53,6 +54,7 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     writeFileSync(join(site, "index.html"), "<p>page</p>\n");
     writeFileSync(join(site, "widget-frame.html"), "<p>frame</p>\n");
     writeFileSync(join(site, "home.html"), "<p>home</p>\n");
+    writeFileSync(join(site, "404.html"), "<p>missing</p>\n");
     writeFileSync(join(site, "assets/app.js"), "code\n");
   });
 
@@ -66,10 +68,11 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     expect(answer.stdout).toContain("serves what was attested");
   });
 
-  it("lists the frame's page and the home among what is attested", () => {
+  it("lists the frame's page, the home and the missing page among what is attested", () => {
     const listed = run(`sums "${site}"`).stdout;
     expect(listed).toContain("widget-frame.html");
     expect(listed).toContain("home.html");
+    expect(listed).toContain("404.html");
   });
 
   it("sees a script Cloudflare adds only for a browser, also on the frame's page", () => {
@@ -78,6 +81,7 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     expect(answer.stdout).toContain("index.html");
     expect(answer.stdout).toContain("widget-frame.html");
     expect(answer.stdout).toContain("home.html");
+    expect(answer.stdout).toContain("404.html");
     expect(answer.stdout).not.toContain("app.js");
   });
 

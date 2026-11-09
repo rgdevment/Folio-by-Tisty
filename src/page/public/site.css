@@ -315,7 +315,162 @@ h1 {
 }
 
 .lost {
-  grid-template-columns: minmax(0, 1fr);
+  flex: 1;
+  width: 100%;
+  max-width: 46rem;
+  margin-inline: auto;
+  padding: 1.5rem 1.25rem 3.5rem;
+  text-align: center;
+}
+
+.asleep {
+  display: block;
+  width: auto;
+  height: 9rem;
+  margin-inline: auto;
+}
+
+.still {
+  fill: none;
+  stroke: var(--sheet-line);
+  stroke-linecap: round;
+  stroke-width: 5;
+}
+
+.still.last {
+  stroke: var(--flame);
+}
+
+.zzz text {
+  fill: var(--muted);
+  font-weight: 700;
+  animation: doze 3.2s ease-in-out infinite;
+}
+
+.zzz text:nth-child(2) {
+  animation-delay: 0.4s;
+}
+
+.zzz text:nth-child(3) {
+  animation-delay: 0.8s;
+}
+
+.moon-sky {
+  fill: var(--flame-tint);
+  stroke: var(--flame);
+  stroke-width: 1.5;
+}
+
+.moon {
+  fill: var(--flame);
+}
+
+.moon-shade {
+  fill: var(--flame-tint);
+}
+
+.lost-copy + .lost-copy {
+  margin-top: 6rem;
+}
+
+html[data-shown] .lost-copy + .lost-copy {
+  margin-top: 0;
+}
+
+.eyebrow {
+  margin: 2rem 0 0;
+  color: var(--flame-ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lost h1 {
+  margin-top: 1rem;
+  font-size: clamp(2rem, 1.5rem + 2.2vw, 3rem);
+}
+
+.lost .lead {
+  margin-inline: auto;
+  text-wrap: pretty;
+}
+
+.reasons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 3rem 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.reasons h2 {
+  margin-top: 1rem;
+}
+
+.badge {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--flame-tint);
+  color: var(--flame-ink);
+}
+
+.badge svg,
+.ask svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.ask {
+  max-width: 36rem;
+  margin: 1.5rem auto 0;
+  padding: 1rem 1.25rem;
+  border-radius: 1rem;
+  background: var(--flame-tint);
+  color: var(--fg);
+  font-size: 0.9rem;
+}
+
+.ask svg {
+  margin-right: 0.35rem;
+  color: var(--flame-ink);
+  vertical-align: -0.15em;
+}
+
+.meet {
+  margin-top: 3.5rem;
+  padding-top: 2.5rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.meet p {
+  max-width: 32rem;
+  margin: 0 auto;
+}
+
+.meet .action {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.button.ghost {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg);
 }
 
 .bottom {
@@ -329,6 +484,18 @@ h1 {
 
 .bottom a {
   text-underline-offset: 0.2em;
+}
+
+@keyframes doze {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
 }
 
 @keyframes breathe {
@@ -428,7 +595,8 @@ h1 {
 @media (prefers-reduced-motion: reduce) {
   .dot,
   .line,
-  .seal {
+  .seal,
+  .zzz text {
     animation: none;
   }
 
@@ -454,7 +622,8 @@ h1 {
     margin-bottom: 0.75rem;
   }
 
-  .facts {
+  .facts,
+  .reasons {
     grid-template-columns: minmax(0, 1fr);
   }
 }

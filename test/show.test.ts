@@ -9,7 +9,7 @@ import { showCase, showLink } from "../src/page/ui/show";
 // biome-ignore lint/suspicious/noExplicitAny: these are the contract's own samples, in the shape it writes them.
 const SAMPLES = VECTORS as any;
 const ID = "k7Qm2xPa";
-const NOT_FOUND = "https://www.tisty.app/404";
+const NOT_FOUND = "/404";
 
 const hex = (said: string) => Uint8Array.from(said.match(/../g) ?? [], (one) => Number.parseInt(one, 16));
 const arrived = (envelope: string) => ({ bytes: hex(envelope), arrivedAt: 1_800_000_000_000, diesOn: 21_000 });
