@@ -94,7 +94,16 @@ describe("the home page", () => {
   });
 
   it("is no longer sent to folio.tisty.app by what the repository tells", () => {
-    for (const told of ["README.md", "README.es.md", "PRIVACY.md", "PRIVACIDAD.md", "SECURITY.md", "SEGURIDAD.md"]) {
+    for (const told of [
+      "README.md",
+      "README.es.md",
+      "PRIVACY.md",
+      "PRIVACIDAD.md",
+      "SECURITY.md",
+      "SEGURIDAD.md",
+      "TERMS.md",
+      "TERMINOS.md",
+    ]) {
       expect(read(told.startsWith("README") ? told : `docs/${told}`)).not.toContain("folio.tisty.app");
     }
   });
