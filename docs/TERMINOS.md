@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 19, vigente desde el 10 de noviembre de 2026.**
+**Versión 20, vigente desde el 10 de noviembre de 2026.**
 
 ## En corto
 
@@ -240,9 +240,8 @@ guardarlo y servirlo a quien tenga el link mientras siga compartido. Los plazos
 y entregas de estos términos existen por seguridad y por la ley, no por una
 autorización que puedas retirar.
 
-Si compartes un documento que otras personas escribieron o editaron, o una
-copia de algo que otra persona compartió, declaras tener su permiso. Folio no
-lo comprueba, y la responsabilidad es tuya.
+Si compartes un documento que otras personas escribieron o editaron, declaras
+tener su permiso. Folio no lo comprueba, y la responsabilidad es tuya.
 
 ## Modo público (todavía no existe)
 
