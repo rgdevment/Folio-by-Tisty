@@ -879,6 +879,14 @@ describe("the written API", () => {
     expect(JSON.parse(response.headers.get("Folio-Revocations") ?? "null")).toEqual([said]);
   });
 
+  it("says on latest when the next version is taken, while the wait runs", async () => {
+    await store.create({ id: ID, owner: "o1", adminHash: await tokenHash(TOKEN), ttlDays: 3, net: "n" }, TODAY);
+    const at = Date.now();
+    await store.upload({ ...SIGNED_BY_THE_OWNER, id: ID, n: 1, hash: "h1", body: "sealed", net: "n", at }, TODAY);
+    const latest = await send({ method: "GET", path: LATEST_PATH, status: 200 });
+    expect(await latest.json()).toEqual({ version: 1, hash: "h1", nextAt: at + 5 * 60_000 });
+  });
+
   it("serves through the last day to correct, stops after it, and a new version lifts it", async () => {
     await shareSigned();
     const fixBy = (day: number) => testEnv.DB.prepare(`UPDATE docs SET fix_by = ? WHERE id = '${ID}'`).bind(day).run();
