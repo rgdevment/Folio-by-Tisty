@@ -20,7 +20,7 @@ const ID = "AbCdEfGh";
 const API = "https://tisty.cl/api/v1/";
 const DOC = `${API}docs/${ID}`;
 const TOKEN = "the admin token";
-const PERMIT = "P".repeat(43);
+const PERMIT = `${"P".repeat(42)}A`;
 const TABLES = ["docs", "net_day", "net_hour", "reports", "false_reporters", "holds", "service_stage", "revocations"];
 
 let network = 0;
@@ -129,6 +129,9 @@ describe("the permit route", () => {
     ["a short permit", '{"permit":"abc"}'],
     ["a long permit", `{"permit":"${"A".repeat(44)}"}`],
     ["a permit with a slash", `{"permit":"${"A".repeat(42)}/"}`],
+    ["a permit with bits past its 32 bytes", `{"permit":"${"P".repeat(43)}"}`],
+    ["a permit of small order", `{"permit":"${"A".repeat(43)}"}`],
+    ["the other spelling of a small-order permit", '{"permit":"7P________________________________________8"}'],
     ["a body past its size", `{"permit":"${PERMIT}","pad":"${"x".repeat(300)}"}`],
   ])("refuses %s with 400 and keeps the permit as it was", async (_what, body) => {
     await share();

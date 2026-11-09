@@ -580,7 +580,9 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Done" }
         "400":
-          description: It is not a permit.
+          description: |
+            It is not a permit: not a key under the contract's rules, which also refuse bits past its 32 bytes
+            and a key of small order.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BadUpload" }

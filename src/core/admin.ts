@@ -1,3 +1,4 @@
+import { check } from "@tisty/contracts/check";
 import { dayOf } from "./limits";
 import { netDigest } from "./net";
 import { type Refused, tooFast } from "./refused";
@@ -40,7 +41,8 @@ const appeal = async (
 export const setPermitHolds = (said: unknown): said is { permit: string | null } => {
   if (typeof said !== "object" || said === null || !("permit" in said)) return false;
   const { permit } = said as { permit: unknown };
-  return permit === null || (typeof permit === "string" && /^[A-Za-z0-9_-]{43}$/.test(permit));
+  // The owner block takes the permit as a contract key, so one the contract refuses could never sign a version.
+  return permit === null || !check("owner", { permit }).some((amiss) => amiss.startsWith("permit "));
 };
 
 export const administer = async (
