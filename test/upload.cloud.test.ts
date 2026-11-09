@@ -152,10 +152,13 @@ describe("sharing something new", () => {
   });
 
   it("stops at the shares a person may keep", async () => {
-    for (let at = 0; at < LIMITS.sharesAtMost; at += 1) await shared();
+    const two = { ...LIMITS, sharesAtMost: 2 };
+    const capped = { ...tools, store: new Cloud(testEnv, two), limits: two };
+    for (let at = 0; at < two.sharesAtMost; at += 1) await shared();
     const first = await started();
     const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
-    expect(await send(first.id, bytes, NOW, first)).toEqual({ refused: "shares_full" });
+    const sending = { id: first.id, now: NOW, ip: "203.0.113.9", bytes: async () => bytes, first };
+    expect(await uploadDoc(sending, capped)).toEqual({ refused: "shares_full" });
   });
 
   it("refuses what is sealed for another id, and what does not hold", async () => {

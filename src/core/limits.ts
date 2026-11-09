@@ -56,7 +56,7 @@ export interface Limits {
 // Level 1 (decisions 36, 41, 42, 49, 93 bis, 97, 116, 128 and 136). What Tisty reads of them is signed in docs/limits.json (decision 120).
 export const LEVEL_ONE: Limits = {
   ttlChoices: [1, 3, 7, 15],
-  sharesAtMost: 2,
+  sharesAtMost: 20,
   newSharesADay: 10,
   languagesAtMost: 20,
   daysAKeyIsNew: 30,
