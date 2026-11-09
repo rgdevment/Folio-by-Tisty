@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 20, in force since November 10, 2026.**
+**Version 21, in force since November 10, 2026.**
 
 ## The short version
 
@@ -27,8 +27,8 @@ receives and shows: documents are edited in Tisty, never here.
 
 ## What they cover
 
-The service that stores and serves shared documents, at tisty.cl, the page where
-they are read in a browser and the site folio.tisty.app. Today only the private
+The service that stores and serves shared documents at tisty.cl, the page where
+they are read in a browser and the home that explains it. Today only the private
 mode exists; the public mode has its own section below and does not work yet.
 The Tisty app has [terms of its
 own](https://github.com/rgdevment/Tisty/blob/main/TERMS.md).
@@ -249,7 +249,7 @@ to it. It says what is planned, which may change. Before you use it, Tisty will
 ask you to accept its rules separately.
 
 - **What is published would not be encrypted.** It would be kept signed and
-  unencrypted, and anyone could read it at folio.tisty.app, the operator too.
+  unencrypted, and anyone could read it, the operator too.
   The server would neither open nor change it, and would serve it from a cache.
 - **It would not expire for lack of readers.** It would be removed after 12
   months with no activity of yours, with notice in Tisty, or when you delete it.
@@ -299,8 +299,8 @@ longer look after it, the service may stop without notice.
 ## Notices
 
 There are no accounts or addresses of yours, so we cannot write to you. Notices
-are posted at folio.tisty.app and in the repository, and Tisty shows them before
-you share.
+are posted on tisty.cl and in the repository, and Tisty shows them before you
+share.
 
 ## Governing law
 

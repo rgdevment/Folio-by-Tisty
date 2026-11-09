@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 20, vigente desde el 10 de noviembre de 2026.**
+**Versión 21, vigente desde el 10 de noviembre de 2026.**
 
 ## En corto
 
@@ -28,10 +28,10 @@ muestra: los documentos se editan en Tisty, nunca aquí.
 
 ## Qué cubren
 
-El servicio que guarda y sirve los documentos compartidos, en tisty.cl, la
-página donde se leen en un navegador y el sitio folio.tisty.app. Hoy solo existe
-el modo privado; el modo público tiene su propia sección más abajo y todavía no
-funciona. La app Tisty tiene sus propios
+El servicio que guarda y sirve los documentos compartidos en tisty.cl, la
+página donde se leen en un navegador y la portada que lo explica. Hoy solo
+existe el modo privado; el modo público tiene su propia sección más abajo y
+todavía no funciona. La app Tisty tiene sus propios
 [términos](https://github.com/rgdevment/Tisty/blob/main/TERMS.md).
 
 Si las versiones en español e inglés difieren, manda la española.
@@ -250,8 +250,8 @@ Dice lo que está previsto, que puede cambiar. Antes de usarlo, Tisty te pedirá
 aceptar sus reglas aparte.
 
 - **Lo publicado no iría cifrado.** Se guardaría firmado y sin cifrar, y lo
-  podría leer cualquiera en folio.tisty.app, también el operador. El servidor no
-  lo abriría ni lo cambiaría, y lo serviría desde una caché.
+  podría leer cualquiera, también el operador. El servidor no lo abriría ni lo
+  cambiaría, y lo serviría desde una caché.
 - **No caducaría por falta de lecturas.** Se retiraría tras 12 meses sin
   actividad tuya, con aviso en Tisty, o cuando lo borres. Una copia en caché, en
   un buscador o en manos de quien ya lo leyó podría seguir existiendo.
@@ -297,7 +297,7 @@ el operador ya no puede atenderlo, el servicio puede detenerse sin aviso.
 ## Avisos
 
 No hay cuentas ni correos tuyos, así que no podemos escribirte. Los avisos se
-publican en folio.tisty.app y en el repositorio, y Tisty los muestra antes de
+publican en tisty.cl y en el repositorio, y Tisty los muestra antes de
 compartir.
 
 ## Ley aplicable
