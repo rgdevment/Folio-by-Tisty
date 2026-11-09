@@ -195,6 +195,11 @@ describe("each cron", () => {
     expect(await diesOn("gone")).toBe(DAY - 1);
   });
 
+  it("the review that cannot go through stops uploads, and reads go on", async () => {
+    await expect(fire("*/5 * * * *", (DAY + 1) * 86_400_000, { BILLING_DAY: "" })).rejects.toThrow("renewal day");
+    expect(await store.stage()).toBe("no_uploads");
+  });
+
   it("the hour sweeps", async () => {
     await dying("gone", DAY - 1);
     await fire("0 * * * *", (DAY + 1) * 86_400_000);

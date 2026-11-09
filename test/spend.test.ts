@@ -216,14 +216,22 @@ describe("checking", () => {
     expect(usageSince).toHaveBeenCalledWith(Date.UTC(2026, 10, 15), NOW);
   });
 
-  it("still answers its stage when what it found cannot be noted for the panel", async () => {
-    const { set } = tools(costing(11), "open");
+  it("sets its stage, then fails when it cannot note what it found, since that time keeps uploads open", async () => {
+    const { set, steps } = tools(costing(11), "open");
     set.store.noteSpend = async () => {
       throw new Error("D1 is busy");
     };
+    await expect(checkSpend(NOW, RENEWAL, set)).rejects.toThrow("D1 is busy");
+    expect(steps).toEqual(["rule:true", "stage:blocked"]);
+  });
+
+  it("keeps the review's own error when stopping uploads fails too", async () => {
+    const { set } = tools(quiet, "open");
+    set.usageSince = () => Promise.reject(new Error("no usage"));
+    set.store.setStage = () => Promise.reject(new Error("D1 is down"));
     const said = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(await checkSpend(NOW, RENEWAL, set)).toBe("blocked");
-    expect(said).toHaveBeenCalled();
+    await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
+    expect(said.mock.calls.flat().join(" ")).toContain("D1 is down");
     said.mockRestore();
   });
 
