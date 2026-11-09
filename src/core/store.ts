@@ -145,6 +145,7 @@ export type Created =
   | "languages_full"
   | "no_anchor"
   | "quota"
+  | "day_full"
   | "bad_ttl";
 export type Uploaded =
   | "stored"

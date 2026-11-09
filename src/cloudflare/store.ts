@@ -164,6 +164,14 @@ export class Cloud implements Store {
     const held = await this.#row(doc.id);
     if (held) return this.#retried(held, doc);
     if (!(await this.#takeQuota(doc.net, 1, 0, today))) return "quota";
+    // Per key and day, so stopping one to share another never turns two at once into as many as anyone likes.
+    if (
+      doc.anchor === undefined &&
+      !(await this.takeHourly(`root:${doc.owner}`, "share", today * 24, this.#limits.newSharesADay))
+    ) {
+      await this.#giveQuotaBack(doc.net, 1, 0, today);
+      return "day_full";
+    }
     const otherLanguages = this.#limits.languagesAtMost - 1;
     const inserted = await this.#db
       .prepare(
@@ -194,6 +202,7 @@ export class Cloud implements Store {
       .run();
     if (inserted.meta.changes > 0) return "created";
     await this.#giveQuotaBack(doc.net, 1, 0, today);
+    if (doc.anchor === undefined) await this.#giveShareBack(doc.owner, today);
     const raced = await this.#row(doc.id);
     if (raced) return this.#retried(raced, doc);
     if (doc.anchor === undefined) return "shares_full";
@@ -769,6 +778,13 @@ export class Cloud implements Store {
       .bind(net, action, hour, atMost, taking)
       .run();
     return taken.meta.changes > 0;
+  }
+
+  async #giveShareBack(owner: string, today: number): Promise<void> {
+    await this.#db
+      .prepare("UPDATE net_hour SET n = n - 1 WHERE net = ?1 AND action = 'share' AND hour = ?2 AND n > 0")
+      .bind(`root:${owner}`, today * 24)
+      .run();
   }
 
   #createSeen(day: number): string {

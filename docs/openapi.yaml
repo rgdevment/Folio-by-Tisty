@@ -207,6 +207,11 @@ paths:
 
         A root Folio has not seen is kept for good, and a network brings only so many new ones a day. Past
         that it answers `quota` until the next day, while a root it knows goes on.
+
+        A root shares at most `new_shares_a_day` new documents a day, a document's languages and its retries
+        aside, and one stopped since still counts. Past that a new document gets `quota` until the next day.
+        A document takes a new version at most every `upload_waits_minutes`; sooner, it gets `slow`, and
+        nothing is written.
       parameters:
         - $ref: "#/components/parameters/Proof"
         - name: Folio-Files

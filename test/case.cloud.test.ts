@@ -5,7 +5,7 @@ import { madeCase as caseFromThePanel } from "../src/admin/page/case";
 import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
 import { isSealedRecords } from "../src/core/case-records";
-import { dayOf } from "../src/core/limits";
+import { dayOf, LEVEL_ONE } from "../src/core/limits";
 import { tokenHash } from "../src/core/start";
 import worker from "../src/private/index";
 import { SIGNED_BY_THE_OWNER } from "./sealed";
@@ -23,7 +23,8 @@ const OTHER = "IjKlMnOp";
 const TOKEN = "T".repeat(43);
 const FILES = "F".repeat(43);
 const SEALED = "case1.c2VhbGVk";
-const store = new Cloud(testEnv);
+// Many documents of one owner in one day, which the daily cap of new shares would otherwise stop.
+const store = new Cloud(testEnv, { ...LEVEL_ONE, newSharesADay: 1000 });
 const moderation = new CloudModeration(testEnv.DB);
 
 let network = 0;

@@ -1,6 +1,6 @@
 # Términos de uso de Folio by Tisty
 
-**Versión 16, vigente desde el 8 de noviembre de 2026.**
+**Versión 17, vigente desde el 9 de noviembre de 2026.**
 
 ## En corto
 
@@ -68,8 +68,9 @@ con lo que lees es tu responsabilidad.
   ese borrado, y no se te avisará.
 - **Hay topes** de tamaño, de imágenes y adjuntos, de idiomas, de documentos
   compartidos a la vez y de subidas por hora, que el servicio puede cambiar. Hoy
-  cada llave puede tener dos documentos compartidos a la vez, y cada documento
-  hasta 20 idiomas. Tisty te avisa antes de compartir si algo no cabe.
+  cada llave puede tener dos documentos compartidos a la vez, compartir hasta
+  10 documentos nuevos al día, y cada documento hasta 20 idiomas. Tisty te avisa
+  antes de compartir si algo no cabe.
 - **Si el servicio llega a su límite de gasto,** puede dejar de aceptar
   documentos o de responder por un tiempo. Mientras esté detenido, nada caduca.
 
