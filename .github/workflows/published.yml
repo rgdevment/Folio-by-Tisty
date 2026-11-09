@@ -35,16 +35,18 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts
 
-      # Every commit of the last eight days against the one before, so a run every six hours misses none.
+      # A reader keeps the highest serial it saw, so the tip must pass every earlier one, not only its parent.
       - name: The limits branch only moves forward
         run: |
           git fetch --quiet origin limits
-          status=0
-          for commit in $(git rev-list --since="8 days ago" FETCH_HEAD); do
-            parent=$(git rev-parse --quiet --verify "$commit~1") || continue
-            bash scripts/limits-serial.sh "$parent" "$commit" || status=1
-          done
-          exit $status
+          parent=$(git rev-parse --quiet --verify FETCH_HEAD~1) || exit 0
+          bash scripts/limits-serial.sh "$parent" FETCH_HEAD
+          tip=$(git show FETCH_HEAD:limits.json | jq .serial)
+          highest=$(git rev-list "$parent" | while read -r commit; do git show "$commit:limits.json" | jq .serial; done | sort -n | tail -1)
+          if [ "$tip" -le "$highest" ]; then
+            echo "::error::the limits branch is at serial $tip, and it already carried $highest: readers keep that one"
+            exit 1
+          fi
 
       - run: npm run limits
 

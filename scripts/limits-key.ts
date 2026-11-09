@@ -22,6 +22,7 @@ export interface LimitsFiles {
   publicKey: string;
   termsEs: string;
   termsEn: string;
+  worker?: string;
 }
 
 interface Terms {
@@ -36,7 +37,9 @@ const KEY_AND_TERMS: Omit<LimitsFiles, "limits"> = {
   publicKey: inDocs("limits.pub"),
   termsEs: inDocs("TERMINOS.md"),
   termsEn: inDocs("TERMS.md"),
+  worker: resolve(fileURLToPath(new URL("../wrangler.toml", import.meta.url))),
 };
+const WORKER_OPEN = /^SHARING_OPEN = "true"$/m;
 const USAGE =
   "node scripts/limits-key.ts new <file> | sign <file> <limits branch> [days uploads halt, 0 to lift a pause]";
 const SIGNED_BYTES_AT_MOST = 16 * 1024;
@@ -189,6 +192,11 @@ export const signLimits = (
   if (past.length > 0) throw new Error(`the server would not hold to these: ${past.join(", ")}`);
   const faults = [...sharingFaults(next), ...makerFaults(current.maker)];
   if (faults.length > 0) throw new Error(`Tisty would not take this: ${faults.join("; ")}`);
+  if (next.sharing_open === true && files.worker && !WORKER_OPEN.test(readFileSync(files.worker, "utf8"))) {
+    throw new Error(
+      `sharing_open is true while ${files.worker} keeps SHARING_OPEN off: open and deploy the Worker first`,
+    );
+  }
 
   const said = Buffer.from(`${JSON.stringify(next, null, 2)}\n`);
   // Tisty reads no signed file past this, so a bigger one would leave every reader without limits.
@@ -214,7 +222,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       process.exitCode = 1;
     } else {
       signLimits(keyFile, haltedDays, Date.now(), publishedLimits(LEVEL_ONE), files);
-      console.log(`signed ${files.limits}: commit it on the limits branch and push it`);
+      console.log(
+        `signed ${files.limits}: commit it on the limits branch, push it, then check what Tisty reads with gh workflow run published.yml`,
+      );
     }
   } else {
     console.error(USAGE);

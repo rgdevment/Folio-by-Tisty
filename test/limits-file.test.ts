@@ -231,6 +231,16 @@ describe("signing the limits", () => {
     rmSync(place, { recursive: true, force: true });
   });
 
+  it("refuses to open sharing while the Worker it names keeps it off", () => {
+    const worker = join(place, "wrangler.toml");
+    writeFileSync(worker, 'SHARING_OPEN = "false"\n');
+    writeFileSync(files.limits, `${JSON.stringify({ serial: 1, sharing_open: true })}\n`);
+    const opening = () => signLimits(keyFile, undefined, NOW, SERVER, { ...files, worker });
+    expect(opening).toThrow("open and deploy the Worker first");
+    writeFileSync(worker, 'SHARING_OPEN = "true"\n');
+    expect(opening).not.toThrow();
+  });
+
   it("writes what its public key answers for, and each signing grows the serial", () => {
     signing();
     signing();

@@ -72,7 +72,11 @@ Node 22 is all it asks for:
 ```sh
 git clone https://github.com/rgdevment/Folio-by-Tisty.git
 npm ci
+npm run limits
 ```
+
+`npm run limits` copies the signed limits from their own branch into
+`.limits/`, which git does not keep. The build and the tests read them there.
 
 Before opening a pull request, run what CI runs:
 
