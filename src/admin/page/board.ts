@@ -1,4 +1,5 @@
 import type { About, Logged, NetsNearTheirTop, Overview, ServiceDay } from "../../core/dashboard";
+import { UNREVIEWED_MS_TO_CLOSE } from "../../core/spend";
 import {
   bar,
   cell,
@@ -41,7 +42,6 @@ const ACTIONS: Record<string, string> = {
   opened: "Abrir para verificar",
 };
 
-const SPEND_STALE_MS = 3_600_000;
 const SWEEP_STALE_HOURS = 26;
 
 const tile = (page: Document, label: string, value: string, under: string, tone: Tone): HTMLElement => {
@@ -167,7 +167,7 @@ export const drawHealth = (page: Document, place: Element, seen: Overlook, now: 
       SWEEP_STALE_HOURS * HOUR_MS,
       now,
     ),
-    beat(page, "gasto", beats.spentAt, SPEND_STALE_MS, now),
+    beat(page, "gasto", beats.spentAt, UNREVIEWED_MS_TO_CLOSE, now),
     piece(page, "span", "soft", digestSaid(beats.digestedHour, now)),
     piece(page, "span", "soft", "respaldo: en GitHub Actions"),
   );

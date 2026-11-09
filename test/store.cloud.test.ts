@@ -891,6 +891,8 @@ describe("what the hour's count writes", () => {
 });
 
 describe("creating", () => {
+  const store = withLimits({ sharesAtMost: 2 });
+
   it("stops at the owner's shares", async () => {
     expect(await store.create(newDoc("d1"), DAY)).toBe("created");
     expect(await store.create(newDoc("d2"), DAY)).toBe("created");
@@ -913,7 +915,7 @@ describe("creating", () => {
 
   it("stops at the shares when many arrive at once", async () => {
     const answers = await Promise.all(["a", "b", "c", "d"].map((id) => store.create(newDoc(id), DAY)));
-    expect(answers.filter((one) => one === "created").length).toBe(LEVEL_ONE.sharesAtMost);
+    expect(answers.filter((one) => one === "created").length).toBe(2);
   });
 
   it("does not count languages or what is held as shares", async () => {

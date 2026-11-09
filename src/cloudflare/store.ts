@@ -1356,6 +1356,13 @@ export class Cloud implements Store {
     return deleted?.meta.changes ?? 0;
   }
 
+  async spentAt(): Promise<number | null> {
+    const row = await this.#db
+      .prepare("SELECT spent_at FROM service_stage WHERE id = 1")
+      .first<{ spent_at: number | null }>();
+    return row?.spent_at ?? null;
+  }
+
   async stage(): Promise<Stage> {
     const row = await this.#db.prepare("SELECT stage FROM service_stage WHERE id = 1").first<{ stage: Stage }>();
     return row?.stage ?? "open";

@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { billOf, checkSpend, cycleOf, lineOf, type SpendTools, stageOf, type Usage } from "../src/core/spend";
+import {
+  billOf,
+  checkSpend,
+  cycleOf,
+  lineOf,
+  reviewOrClose,
+  type SpendTools,
+  stageOf,
+  type Usage,
+} from "../src/core/spend";
 import type { Stage } from "../src/core/store";
 
 const quiet: Usage = { requests: 0, rowsRead: 0, rowsWritten: 0, classA: 0, classB: 0, storedGb: 0 };
@@ -152,6 +161,46 @@ describe("checking", () => {
     expect(steps).toEqual([]);
   });
 
+  const MINUTE = 60_000;
+  const unreviewed = (was: Stage, spentAt: number | null) => {
+    const { set, steps } = tools(quiet, was);
+    set.usageSince = () => Promise.reject(new Error("no usage"));
+    set.store.spentAt = async () => spentAt;
+    return { set, steps };
+  };
+
+  it("stops uploads once no review has gone through for fifteen minutes", async () => {
+    const { set, steps } = unreviewed("open", NOW - 15 * MINUTE);
+    await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
+    expect(steps).toEqual(["stage:no_uploads"]);
+  });
+
+  it("lets one missed review pass", async () => {
+    const { set, steps } = unreviewed("open", NOW - 5 * MINUTE);
+    await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
+    expect(steps).toEqual([]);
+  });
+
+  it("stops uploads when no review ever went through", async () => {
+    const { set, steps } = unreviewed("warned", null);
+    await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
+    expect(steps).toEqual(["stage:no_uploads"]);
+  });
+
+  it("never loosens a stage already closed while reviews fail", async () => {
+    for (const was of ["no_uploads", "blocked"] as Stage[]) {
+      const { set, steps } = unreviewed(was, null);
+      await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
+      expect(steps).toEqual([]);
+    }
+  });
+
+  it("opens again on the first review that goes through", async () => {
+    const { set, steps } = tools(quiet, "no_uploads");
+    expect(await reviewOrClose(NOW, RENEWAL, set)).toBe("open");
+    expect(steps).toEqual(["stage:open"]);
+  });
+
   it("keeps the stage when the usage cannot be read", async () => {
     const { set, steps } = tools(quiet, "blocked");
     set.usageSince = () => Promise.reject(new Error("no usage"));
@@ -167,14 +216,22 @@ describe("checking", () => {
     expect(usageSince).toHaveBeenCalledWith(Date.UTC(2026, 10, 15), NOW);
   });
 
-  it("still answers its stage when what it found cannot be noted for the panel", async () => {
-    const { set } = tools(costing(11), "open");
+  it("sets its stage, then fails when it cannot note what it found, since that time keeps uploads open", async () => {
+    const { set, steps } = tools(costing(11), "open");
     set.store.noteSpend = async () => {
       throw new Error("D1 is busy");
     };
+    await expect(checkSpend(NOW, RENEWAL, set)).rejects.toThrow("D1 is busy");
+    expect(steps).toEqual(["rule:true", "stage:blocked"]);
+  });
+
+  it("keeps the review's own error when stopping uploads fails too", async () => {
+    const { set } = tools(quiet, "open");
+    set.usageSince = () => Promise.reject(new Error("no usage"));
+    set.store.setStage = () => Promise.reject(new Error("D1 is down"));
     const said = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(await checkSpend(NOW, RENEWAL, set)).toBe("blocked");
-    expect(said).toHaveBeenCalled();
+    await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
+    expect(said.mock.calls.flat().join(" ")).toContain("D1 is down");
     said.mockRestore();
   });
 

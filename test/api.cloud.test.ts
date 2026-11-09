@@ -189,6 +189,7 @@ const listFull = async () => {
     .run();
 };
 const keepsAsManyAsTheyMay = async () => {
+  LEVEL_ONE.sharesAtMost = 2;
   for (const id of ["AAAAAAAA", "BBBBBBBB"]) {
     await store.create({ id, owner: rootOf(owner), adminHash: "a", ttlDays: 3, net: "n" }, TODAY);
   }
@@ -752,6 +753,7 @@ beforeEach(async () => {
   LEVEL_ONE.oldestContractServed = null;
   LEVEL_ONE.revocationsAnHour = 30;
   LEVEL_ONE.newSharesADay = 10;
+  LEVEL_ONE.sharesAtMost = 20;
   LEVEL_ONE.uploadsAnHour = 60;
   LEVEL_ONE.keyBytesAtMost = 25_000_000;
   for (const table of [

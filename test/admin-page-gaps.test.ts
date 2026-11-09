@@ -8,6 +8,7 @@ import { drawKey } from "../src/admin/page/key";
 import { ago, when } from "../src/admin/page/say";
 import type { KeyView } from "../src/core/dashboard";
 import type { Queue } from "../src/core/queue";
+import { UNREVIEWED_MS_TO_CLOSE } from "../src/core/spend";
 
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
@@ -120,9 +121,9 @@ describe("the tones that warn the operator", () => {
   });
 
   it.each([
-    [HOUR, "✓"],
-    [HOUR + 1, "✗"],
-  ])("calls a spend check %i ms old %s", (old, mark) => {
+    [UNREVIEWED_MS_TO_CLOSE, "✓"],
+    [UNREVIEWED_MS_TO_CLOSE + 1, "✗"],
+  ])("calls a spend check %i ms old %s, as uploads stop then", (old, mark) => {
     const page = fresh();
     const seen = { ...OVERLOOK, beats: { ...OVERLOOK.beats, spentAt: NOW - old } };
     drawHealth(page, page.getElementById("health") as Element, seen, NOW);

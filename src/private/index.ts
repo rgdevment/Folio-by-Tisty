@@ -5,7 +5,7 @@ import { type Bindings, Cloud } from "../cloudflare/store";
 import { sendDigest } from "../core/digest";
 import { dayOf, LEVEL_ONE } from "../core/limits";
 import { DayKeys } from "../core/net";
-import { checkSpend } from "../core/spend";
+import { reviewOrClose } from "../core/spend";
 import { hourOf } from "../core/start";
 import { answer } from "./api";
 
@@ -30,14 +30,14 @@ const makerRootOf = (limits: object): string | null => {
 const MAKER_ROOT = makerRootOf(SIGNED_LIMITS);
 
 const WEEKLY = "0 4 * * SUN";
-const SPEND = "*/15 * * * *";
+const SPEND = "*/5 * * * *";
 const DIGEST = "0 0,6,12,18 * * *";
 const dayKeys = new DayKeys();
 const evidenceKeys = new DayKeys();
 
 const reviewSpend = async (now: number, env: Env): Promise<void> => {
   const spend = new CloudSpend(env);
-  const stage = await checkSpend(now, Number(env.BILLING_DAY), {
+  const stage = await reviewOrClose(now, Number(env.BILLING_DAY), {
     store: new Cloud(env),
     usageSince: (start, until) => spend.usageSince(start, until),
     setBlocked: (blocked) => spend.setBlocked(blocked),

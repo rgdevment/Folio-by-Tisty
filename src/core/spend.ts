@@ -69,10 +69,41 @@ export const stageOf = (usage: Usage, cycle: Cycle): Stage => {
 };
 
 export interface SpendTools {
-  store: Pick<Store, "stage" | "setStage" | "liftCut"> & Partial<Pick<Store, "noteSpend">>;
+  store: Pick<Store, "stage" | "setStage" | "liftCut"> & Partial<Pick<Store, "noteSpend" | "spentAt">>;
   usageSince: (start: number, now: number) => Promise<Usage>;
   setBlocked: (blocked: boolean) => Promise<void>;
 }
+
+export const UNREVIEWED_MS_TO_CLOSE = 15 * 60_000;
+const OPEN_TO_UPLOADS: Stage[] = ["open", "warned", "new_keys_off"];
+
+// Without a review nothing cuts the bill, so once reviews stop arriving for a while uploads stop until one does.
+export const reviewOrClose = async (now: number, renewalDay: number, tools: SpendTools): Promise<Stage> => {
+  try {
+    return await checkSpend(now, renewalDay, tools);
+  } catch (error) {
+    console.error("the review of the bill failed", String(error));
+    try {
+      await closeUnreviewed(now, tools.store);
+    } catch (closing) {
+      console.error("uploads could not be stopped after it", String(closing));
+    }
+    throw error;
+  }
+};
+
+const closeUnreviewed = async (now: number, store: SpendTools["store"]): Promise<void> => {
+  const seen = (await store.spentAt?.()) ?? null;
+  if (seen !== null && now - seen < UNREVIEWED_MS_TO_CLOSE) return;
+  const was = await store.stage();
+  if (!OPEN_TO_UPLOADS.includes(was)) return;
+  console.error(
+    "no review went through since",
+    seen === null ? "ever" : new Date(seen).toISOString(),
+    "so uploads stop",
+  );
+  await store.setStage("no_uploads");
+};
 
 export const checkSpend = async (now: number, renewalDay: number, tools: SpendTools): Promise<Stage> => {
   const { store, usageSince, setBlocked } = tools;
@@ -85,11 +116,7 @@ export const checkSpend = async (now: number, renewalDay: number, tools: SpendTo
     if (was === "blocked") await store.liftCut(dayOf(now));
     await store.setStage(stage);
   }
-  try {
-    await store.noteSpend?.({ bill: billOf(usage), line: lineOf(cycle), storedGb: usage.storedGb }, now);
-  } catch (error) {
-    // Only the panel reads it, so failing to note it must not look like a review that failed.
-    console.error("what the review found could not be noted", String(error));
-  }
+  // Its time is what keeps uploads open, so a review that cannot note it has not gone through.
+  await store.noteSpend?.({ bill: billOf(usage), line: lineOf(cycle), storedGb: usage.storedGb }, now);
   return stage;
 };
