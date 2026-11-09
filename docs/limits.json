@@ -1,0 +1,43 @@
+{
+  "serial": 39,
+  "ttl_days": [
+    1,
+    3,
+    7,
+    15
+  ],
+  "shares_at_most": 20,
+  "new_shares_a_day": 10,
+  "languages_at_most": 20,
+  "days_a_key_is_new": 30,
+  "key_bytes_at_most": 25000000,
+  "envelope_bytes_at_most": 24000000,
+  "first_bytes_at_most": 2512000,
+  "rest_bytes_at_most": 15572000,
+  "pictures_at_most": 64,
+  "picture_bytes_at_most": 1000000,
+  "pictures_bytes_at_most": 24000000,
+  "files_at_most": 64,
+  "files_bytes_at_most": 24000000,
+  "uploads_of_a_root_an_hour": 10,
+  "upload_waits_minutes": [
+    5
+  ],
+  "oldest_contract_taken": null,
+  "oldest_contract_served": null,
+  "terms": {
+    "version": "18",
+    "es": "b294edf87c0690e85f66a5e048aeddde54f949dec6538344f8130e9f9d73a0cb",
+    "en": "b086e810ad30d9204a487f6bc778ac0bfefbc634dfd6e65c36366e2398a8aa1a"
+  },
+  "sharing_open": false,
+  "sharing_closed_note": {
+    "es": "Esta versión de Tisty ya no comparte con Folio. Actualiza Tisty a la 1.43.1 o posterior para seguir compartiendo.",
+    "en": "This version of Tisty no longer shares with Folio. Update Tisty to 1.43.1 or later to keep sharing."
+  },
+  "maker": {
+    "root": "AfnGoRnNecrr5RMnprcTbdZdk7_LABXtpqchY-L0b0s",
+    "name": "rgdevment",
+    "domain": "rgdevment.dev"
+  }
+}
