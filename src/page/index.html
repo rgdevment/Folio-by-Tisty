@@ -109,18 +109,34 @@
 
         <section class="panel" id="panel-details" aria-labelledby="title-details">
           <h2 id="title-details" data-say="details">Details</h2>
-          <p class="trust">
-            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7.5" rx="1.5" /><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" /></svg>
-            <span><span data-say="encrypted">End-to-end encrypted (AES-256-GCM): the server keeps bytes it cannot read.</span> <a data-say="howItWorks" href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/SECURITY.md" data-say-href="howItWorksAt" rel="noopener noreferrer">How it works</a></span>
-          </p>
-          <dl class="facts facts-first">
-            <div><dt data-say="expires">Deletes itself on</dt><dd><span class="dies-on" id="dies-on"></span> <span class="fact-note" data-say="expiresNote">Every read pushes it back.</span></dd></div>
-            <div><dt data-say="access">Access</dt><dd data-say="onlyWithTheLink">Only with the link</dd></div>
-          </dl>
-          <dl class="facts">
-            <div><dt data-say="signedAs">Whoever signed it goes by</dt><dd><bdi id="signer"></bdi><span class="name-tag" id="signer-verified" data-say="verified" hidden>verified</span><span class="name-tag" id="signer-checked" data-say="checkedDomain" hidden>checked domain</span><span class="fact-note" id="signer-note" hidden></span></dd></div>
-            <div><dt data-say="fingerprint">Fingerprint</dt><dd class="fingerprint" id="fingerprint"></dd></div>
-          </dl>
+          <ul class="assurances">
+            <li class="assurance">
+              <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7.5" rx="1.5" /><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" /></svg>
+              <div>
+                <p class="assurance-title in-two"><span lang="en">Private</span><span lang="es">Privado</span></p>
+                <p class="assurance-said in-two"><span lang="en">Only someone with the link reads it. Folio keeps it encrypted and cannot open it.</span><span lang="es">Solo lo lee quien tiene el link. Folio lo guarda cifrado y no puede abrirlo.</span></p>
+              </div>
+            </li>
+            <li class="assurance" id="signed">
+              <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 3 3.7v4c0 3 2.1 5.3 5 6.5 2.9-1.2 5-3.5 5-6.5v-4z" /><path d="m5.8 8 1.6 1.6 2.9-3" /></svg>
+              <div>
+                <p class="assurance-title"><span class="in-two"><span lang="en">Signed by</span><span lang="es">Firmó</span></span> <bdi id="signer"></bdi><span class="name-tag" id="signer-verified" data-say="verified" hidden>verified</span><span class="name-tag" id="signer-checked" data-say="checkedDomain" hidden>checked domain</span></p>
+                <span class="fact-note" id="signer-note" hidden></span>
+                <p class="assurance-said alias-note in-two"><span lang="en">Whoever signs chooses this name.</span><span lang="es">Este nombre lo elige quien firma.</span></p>
+              </div>
+            </li>
+            <li class="assurance">
+              <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 4.8V8l2.2 1.5" /></svg>
+              <div>
+                <p class="assurance-title"><span data-say="expires">Deletes itself on</span> <span class="dies-on" id="dies-on"></span></p>
+                <p class="assurance-said" data-say="expiresNote">Every read pushes it back.</p>
+              </div>
+            </li>
+          </ul>
+          <div class="print-box">
+            <p class="print-label" data-say="fingerprint">Fingerprint</p>
+            <p class="fingerprint" id="fingerprint"></p>
+          </div>
           <dl class="facts facts-next" id="owner-facts" hidden>
             <div><dt data-say="ownerAs">The owner goes by</dt><dd><bdi id="owner"></bdi><span class="name-tag" id="owner-verified" data-say="verified" hidden>verified</span><span class="name-tag" id="owner-checked" data-say="checkedDomain" hidden>checked domain</span><span class="fact-note" id="owner-note" hidden></span></dd></div>
             <div><dt data-say="ownerFingerprint">Owner's fingerprint</dt><dd class="fingerprint" id="owner-fingerprint"></dd></div>
@@ -129,6 +145,25 @@
             <summary data-say="howToCheck">How to check it</summary>
             <p data-say="howToCheckSaid">Ask whoever sent it for the fingerprint, through another channel, and compare them. The signature says which key signed it, not that the content is safe. If that key was taken back, this page says so, as the server reports it.</p>
           </details>
+          <details class="explain protect in-two">
+            <summary><span lang="en">How what you share is protected</span><span lang="es">Cómo protegemos lo que compartes</span></summary>
+            <dl>
+              <dt><span lang="en">The key</span><span lang="es">La llave</span></dt>
+              <dd><span lang="en">Tisty makes a random key for each shared document. It travels in the link, after the #, and the browser never sends it to Folio.</span><span lang="es">Tisty crea una llave al azar para cada documento compartido. Viaja en el link, después del #, y el navegador nunca se la manda a Folio.</span></dd>
+              <dt><span lang="en">Who holds it</span><span lang="es">Quién la tiene</span></dt>
+              <dd><span lang="en">Whoever shared it, in their Tisty, and whoever gets the link. Folio does not. In an encrypted Tisty cloud it is sealed under its owner's 24-word phrase.</span><span lang="es">Quien lo compartió, en su Tisty, y quien recibe el link. Folio no. En una nube cifrada de Tisty va sellada con la frase de 24 palabras de su dueño.</span></dd>
+              <dt><span lang="en">Sealing and opening</span><span lang="es">Cifrar y descifrar</span></dt>
+              <dd><span lang="en">It is encrypted on the sharer's computer with AES-256-GCM and decrypted in the reader's browser. Folio only sees how many parts there are, their kind and size, and the version.</span><span lang="es">Se cifra en el equipo de quien comparte, con AES-256-GCM, y se descifra en el navegador de quien lee. Folio solo ve cuántas partes tiene, de qué tipo y tamaño, y la versión.</span></dd>
+              <dt><span lang="en">The signature</span><span lang="es">La firma</span></dt>
+              <dd><span lang="en">Each computer has its own key, vouched for by its owner's root key, and signs every version. Change a single byte and the signature no longer holds.</span><span lang="es">Cada equipo tiene su propia llave, avalada por la llave raíz de su dueño, y firma cada versión. Si cambia un solo byte, la firma deja de cuadrar.</span></dd>
+              <dt><span lang="en">Forks and other apps</span><span lang="es">Forks y otras apps</span></dt>
+              <dd><span lang="en">Folio checks who signed, not which program did. Every app goes through the same limits, and nobody shows as verified without that person's key.</span><span lang="es">Folio comprueba quién firmó, no qué programa lo hizo. Toda app pasa por los mismos topes, y nadie aparece como verificado sin la llave de esa persona.</span></dd>
+              <dt><span lang="en">What it does not protect</span><span lang="es">Lo que no protege</span></dt>
+              <dd><span lang="en">Whoever holds the link can pass it on. Folio serves this page: its code is public, and each version publishes an attested list to compare with what is served.</span><span lang="es">Quien tiene el link puede reenviarlo. Esta página la sirve Folio: su código es público, y cada versión publica una lista atestada para compararla con lo que se sirve.</span></dd>
+            </dl>
+            <a data-say="howItWorks" href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/SECURITY.md" data-say-href="howItWorksAt" rel="noopener noreferrer">How it works</a>
+          </details>
+          <h3 class="about in-two"><span lang="en">About the document</span><span lang="es">Sobre el documento</span></h3>
           <dl class="facts" id="details"></dl>
         </section>
 
