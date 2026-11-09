@@ -1054,6 +1054,12 @@ html[lang="es"] .in-two [lang="en"] {
   line-height: 1.6;
 }
 
+.editors {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .explain {
   margin: 6px 0 0;
   color: var(--tisty-soft);

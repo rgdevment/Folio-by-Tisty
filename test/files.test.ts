@@ -17,6 +17,7 @@ const SEAL = {
   ownerFingerprint: null,
   signerStanding: "plain",
   ownerStanding: "plain",
+  editors: [],
   diesOn: 20_773,
 } as const;
 const ID = "k7Qm2xPa";

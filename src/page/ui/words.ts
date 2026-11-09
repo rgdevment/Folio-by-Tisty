@@ -32,6 +32,7 @@ const es = {
   fingerprint: "Huella",
   ownerAs: "El dueño se presenta como",
   ownerFingerprint: "Huella del dueño",
+  editedBy: "Lo editaron",
   howToCheck: "Cómo comprobarla",
   howToCheckSaid:
     "Pídele la huella a quien te lo mandó, por otro canal, y compárala. La firma dice qué llave lo firmó, no que el contenido sea seguro. Si esa llave se retiró, aquí se avisa, según lo que dice el servidor.",
@@ -213,6 +214,7 @@ const en: Words = {
   fingerprint: "Fingerprint",
   ownerAs: "The owner goes by",
   ownerFingerprint: "Owner's fingerprint",
+  editedBy: "Edited by",
   howToCheck: "How to check it",
   howToCheckSaid:
     "Ask whoever sent it for the fingerprint, through another channel, and compare them. The signature says which key signed it, not that the content is safe. If that key was taken back, this page says so, as the server reports it.",

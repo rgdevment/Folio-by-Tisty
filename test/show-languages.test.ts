@@ -40,6 +40,7 @@ const openedOf = (held: Document, fingerprint: string, ownerFingerprint: string 
   pictures: [],
   signerStanding: "plain",
   ownerStanding: "plain",
+  editors: [],
   verdict: "holds",
   fingerprint,
   ownerFingerprint,

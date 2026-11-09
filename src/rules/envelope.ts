@@ -1,4 +1,4 @@
-import type { Envelope, EnvelopeKind, Opening, Owner, Signature } from "@tisty/contracts";
+import type { Editor, Envelope, EnvelopeKind, Opening, Owner, Signature } from "@tisty/contracts";
 import { check, VERSION } from "@tisty/contracts/check";
 import { type Bytes, bigEndian, fromBase64Url, joined, sameBytes, sha256, words } from "../core/bytes";
 
@@ -110,7 +110,12 @@ const verified = async (key: Bytes, signature: Bytes, ...signed: Bytes[]): Promi
 
 const secondsOf = (moment: string): Bytes => bigEndian(Date.parse(moment) / 1000);
 
-const certified = ({ root, machine, certificate, since }: Signature | Owner): Promise<boolean> => {
+const certified = ({
+  root,
+  machine,
+  certificate,
+  since,
+}: Pick<Signature, "root" | "machine" | "certificate" | "since">): Promise<boolean> => {
   const rootKey = fromBase64Url(root);
   return verified(
     rootKey,
@@ -183,6 +188,32 @@ const holdsOwner = async (
     index,
   );
   if (!allowed) refuse("unsigned", "its token did not sign it");
+};
+
+// An entry answers for itself alone: one that fails is left aside, and never takes the document with it.
+export const editorHolds = async (editor: Editor): Promise<boolean> => {
+  try {
+    if (!(await certified(editor))) return false;
+    const about = words("editor");
+    const inBytes = words(editor.in);
+    const name = words(editor.name);
+    return await verified(
+      fromBase64Url(editor.machine),
+      fromBase64Url(editor.signed),
+      words("tisty-share.signed.v1\0"),
+      fromBase64Url(editor.root),
+      fromBase64Url(editor.machine),
+      bigEndian(about.length),
+      about,
+      bigEndian(inBytes.length),
+      inBytes,
+      Uint8Array.of(editor.owned ? 1 : 0),
+      bigEndian(name.length),
+      name,
+    );
+  } catch {
+    return false;
+  }
 };
 
 const readBytes = async (bytes: Bytes, asked: Asked): Promise<ReadEnvelope> => {

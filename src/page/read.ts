@@ -1,8 +1,8 @@
-import type { Document, Revocation, Verdict } from "@tisty/contracts";
+import type { Document, Revocation, Served, Verdict } from "@tisty/contracts";
 import { type Bytes, fromBase64Url } from "../core/bytes";
 import { type Standing, standingOf, stillSpeaks } from "../core/look-alike";
 import { momentOf } from "../core/moment";
-import { refuse } from "../rules/envelope";
+import { editorHolds, refuse } from "../rules/envelope";
 import { isChecked, type ShardLoader } from "./checked";
 import { MAKER } from "./maker";
 import { documentIn, openEnvelope } from "./open";
@@ -24,7 +24,13 @@ export interface Opened {
   ownerFingerprint: string | null;
   signerStanding: Standing;
   ownerStanding: Standing;
+  editors: readonly ShownEditor[];
   diesOn: number;
+}
+
+export interface ShownEditor {
+  name: string;
+  standing: Standing;
 }
 
 const FIRST_PICTURE_PART = 2;
@@ -50,6 +56,27 @@ export const standingFor = async (
   return (await isChecked(root, alias, load, shards)) ? "checked" : standing;
 };
 
+// One per root, chosen among those that hold, so an entry that fails cannot hide a person's real one.
+export const editorsOf = async (
+  { id, editors = [] }: Document,
+  served: Served,
+  load?: ShardLoader,
+): Promise<ShownEditor[]> => {
+  const holding = await Promise.all(
+    editors.map(async (one) => (one.in === id && (await editorHolds(one)) ? one : null)),
+  );
+  const roots = new Set<string>();
+  const shown: ShownEditor[] = [];
+  for (const one of holding) {
+    if (one === null || roots.has(one.root)) continue;
+    const verdict = await verdictOf(one, served);
+    if (!stillSpeaks(verdict)) continue;
+    roots.add(one.root);
+    shown.push({ name: one.name, standing: await standingFor(one.root, verdict, one.name, load) });
+  }
+  return shown;
+};
+
 export const openLink = async (id: string, linkKey: string, arrived: Arrived, load?: ShardLoader): Promise<Opened> => {
   const open = await openEnvelope(arrived.bytes, { id, kind: "main" }, keyIn(linkKey));
   const held = await documentIn(open);
@@ -58,11 +85,11 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived, lo
   const signer = await verdictOf(signature, served);
   const owner = manifest.owner;
   const ownerVerdict = owner ? await verdictOf(owner, served) : signer;
-  const [signerStanding, ownerStanding] = await Promise.all([
+  const [signerStanding, ownerStanding, editors] = await Promise.all([
     standingFor(signature.root, signer, held.signed_as, load),
     standingFor(owner?.root ?? signature.root, ownerVerdict, held.owner_name, load),
+    editorsOf(held, served, load),
   ]);
-  // held.editors goes unshown until each entry has its own check under signing.editor: unchecked, one could name someone who never edited it.
   return {
     held,
     pictures: open.opened.slice(FIRST_PICTURE_PART),
@@ -71,6 +98,7 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived, lo
     ownerFingerprint: owner && owner.root !== signature.root ? await fingerprintOf(owner.root) : null,
     signerStanding,
     ownerStanding,
+    editors,
     diesOn: arrived.diesOn,
   };
 };

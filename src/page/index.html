@@ -141,6 +141,9 @@
             <div><dt data-say="ownerAs">The owner goes by</dt><dd><bdi id="owner"></bdi><span class="name-tag" id="owner-verified" data-say="verified" hidden>verified</span><span class="name-tag" id="owner-checked" data-say="checkedDomain" hidden>checked domain</span><span class="fact-note" id="owner-note" hidden></span></dd></div>
             <div><dt data-say="ownerFingerprint">Owner's fingerprint</dt><dd class="fingerprint" id="owner-fingerprint"></dd></div>
           </dl>
+          <dl class="facts facts-next" id="editors-facts" hidden>
+            <div><dt data-say="editedBy">Edited by</dt><dd><ul class="editors" id="editors"></ul></dd></div>
+          </dl>
           <details class="explain">
             <summary data-say="howToCheck">How to check it</summary>
             <p data-say="howToCheckSaid">Ask whoever sent it for the fingerprint, through another channel, and compare them. The signature says which key signed it, not that the content is safe. If that key was taken back, this page says so, as the server reports it.</p>
