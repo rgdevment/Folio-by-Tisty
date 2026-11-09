@@ -194,7 +194,7 @@ describe("what only one rule refuses, on an envelope whose signature holds", () 
 
 describe("the contract in use", () => {
   it("is the version Folio fixed, and these samples are written under it", async () => {
-    expect(VERSION).toBe("1.7.1");
+    expect(VERSION).toBe("1.7.3");
     const { manifest } = await readEnvelope(hex(SAMPLES.main.envelope), MAIN);
     expect(manifest.contract).toBe(VERSION);
   });
