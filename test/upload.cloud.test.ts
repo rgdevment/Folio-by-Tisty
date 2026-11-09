@@ -1824,14 +1824,51 @@ describe("asking which version there is", () => {
     expect(later).not.toHaveProperty("nextAt");
   });
 
+  const language = async (anchor: string, at: number) => {
+    const first = { ...(await started(at)), anchor };
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+    const sending = { id: first.id, now: at, ip: "203.0.113.9", bytes: async () => bytes, first };
+    expect(await uploadDoc(sending, tools)).toEqual({ stored: true, version: 1 });
+    return first.id;
+  };
+  const askedAt = (id: string, now: number) => latestVersion({ id, now, ip: "203.0.113.9" }, tools);
+
   it("waits on a language just sent, whoever sent it", async () => {
     const id = await shared();
-    const first = { ...(await started(NOW + 3 * MINUTE)), anchor: id };
-    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
-    const sending = { id: first.id, now: NOW + 3 * MINUTE, ip: "203.0.113.9", bytes: async () => bytes, first };
-    expect(await uploadDoc(sending, tools)).toEqual({ stored: true, version: 1 });
-    const asked = await latestVersion({ id, now: NOW + 6 * MINUTE, ip: "203.0.113.9" }, tools);
-    expect(asked).toMatchObject({ nextAt: NOW + 8 * MINUTE });
+    await language(id, NOW + 3 * MINUTE);
+    expect(await askedAt(id, NOW + 6 * MINUTE)).toMatchObject({ nextAt: NOW + 8 * MINUTE });
+  });
+
+  it("says the same when asked for one of its languages", async () => {
+    const id = await shared();
+    const spanish = await language(id, NOW + MINUTE);
+    const second = await sealedEnvelope({ id, version: 2, owner: mario });
+    expect(await send(id, second, NOW + 5 * MINUTE)).toEqual({ stored: true, version: 2 });
+    expect(await askedAt(spanish, NOW + 6 * MINUTE)).toMatchObject({ nextAt: NOW + 10 * MINUTE });
+  });
+
+  it("leaves out a paused language, which takes no version anyway", async () => {
+    const id = await shared();
+    const spanish = await language(id, NOW + 3 * MINUTE);
+    await store.pause(spanish, dayOf(NOW));
+    expect(await askedAt(id, NOW + 6 * MINUTE)).not.toHaveProperty("nextAt");
+  });
+
+  it("leaves out what another key owns", async () => {
+    const id = await shared();
+    const spanish = await language(id, NOW + 3 * MINUTE);
+    await testEnv.DB.prepare("UPDATE docs SET owner = 'someone else' WHERE id = ?").bind(spanish).run();
+    expect(await askedAt(id, NOW + 6 * MINUTE)).not.toHaveProperty("nextAt");
+  });
+
+  it("reads only the last versions a wait looks at", async () => {
+    const id = await shared();
+    for (const n of [2, 3]) {
+      const next = await sealedEnvelope({ id, version: n, owner: mario });
+      expect(await send(id, next, NOW + (n - 1) * 5 * MINUTE)).toEqual({ stored: true, version: n });
+    }
+    const lasts = await store.lastVersionsWithLanguages(id, rootOf(mario), 2);
+    expect(lasts.map((versions) => versions.map((one) => one.n))).toEqual([[2, 3]]);
   });
 
   it("refuses what a read refuses", async () => {

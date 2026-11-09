@@ -534,7 +534,8 @@ paths:
         It counts as no reader and no activity, and it writes nothing.
 
         `nextAt` says when the document or one of its languages takes a new version again, whoever signs the
-        next one; absent, it may be sent now. Each signer's hourly cap is not in it.
+        next one, and asked for any of them it says the same; absent, it may be sent now. A paused or blocked
+        language is left out, and so is each signer's hourly cap.
       responses:
         "200":
           description: Its latest version.

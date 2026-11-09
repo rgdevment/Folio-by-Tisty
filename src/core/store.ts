@@ -200,7 +200,7 @@ export interface Store {
   admit(reading: Reading, today: number): Promise<Admitted>;
   note(reading: Reading, today: number): Promise<void>;
   shown(id: string, today: number): Promise<Shown | null>;
-  familyVersions(id: string, owner: string): Promise<Version[][]>;
+  lastVersionsWithLanguages(id: string, owner: string, count: number): Promise<Version[][]>;
   openedCase(id: string, hash: string, today: number, now: number): Promise<OpenedCase | null>;
   envelope(id: string, version: Version): Promise<ReadableStream | null>;
   filesBytes(id: string, hash: string): Promise<number | null>;

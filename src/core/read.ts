@@ -79,8 +79,8 @@ export const latestVersion = async (
   if (refused || !shown?.version) return refused ?? { refused: "missing" };
   const latest = { version: shown.version.n, hash: shown.version.hash };
   // Its languages too, since a Sync sends them together and another device or editor may have just sent one.
-  const family = await store.familyVersions(id, shown.owner);
-  const nextAt = Math.max(now, ...family.map((versions) => waitEndsAt(versions, now, limits)));
+  const lasts = await store.lastVersionsWithLanguages(id, shown.owner, limits.uploadWaitsMinutes.length);
+  const nextAt = Math.max(now, ...lasts.map((versions) => waitEndsAt(versions, now, limits)));
   return nextAt > now ? { ...latest, nextAt } : latest;
 };
 

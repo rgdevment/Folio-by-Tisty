@@ -630,12 +630,19 @@ export class Cloud implements Store {
     }
   }
 
-  async familyVersions(id: string, owner: string): Promise<Version[][]> {
+  // From any of its languages the same set, and of each only the versions a wait can look at.
+  async lastVersionsWithLanguages(id: string, owner: string, count: number): Promise<Version[][]> {
     const { results } = await this.#db
-      .prepare("SELECT versions FROM docs WHERE owner = ?2 AND (id = ?1 OR anchor = ?1) AND latest > 0")
-      .bind(id, owner)
-      .all<{ versions: string }>();
-    return results.map((one) => JSON.parse(one.versions) as Version[]);
+      .prepare(
+        `SELECT (SELECT json_group_array(json(v.value)) FROM json_each(d.versions) v
+                 WHERE v.key >= json_array_length(d.versions) - ?3) AS last
+         FROM docs d
+         WHERE d.owner = ?2 AND d.latest > 0 AND d.paused_at IS NULL AND d.blocked_at IS NULL
+           AND COALESCE((SELECT a.anchor FROM docs a WHERE a.id = ?1), ?1) IN (d.id, d.anchor)`,
+      )
+      .bind(id, owner, count)
+      .all<{ last: string }>();
+    return results.map((one) => (JSON.parse(one.last) as Version[]).sort((a, b) => a.n - b.n));
   }
 
   async shown(id: string, today: number): Promise<Shown | null> {
