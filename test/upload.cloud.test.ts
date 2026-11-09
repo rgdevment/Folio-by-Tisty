@@ -1814,8 +1814,24 @@ describe("asking which version there is", () => {
     const id = await shared();
     const before = await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM sqlite_master").first();
     const held = JSON.parse((await row(id))?.versions ?? "[]") as Version[];
-    expect(await counted(id)).toEqual({ version: 1, hash: held[0]?.hash });
+    expect(await counted(id)).toEqual({ version: 1, hash: held[0]?.hash, nextAt: NOW + 5 * MINUTE });
     expect(await testEnv.DB.prepare("SELECT COUNT(*) AS n FROM sqlite_master").first()).toEqual(before);
+  });
+
+  it("says no nextAt once the wait is over", async () => {
+    const id = await shared();
+    const later = await latestVersion({ id, now: NOW + 5 * MINUTE, ip: "203.0.113.9" }, tools);
+    expect(later).not.toHaveProperty("nextAt");
+  });
+
+  it("waits on a language just sent, whoever sent it", async () => {
+    const id = await shared();
+    const first = { ...(await started(NOW + 3 * MINUTE)), anchor: id };
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+    const sending = { id: first.id, now: NOW + 3 * MINUTE, ip: "203.0.113.9", bytes: async () => bytes, first };
+    expect(await uploadDoc(sending, tools)).toEqual({ stored: true, version: 1 });
+    const asked = await latestVersion({ id, now: NOW + 6 * MINUTE, ip: "203.0.113.9" }, tools);
+    expect(asked).toMatchObject({ nextAt: NOW + 8 * MINUTE });
   });
 
   it("refuses what a read refuses", async () => {

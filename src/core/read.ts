@@ -5,6 +5,7 @@ import { netDigest } from "./net";
 import { askForProof, type Refused, tooFast } from "./refused";
 import { proofIsFresh } from "./start";
 import type { Reading, Shown, Store, Version } from "./store";
+import { waitEndsAt } from "./versions";
 
 export interface Asked {
   id: string;
@@ -60,17 +61,27 @@ interface AdmittedReader {
   note?: Reading;
 }
 
+export interface Latest {
+  version: number;
+  hash: string;
+  nextAt?: number;
+}
+
 export const latestVersion = async (
   { id, ip, now }: Asking,
   { store, limiter, syncLimiter, limits, dayKey }: SyncTools,
-): Promise<{ version: number; hash: string } | Refused> => {
+): Promise<Latest | Refused> => {
   const today = dayOf(now);
   const net = await netDigest(await dayKey(today), ip);
   if (!(await limiter.allows(net)) || !(await syncLimiter.allows(`${net}|${id}`))) return tooFast(now);
   const shown = await store.shown(id, today);
   const refused = refusalOfState(shown, limits);
   if (refused || !shown?.version) return refused ?? { refused: "missing" };
-  return { version: shown.version.n, hash: shown.version.hash };
+  const latest = { version: shown.version.n, hash: shown.version.hash };
+  // Its languages too, since a Sync sends them together and another device or editor may have just sent one.
+  const family = await store.familyVersions(id, shown.owner);
+  const nextAt = Math.max(now, ...family.map((versions) => waitEndsAt(versions, now, limits)));
+  return nextAt > now ? { ...latest, nextAt } : latest;
 };
 
 const admittedReader = async ({ id, ip, now, proof }: Asked, tools: ReadTools): Promise<AdmittedReader | Refused> => {

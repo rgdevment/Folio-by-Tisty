@@ -630,6 +630,14 @@ export class Cloud implements Store {
     }
   }
 
+  async familyVersions(id: string, owner: string): Promise<Version[][]> {
+    const { results } = await this.#db
+      .prepare("SELECT versions FROM docs WHERE owner = ?2 AND (id = ?1 OR anchor = ?1) AND latest > 0")
+      .bind(id, owner)
+      .all<{ versions: string }>();
+    return results.map((one) => JSON.parse(one.versions) as Version[]);
+  }
+
   async shown(id: string, today: number): Promise<Shown | null> {
     const row = await this.#db
       .prepare(
