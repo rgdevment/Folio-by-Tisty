@@ -7,7 +7,7 @@ import { said, speak } from "./speak";
 import { offerThemes } from "./theme";
 
 const ID_PATH = /^\/[A-Za-z0-9]{8}$/;
-const NOT_FOUND = "https://www.tisty.app/404";
+const NOT_FOUND = "/404";
 
 const showSample = async (): Promise<void> => {
   const [{ SAMPLE, SAMPLE_SEAL }, { drawFrame }, { domPurifyCleaner }] = await Promise.all([

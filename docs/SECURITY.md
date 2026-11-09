@@ -3,8 +3,9 @@
 [Español](SEGURIDAD.md)
 
 This covers the Folio service: its links at tisty.cl, its API under
-`/api/v1/`, the page that reads a link, the operator's panel, the page at
-folio.tisty.app, and the envelope format both the app and the server speak.
+`/api/v1/`, the page that reads a link, the home of tisty.cl and its page for a
+link that is gone, the operator's panel, and the envelope format both the app
+and the server speak.
 The Tisty app has a [security policy of its own](https://github.com/rgdevment/Tisty/blob/main/SECURITY.md).
 
 ## Reporting a vulnerability

@@ -53,7 +53,7 @@ There is no company behind it and nobody makes money from it. Contact:
 ## Its code
 
 It is being written again from scratch in TypeScript, on Cloudflare Workers, D1
-and R2, and the service is open, in beta: [folio.tisty.app](https://folio.tisty.app)
+and R2, and the service is open, in beta: [tisty.cl](https://tisty.cl)
 says what it is. It speaks to the
 [Tisty app](https://github.com/rgdevment/Tisty) through a contract that the
 app's repository keeps: the formats of what travels and the style rules of a

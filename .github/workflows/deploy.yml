@@ -96,7 +96,7 @@ jobs:
       # Signed ahead of a terms change still under review, they would ask for terms this commit does not serve.
       - name: The limits name the terms this commit carries
         run: node scripts/limits-published.ts here
-      # Kept on their own branch, as Tisty keeps its manifest, and absent until a first domain is approved.
+      # Absent until a first shard or host is signed, and the page builds without it.
       - name: Take the domains from their branch
         run: |
           if git ls-remote --exit-code --heads "https://github.com/${GITHUB_REPOSITORY}.git" domains > /dev/null; then
@@ -292,7 +292,18 @@ jobs:
             [ "$status" = 200 ] || return 1
             grep -qi '^content-security-policy:.*script-src .self.' "$RUNNER_TEMP/page-headers" || return 1
             grep -q 'id="sheet"' "$RUNNER_TEMP/page" || return 1
-            [ "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{redirect_url}' "$FOLIO_URL/")" = "301 https://www.tisty.app/" ] || return 1
+            status=$(curl -s --max-time 10 -o "$RUNNER_TEMP/home" -w '%{http_code}' -H 'Sec-Fetch-Mode: navigate' "$FOLIO_URL/") || return 1
+            [ "$status" = 200 ] || return 1
+            grep -q 'class="hero"' "$RUNNER_TEMP/home" || return 1
+            # Sent with nosniff, so a stylesheet or script served under another type would not load at all.
+            case "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' "$FOLIO_URL/site.css")" in
+              "200 text/css"*) ;;
+              *) return 1 ;;
+            esac
+            case "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' "$FOLIO_URL/language.js")" in
+              "200 "*javascript*) ;;
+              *) return 1 ;;
+            esac
             curl -s --max-time 10 "$FOLIO_URL/robots.txt" | grep -qx 'Disallow: /' || return 1
           }
           export -f answers
@@ -308,7 +319,9 @@ jobs:
 
       # After the step that goes back: a working version stays up, and a difference is for a person to read.
       - name: What it serves is what was attested
-        run: bash scripts/page-code.sh served dist/page "$FOLIO_URL"
+        run: |
+          bash scripts/page-code.sh served dist/page "$FOLIO_URL"
+          bash scripts/page-code.sh detects https://www.tisty.app/
 
   # Apart from the Worker: a panel that does not go up leaves the service and its release as they are.
   panel:
@@ -402,65 +415,6 @@ jobs:
           gh api "repos/$GH_REPO/git/tags/$tag_object" --jq .message \
             | sed '/-----BEGIN SSH SIGNATURE-----/,$d' > "$RUNNER_TEMP/notes.md"
           gh release create "$TAG" dist/release/SHA256SUMS dist/release/folio.spdx.json --verify-tag --notes-file "$RUNNER_TEMP/notes.md"
-
-  # In its own environment and with its own token, so what is public never holds the keys to what is private (decision 109).
-  public:
-    name: Deploy the public page
-    needs: tested
-    if: github.event_name == 'push'
-    environment: prod-public
-    concurrency:
-      group: public
-      cancel-in-progress: false
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      PUBLIC_URL: https://folio.tisty.app
-      TAG: ${{ github.ref_name }}
-    steps:
-      - name: The account and its token are there
-        run: |
-          [ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "::error::the prod-public environment has no CLOUDFLARE_API_TOKEN secret"; exit 1; }
-          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || { echo "::error::the prod-public environment has no CLOUDFLARE_ACCOUNT_ID variable"; exit 1; }
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          package-manager-cache: false
-      - run: npm ci --ignore-scripts
-      - name: Deploy
-        run: npx --no-install wrangler deploy --config wrangler.public.toml --tag "$TAG" --message "$TAG ${GITHUB_SHA:0:8}"
-      - name: It answers as it should
-        run: |
-          set -uo pipefail
-          answers() {
-            local status
-            status=$(curl -s --max-time 10 -D "$RUNNER_TEMP/public-headers" -o "$RUNNER_TEMP/public-page" -w '%{http_code}' "$PUBLIC_URL/")
-            grep -qsi '^cf-mitigated:' "$RUNNER_TEMP/public-headers" && return 2
-            [ "$status" = 200 ] || return 1
-            grep -q 'class="hero"' "$RUNNER_TEMP/public-page" || return 1
-            grep -qi "^content-security-policy: default-src 'none'" "$RUNNER_TEMP/public-headers" || return 1
-            case "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' "$PUBLIC_URL/site.css")" in
-              "200 text/css"*) ;;
-              *) return 1 ;;
-            esac
-            case "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' "$PUBLIC_URL/language.js")" in
-              "200 "*javascript*) ;;
-              *) return 1 ;;
-            esac
-            [ "$(curl -s --max-time 10 -o /dev/null -w '%{http_code}' "$PUBLIC_URL/not-a-page")" = 404 ] || return 1
-          }
-          export -f answers
-          bash scripts/wait-for.sh "$PUBLIC_URL" 20 15 answers
-      - name: It is served as written
-        run: |
-          bash scripts/page-code.sh written src/public/page/index.html "$PUBLIC_URL/"
-          bash scripts/page-code.sh written src/public/page/404.html "$PUBLIC_URL/not-a-page"
-          bash scripts/page-code.sh detects https://www.tisty.app/
 
   rollback:
     name: Put a version back
