@@ -88,6 +88,14 @@ jobs:
           node-version: 22
           package-manager-cache: false
       - run: npm ci --ignore-scripts
+      # Kept on their own branch, as Tisty keeps its manifest, and absent until a first domain is approved.
+      - name: Take the domains from their branch
+        run: |
+          if git ls-remote --exit-code --heads "https://github.com/${GITHUB_REPOSITORY}.git" domains > /dev/null; then
+            git clone --quiet --depth 1 --branch domains "https://github.com/${GITHUB_REPOSITORY}.git" "$RUNNER_TEMP/domains"
+            node scripts/domains.ts verify "$RUNNER_TEMP/domains"
+            echo "FOLIO_DOMAINS=$RUNNER_TEMP/domains" >> "$GITHUB_ENV"
+          fi
       - run: npm run build
       - run: npm run budget
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

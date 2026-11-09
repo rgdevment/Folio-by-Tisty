@@ -7,13 +7,13 @@ import { holdsSignature, signedFile } from "./limits-key.ts";
 
 const ROOT = /^[A-Za-z0-9_-]{43}$/;
 const SHARD_FILE = /^[0-9a-f]{2}\.json$/;
-export const SHARDS = "docs/domains";
+const SHARD_OR_SIGNATURE = /^[0-9a-f]{2}\.json(\.minisig)?$/;
 const PUBLIC_KEY = "docs/limits.pub";
 const TRIES = 5;
 const BETWEEN_TRIES_MS = 60_000;
 const ASKED_AT_ONCE = 16;
 const USAGE =
-  "node scripts/domains.ts check <domain> <root> | build <private list> | sign <key file> | watch (reads DOMAINS_CLEAR)";
+  "node scripts/domains.ts check <domain> <root> | build <private list> <domains branch> | sign <key file> <domains branch> | verify <domains branch> | watch (reads DOMAINS_CLEAR)";
 
 export interface Approved {
   domain: string;
@@ -82,10 +82,11 @@ export const shardsOf = async (approved: Approved[]): Promise<Map<string, string
   return written;
 };
 
-export const writeShards = (shards: Map<string, string>, dir = SHARDS): void => {
+// Only shards and their signatures, since the folder is a checkout of the domains branch and holds its .git.
+export const writeShards = (shards: Map<string, string>, dir: string): void => {
   mkdirSync(dir, { recursive: true });
   for (const name of readdirSync(dir)) {
-    if (!shards.has(name.slice(0, 2))) rmSync(join(dir, name));
+    if (SHARD_OR_SIGNATURE.test(name) && !shards.has(name.slice(0, 2))) rmSync(join(dir, name));
   }
   for (const [shard, said] of shards) {
     const file = join(dir, `${shard}.json`);
@@ -95,7 +96,7 @@ export const writeShards = (shards: Map<string, string>, dir = SHARDS): void => 
   }
 };
 
-export const signShards = (keyFile: string, now: number, dir = SHARDS, publicKeyFile = PUBLIC_KEY): number => {
+export const signShards = (keyFile: string, now: number, dir: string, publicKeyFile = PUBLIC_KEY): number => {
   const secret = readFileSync(keyFile, "utf8").trim();
   const publicKey = readFileSync(publicKeyFile, "utf8");
   const names = readdirSync(dir).filter((name) => SHARD_FILE.test(name));
@@ -111,12 +112,12 @@ export const signShards = (keyFile: string, now: number, dir = SHARDS, publicKey
 };
 
 export const shardFaults = (
-  dir = SHARDS,
+  dir: string,
   publicKey = existsSync(PUBLIC_KEY) ? readFileSync(PUBLIC_KEY, "utf8") : "",
 ): string[] => {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
-    .filter((name) => !name.endsWith(".minisig"))
+    .filter((name) => !name.endsWith(".minisig") && !name.startsWith("."))
     .flatMap((name) => {
       if (!SHARD_FILE.test(name)) return [`domains/${name} is not a shard`];
       const said = readFileSync(join(dir, name));
@@ -141,15 +142,19 @@ const run = async ([what, first, second]: string[]): Promise<void> => {
     const faults = await txtFaults(first, second, dnsLookup);
     console.log(faults.length === 0 ? `ok ${first} names that root` : faults.join("\n"));
     if (faults.length > 0) process.exitCode = 1;
-  } else if (what === "build" && first) {
+  } else if (what === "build" && first && second) {
     const approved = approvedIn(readFileSync(first, "utf8"));
     const faults = [...listFaults(approved), ...(await dnsFaults(approved, dnsLookup))];
     if (faults.length > 0) throw new Error(`nothing was written:\n${faults.join("\n")}`);
     const shards = await shardsOf(approved);
-    writeShards(shards);
+    writeShards(shards, second);
     console.log(`wrote ${approved.length} domains in ${shards.size} shards: sign them next`);
-  } else if (what === "sign" && first) {
-    console.log(`signed ${signShards(first, Date.now())} shards`);
+  } else if (what === "sign" && first && second) {
+    console.log(`signed ${signShards(first, Date.now(), second)} shards`);
+  } else if (what === "verify" && first) {
+    const faults = shardFaults(first);
+    console.log(faults.length === 0 ? "ok the shards hold, signed with the limits key" : faults.join("\n"));
+    if (faults.length > 0) process.exitCode = 1;
   } else if (what === "watch") {
     const approved = approvedIn(process.env.DOMAINS_CLEAR ?? "");
     const failing = await retried(() => failingLines(approved, dnsLookup), TRIES, BETWEEN_TRIES_MS);

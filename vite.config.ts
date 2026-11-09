@@ -42,10 +42,11 @@ const licenses = (): Plugin => ({
   },
 });
 
-const SHARDS = "docs/domains";
+// A checkout of the domains branch, made only by deploy.yml; without one the page carries no shard.
+const SHARDS = process.env.FOLIO_DOMAINS;
 
 const shardNames = (): string[] =>
-  existsSync(SHARDS) ? readdirSync(SHARDS).filter((one) => /^[0-9a-f]{2}\.json$/.test(one)) : [];
+  SHARDS && existsSync(SHARDS) ? readdirSync(SHARDS).filter((one) => /^[0-9a-f]{2}\.json$/.test(one)) : [];
 
 const domains = (): Plugin => ({
   name: "folio-domains",
