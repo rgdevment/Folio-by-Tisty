@@ -1,5 +1,5 @@
 {
-  "serial": 36,
+  "serial": 38,
   "ttl_days": [
     1,
     3,
@@ -30,7 +30,7 @@
     "es": "b294edf87c0690e85f66a5e048aeddde54f949dec6538344f8130e9f9d73a0cb",
     "en": "b086e810ad30d9204a487f6bc778ac0bfefbc634dfd6e65c36366e2398a8aa1a"
   },
-  "sharing_open": false,
+  "sharing_open": true,
   "maker": {
     "root": "AfnGoRnNecrr5RMnprcTbdZdk7_LABXtpqchY-L0b0s",
     "name": "rgdevment",
