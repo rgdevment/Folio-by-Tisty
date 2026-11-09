@@ -530,7 +530,12 @@ paths:
       tags: [Reading]
       operationId: latest
       summary: Says which version there is, for the button that syncs.
-      description: It counts as no reader and no activity, and it writes nothing.
+      description: |
+        It counts as no reader and no activity, and it writes nothing.
+
+        `nextAt` says when the document or one of its languages takes a new version again, whoever signs the
+        next one, and asked for any of them it says the same; absent, it may be sent now. A paused or blocked
+        language is left out, and so is each signer's hourly cap.
       responses:
         "200":
           description: Its latest version.
@@ -838,6 +843,7 @@ components:
       properties:
         version: { type: integer }
         hash: { type: string }
+        nextAt: { type: integer, description: "When a new version is taken again, in milliseconds." }
     BadUpload:
       type: object
       required: [refused]
