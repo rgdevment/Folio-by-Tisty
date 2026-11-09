@@ -3,8 +3,9 @@
 [English](SECURITY.md)
 
 Cubre el servicio Folio: sus links en tisty.cl, su API bajo
-`/api/v1/`, la página que lee un link, el panel del operador, la página de
-folio.tisty.app y el formato del sobre que hablan la app y el servidor.
+`/api/v1/`, la página que lee un link, la portada de tisty.cl y su página para
+un link que ya no está, el panel del operador y el formato del sobre que hablan
+la app y el servidor.
 La app Tisty tiene su propia [política de seguridad](https://github.com/rgdevment/Tisty/blob/main/SECURITY.md).
 
 ## Reportar una vulnerabilidad

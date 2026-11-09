@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-action=${1:?sums, served, written or detects}
+action=${1:?sums, served or detects}
 
 # As a browser asks, because Cloudflare adds its analytics script only for one.
 as_browser() {
@@ -11,7 +11,7 @@ as_browser() {
 }
 
 code_files() {
-  (cd "$page" && find . -type f \( -name '*.js' -o -name '*.css' -o -name index.html -o -name widget-frame.html \) | sed 's|^\./||' | LC_ALL=C sort)
+  (cd "$page" && find . -type f \( -name '*.js' -o -name '*.css' -o -name index.html -o -name home.html -o -name 404.html -o -name widget-frame.html \) | sed 's|^\./||' | LC_ALL=C sort)
 }
 
 sums() {
@@ -43,6 +43,8 @@ served() {
         compare "$file" as_browser "$address/AAAAAAAA"
         grep -qi '^speculation-rules:' "$headers" && prefetches=1
         ;;
+      home.html) compare "$file" as_browser "$address/" ;;
+      404.html) compare "$file" as_browser "$address/404" ;;
       widget-frame.html) compare "$file" as_browser "$address/widget-frame" ;;
       *) compare "$file" curl -s --max-time 10 "$address/$file" ;;
     esac
@@ -69,25 +71,6 @@ served() {
   echo "$address serves what was attested"
 }
 
-written() {
-  local file=${1:?the file as it was written}
-  local address=${2:?the address that serves it}
-  local received headers verdict=0
-  received=$(mktemp)
-  headers=$(mktemp)
-  as_browser -D "$headers" -o "$received" "$address"
-  if grep -qi '^cf-mitigated:' "$headers"; then
-    echo "::warning::$address challenged this runner, so it was not compared"
-  elif ! cmp -s "$received" "$file"; then
-    echo "::error::$address serves something else than $file"
-    verdict=1
-  else
-    echo "$address serves $file as written"
-  fi
-  rm -f "$received" "$headers"
-  return "$verdict"
-}
-
 detects() {
   local address=${1:?an address where Cloudflare adds its script}
   if ! as_browser "$address" | grep -q cloudflareinsights; then
@@ -104,7 +87,6 @@ case $action in
     page=${2:?the folder of the built page}
     served "${3:-}"
     ;;
-  written) written "${2:-}" "${3:-}" ;;
   detects) detects "${2:-}" ;;
   *)
     echo "unknown action: $action" >&2

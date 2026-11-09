@@ -55,7 +55,7 @@ público. No hay una empresa detrás y nadie gana dinero con él. Contacto:
 ## Su código
 
 Se está escribiendo de nuevo desde cero en TypeScript, sobre Cloudflare Workers,
-D1 y R2, y el servicio está abierto, en beta: [folio.tisty.app](https://folio.tisty.app)
+D1 y R2, y el servicio está abierto, en beta: [tisty.cl](https://tisty.cl)
 dice qué es. Se entiende con la
 [app Tisty](https://github.com/rgdevment/Tisty) por un contrato que guarda el
 repositorio de la app: los formatos de lo que viaja y las reglas de estilo de la

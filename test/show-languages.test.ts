@@ -14,7 +14,7 @@ vi.mock("../src/page/read", async (original) => ({
 const ANCHOR = "k7Qm2xPa";
 const ENGLISH = "enWords1";
 const FRENCH = "frWords1";
-const NOT_FOUND = "https://www.tisty.app/404";
+const NOT_FOUND = "/404";
 const HASH = "H".repeat(43);
 
 const page = (id: string, title: string, lang: string): Document => ({
