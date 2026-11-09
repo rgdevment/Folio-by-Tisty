@@ -15,9 +15,8 @@ live at tisty.cl, and its site is [www.tisty.app](https://www.tisty.app).
 ## How it works
 
 - **You share from Tisty,** from the *Shared* row of a document's panel, since
-  version 1.42.0. While Folio is not open yet, Tisty says so and uploads
-  nothing. Nothing is shared any other way, and there are no accounts: the link
-  is the permission.
+  version 1.42.0. Nothing is shared any other way, and there are no accounts:
+  the link is the permission.
 - **Each document gets three links:** one to read, one to edit and one to
   manage.
 - **What you share is encrypted in your Tisty before it leaves.** The key
@@ -54,7 +53,7 @@ There is no company behind it and nobody makes money from it. Contact:
 ## Its code
 
 It is being written again from scratch in TypeScript, on Cloudflare Workers, D1
-and R2, and the service is not open yet: [folio.tisty.app](https://folio.tisty.app)
+and R2, and the service is open, in beta: [folio.tisty.app](https://folio.tisty.app)
 says what it is. It speaks to the
 [Tisty app](https://github.com/rgdevment/Tisty) through a contract that the
 app's repository keeps: the formats of what travels and the style rules of a
