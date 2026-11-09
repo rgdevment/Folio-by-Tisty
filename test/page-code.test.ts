@@ -103,6 +103,13 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     expect(answer.stdout).toContain("::warning::");
   });
 
+  it("warns if its request no longer gets what a browser gets", () => {
+    expect(run(`detects ${ADDRESS}/`, { ADDS_SCRIPT: "1" }).stdout).not.toContain("::warning::");
+    const answer = run(`detects ${ADDRESS}/`);
+    expect(answer.status).toBe(0);
+    expect(answer.stdout).toContain("::warning::");
+  });
+
   it("warns when Cloudflare makes browsers prefetch, without failing", () => {
     const answer = run(`served "${site}" ${ADDRESS}`, { MORE_HEADERS: 'Speculation-Rules: "/cdn-cgi/speculation"' });
     expect(answer.status).toBe(0);

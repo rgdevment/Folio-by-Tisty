@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-action=${1:?sums or served}
+action=${1:?sums, served or detects}
 
 # As a browser asks, because Cloudflare adds its analytics script only for one.
 as_browser() {
@@ -71,6 +71,13 @@ served() {
   echo "$address serves what was attested"
 }
 
+detects() {
+  local address=${1:?an address where Cloudflare adds its script}
+  if ! as_browser "$address" | grep -q cloudflareinsights; then
+    echo "::warning::Cloudflare added no script to $address for this request, so the comparisons may no longer ask as a browser does"
+  fi
+}
+
 case $action in
   sums)
     page=${2:?the folder of the built page}
@@ -80,6 +87,7 @@ case $action in
     page=${2:?the folder of the built page}
     served "${3:-}"
     ;;
+  detects) detects "${2:-}" ;;
   *)
     echo "unknown action: $action" >&2
     exit 2

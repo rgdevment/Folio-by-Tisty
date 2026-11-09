@@ -369,14 +369,6 @@ h1 {
   fill: var(--flame-tint);
 }
 
-.lost-copy + .lost-copy {
-  margin-top: 6rem;
-}
-
-html[data-shown] .lost-copy + .lost-copy {
-  margin-top: 0;
-}
-
 .eyebrow {
   margin: 2rem 0 0;
   color: var(--flame-ink);

@@ -96,7 +96,7 @@ jobs:
       # Signed ahead of a terms change still under review, they would ask for terms this commit does not serve.
       - name: The limits name the terms this commit carries
         run: node scripts/limits-published.ts here
-      # Kept on their own branch, as Tisty keeps its manifest: the shards and the private host Tisty shares on, each signed.
+      # Absent until a first shard or host is signed, and the page builds without it.
       - name: Take the domains from their branch
         run: |
           if git ls-remote --exit-code --heads "https://github.com/${GITHUB_REPOSITORY}.git" domains > /dev/null; then
@@ -295,6 +295,15 @@ jobs:
             status=$(curl -s --max-time 10 -o "$RUNNER_TEMP/home" -w '%{http_code}' -H 'Sec-Fetch-Mode: navigate' "$FOLIO_URL/") || return 1
             [ "$status" = 200 ] || return 1
             grep -q 'class="hero"' "$RUNNER_TEMP/home" || return 1
+            # Sent with nosniff, so a stylesheet or script served under another type would not load at all.
+            case "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' "$FOLIO_URL/site.css")" in
+              "200 text/css"*) ;;
+              *) return 1 ;;
+            esac
+            case "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' "$FOLIO_URL/language.js")" in
+              "200 "*javascript*) ;;
+              *) return 1 ;;
+            esac
             curl -s --max-time 10 "$FOLIO_URL/robots.txt" | grep -qx 'Disallow: /' || return 1
           }
           export -f answers
@@ -310,7 +319,9 @@ jobs:
 
       # After the step that goes back: a working version stays up, and a difference is for a person to read.
       - name: What it serves is what was attested
-        run: bash scripts/page-code.sh served dist/page "$FOLIO_URL"
+        run: |
+          bash scripts/page-code.sh served dist/page "$FOLIO_URL"
+          bash scripts/page-code.sh detects https://www.tisty.app/
 
   # Apart from the Worker: a panel that does not go up leaves the service and its release as they are.
   panel:
