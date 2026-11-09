@@ -1,6 +1,6 @@
 # Folio by Tisty terms of use
 
-**Version 18, in force since November 10, 2026.**
+**Version 19, in force since November 10, 2026.**
 
 ## The short version
 
@@ -238,6 +238,10 @@ What you write is yours. Sharing it only gives the operator permission to keep
 it and serve it to whoever has the link while it stays shared. The periods and
 handovers in these terms exist for safety and by law, not under a permission you
 can withdraw.
+
+If you share a document that other people wrote or edited, or a copy of
+something someone else shared, you declare that you have their permission.
+Folio does not check it, and the responsibility is yours.
 
 ## Public mode (does not exist yet)
 

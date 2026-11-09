@@ -253,7 +253,7 @@ const caseRoute = (path: string, ready: () => Promise<void>): Scenario[] => [
   { method: "GET", path, status: 500, refused: "failed", caseToken: CASE_TOKEN, broken: true },
 ];
 
-const PERMIT = JSON.stringify({ permit: "A".repeat(43) });
+const PERMIT = JSON.stringify({ permit: `${"P".repeat(42)}A` });
 const UPLOAD_PATH = "/docs/{id}";
 const LATEST_PATH = "/docs/{id}/latest";
 const FILES_PATH = "/docs/{id}/files";

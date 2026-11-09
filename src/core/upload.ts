@@ -40,12 +40,12 @@ const closedTo = (read: ReadEnvelope, sharing: boolean, owner: string | undefine
   !tools.sharingOpen &&
   (sharing ? !madeByMaker(read, tools.makerRoot) : owner === tools.makerRoot && read.signature.root !== owner);
 
-// One ahead while a deploy catches up with the signed file, and one behind while readers' caches do: nobody waits on either.
+// One ahead while a deploy catches up with the signed file; none behind, or new terms would bind nobody until the next.
 const termsAccepted = ({ terms }: Envelope, { termsVersion }: UploadTools): string | null => {
   if (terms === undefined) return null;
   const said = BigInt(terms);
   const inForce = BigInt(termsVersion);
-  return said >= inForce - 1n && said <= inForce + 1n ? terms : null;
+  return said >= inForce && said <= inForce + 1n ? terms : null;
 };
 
 export type UploadAnswer = { stored: true; version: number; filesWanted?: true } | Refused;
