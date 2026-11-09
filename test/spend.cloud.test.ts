@@ -1,6 +1,6 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CloudSpend } from "../src/cloudflare/spend";
 import { Cloud } from "../src/cloudflare/store";
 import worker from "../src/private/index";
@@ -31,6 +31,21 @@ const answering = (body: unknown, status = 200) => {
   }) as unknown as typeof fetch;
   return { calls, spend: new CloudSpend(BINDINGS, fetcher) };
 };
+
+describe("the review's own fetch", () => {
+  it("calls the global fetch as workerd wants it, not as a method of the review", async () => {
+    const answer = { data: { viewer: { accounts: [{ workers: [], d1: [], r2: [], stored: [] }] } } };
+    const strict = vi.spyOn(globalThis, "fetch").mockImplementation(async function (this: unknown) {
+      if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+      return new Response(JSON.stringify(answer));
+    });
+    try {
+      await expect(new CloudSpend(BINDINGS).usageSince(0, 1)).resolves.toMatchObject({ requests: 0 });
+    } finally {
+      strict.mockRestore();
+    }
+  });
+});
 
 const dying = async (id: string, diesOn: number, more = "") => {
   await store.create({ id, owner: `o-${id}`, adminHash: "a", ttlDays: 3, net: "n" }, DAY);
