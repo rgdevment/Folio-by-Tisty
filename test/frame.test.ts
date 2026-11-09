@@ -565,27 +565,29 @@ describe("who edited it", () => {
     expect(facts().hidden).toBe(true);
   });
 
-  it("names each one as words, and marks only the maker as verified", () => {
+  it("names each one as words, by the name it signed, with its standing for the page's styles", () => {
     drawEditors([
-      { name: "whatever it wrote", standing: "verified" },
+      { name: "Mario", standing: "verified" },
       { name: "<b>Ana</b>", standing: "plain" },
     ]);
     expect(facts().hidden).toBe(false);
     const [maker, ana] = items() as [HTMLElement, HTMLElement];
-    expect(maker.querySelector("bdi")?.textContent).toBe("rgdevment");
-    expect(maker.querySelector(".name-tag")?.textContent).toBe("verificado");
+    expect(maker.querySelector("bdi")?.textContent).toBe("Mario");
+    expect(maker.dataset.standing).toBe("verified");
+    expect(maker.querySelector('.name-tag [lang="es"]')?.textContent).toBe("verificado");
     expect(ana.querySelector("bdi")?.textContent).toBe("<b>Ana</b>");
     expect(ana.querySelector("b")).toBeNull();
-    expect(ana.querySelector(".name-tag")).toBeNull();
-    expect((ana.querySelector(".fact-note") as HTMLElement).hidden).toBe(true);
+    expect(ana.dataset.standing).toBe("plain");
   });
 
-  it("warns beneath a name that imitates the maker's", () => {
+  it("carries the warning for a name that imitates the maker's, in both tongues", () => {
     drawEditors([{ name: "rgdevrnent", standing: "imitates" }]);
-    const note = items()[0]?.querySelector(".fact-note") as HTMLElement;
-    expect(note.hidden).toBe(false);
-    expect(note.textContent).toBe("Ese nombre es de otra llave");
+    const [item] = items() as [HTMLElement];
+    expect(item.dataset.standing).toBe("imitates");
+    const note = item.querySelector(".fact-note") as HTMLElement;
     expect(note.classList.contains("is-warning")).toBe(true);
+    expect(note.querySelector('[lang="es"]')?.textContent).toBe("Ese nombre es de otra llave");
+    expect(note.querySelector('[lang="en"]')?.textContent).toBe("That name belongs to another key");
   });
 
   it("draws the list again, not on top of the last one", () => {

@@ -246,29 +246,22 @@ const drawDetails = (root: ShadowRoot, held: Document): void => {
   list.hidden = list.childElementCount === 0;
 };
 
-const nameShown = (alias: string | undefined, standing: Standing): string =>
-  (standing === "verified" && MAKER ? shownNameOf(MAKER) : alias) ?? said().noName;
-
-const noteOf = (standing: Standing): string =>
-  ({
+const drawName = (who: "signer" | "owner", alias: string | undefined, standing: Standing): void => {
+  const verified = standing === "verified";
+  element(who).textContent = (verified && MAKER ? shownNameOf(MAKER) : alias) ?? said().noName;
+  element(`${who}-verified`).hidden = !verified;
+  element(`${who}-checked`).hidden = standing !== "checked";
+  const note = element(`${who}-note`);
+  const notes: Record<Standing, string> = {
     verified: MAKER?.name === undefined ? "" : (MAKER.domain ?? ""),
     imitates: said().anotherKey,
     takenBack: said().takenBack,
     checked: "",
     plain: "",
-  })[standing];
-
-const drawNote = (note: HTMLElement, standing: Standing): void => {
-  note.textContent = noteOf(standing);
+  };
+  note.textContent = notes[standing];
   note.hidden = note.textContent === "";
-  note.classList.toggle("is-warning", standing !== "verified");
-};
-
-const drawName = (who: "signer" | "owner", alias: string | undefined, standing: Standing): void => {
-  element(who).textContent = nameShown(alias, standing);
-  element(`${who}-verified`).hidden = standing !== "verified";
-  element(`${who}-checked`).hidden = standing !== "checked";
-  drawNote(element(`${who}-note`), standing);
+  note.classList.toggle("is-warning", !verified);
 };
 
 const drawOwner = (held: Document, { ownerFingerprint, ownerStanding }: Seal): void => {
@@ -277,24 +270,11 @@ const drawOwner = (held: Document, { ownerFingerprint, ownerStanding }: Seal): v
   element("owner-fingerprint").textContent = ownerFingerprint ?? "";
 };
 
-const tagSaying = (words: string): HTMLElement => {
-  const tag = document.createElement("span");
-  tag.className = "name-tag";
-  tag.textContent = words;
-  return tag;
-};
-
-const editorItem = ({ name, standing }: ShownEditor): HTMLElement => {
-  const item = document.createElement("li");
-  const shown = document.createElement("bdi");
-  shown.textContent = nameShown(name, standing);
-  item.append(shown);
-  if (standing === "verified") item.append(tagSaying(said().verified));
-  if (standing === "checked") item.append(tagSaying(said().checkedDomain));
-  const note = document.createElement("span");
-  note.className = "fact-note";
-  drawNote(note, standing);
-  item.append(note);
+// Its tag and its warning travel in both tongues in the HTML, so they cost the scripts nothing; frame.css picks by standing.
+const editorItem = ({ name, standing }: ShownEditor): Node => {
+  const item = element<HTMLTemplateElement>("editor").content.firstElementChild?.cloneNode(true) as HTMLElement;
+  item.dataset.standing = standing;
+  (item.firstElementChild as HTMLElement).textContent = name;
   return item;
 };
 

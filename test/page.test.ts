@@ -150,6 +150,15 @@ describe("the foot of the page", () => {
   });
 });
 
+describe("who edited it", () => {
+  it("shows an editor's tag only for the maker, and its warning only for a name that imitates it", () => {
+    expect(HTML).toContain('<template id="editor">');
+    expect(read("src/page/ui/frame.css")).toMatch(
+      /\.editors li:not\(\[data-standing="verified"\]\) \.name-tag,\s+\.editors li:not\(\[data-standing="imitates"\]\) \.fact-note \{\s+display: none;/,
+    );
+  });
+});
+
 describe("the button that hands a link to Tisty", () => {
   it("writes the address as the contract's own example does, with the # of the key encoded", () => {
     const { link, address } = (CONTRACTS.link as { values: { edit_example: { link: string; address: string } } }).values

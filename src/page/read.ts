@@ -57,24 +57,17 @@ export const standingFor = async (
 };
 
 // One per root, chosen among those that hold, so an entry that fails cannot hide a person's real one.
-export const editorsOf = async (
-  { id, editors = [] }: Document,
-  served: Served,
-  load?: ShardLoader,
-): Promise<ShownEditor[]> => {
-  const holding = await Promise.all(
-    editors.map(async (one) => (one.in === id && (await editorHolds(one)) ? one : null)),
+export const editorsOf = async ({ id, editors = [] }: Document, served: Served): Promise<ShownEditor[]> => {
+  const verdicts = await Promise.all(
+    editors.map(async (one) => (one.in === id && (await editorHolds(one)) ? verdictOf(one, served) : "refused")),
   );
   const roots = new Set<string>();
-  const shown: ShownEditor[] = [];
-  for (const one of holding) {
-    if (one === null || roots.has(one.root)) continue;
-    const verdict = await verdictOf(one, served);
-    if (!stillSpeaks(verdict)) continue;
+  return editors.flatMap((one, at) => {
+    const verdict = verdicts[at] as Verdict;
+    if (!stillSpeaks(verdict) || roots.has(one.root)) return [];
     roots.add(one.root);
-    shown.push({ name: one.name, standing: await standingFor(one.root, verdict, one.name, load) });
-  }
-  return shown;
+    return [{ name: one.name, standing: standingOf(one.root, verdict, one.name, MAKER) }];
+  });
 };
 
 export const openLink = async (id: string, linkKey: string, arrived: Arrived, load?: ShardLoader): Promise<Opened> => {
@@ -88,7 +81,7 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived, lo
   const [signerStanding, ownerStanding, editors] = await Promise.all([
     standingFor(signature.root, signer, held.signed_as, load),
     standingFor(owner?.root ?? signature.root, ownerVerdict, held.owner_name, load),
-    editorsOf(held, served, load),
+    editorsOf(held, served),
   ]);
   return {
     held,

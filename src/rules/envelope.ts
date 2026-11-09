@@ -127,24 +127,31 @@ const certified = ({
   );
 };
 
+const sized = (said: string): Bytes[] => {
+  const bytes = words(said);
+  return [bigEndian(bytes.length), bytes];
+};
+
+const machineSigned = (
+  { root, machine, signed }: Pick<Signature, "root" | "machine" | "signed">,
+  about: string,
+  ...rest: Bytes[]
+): Promise<boolean> =>
+  verified(
+    fromBase64Url(machine),
+    fromBase64Url(signed),
+    words("tisty-share.signed.v1\0"),
+    fromBase64Url(root),
+    fromBase64Url(machine),
+    ...sized(about),
+    ...rest,
+  );
+
 const holdsSignature = async (signature: Signature, manifestBytes: Bytes, index: Bytes): Promise<void> => {
   const amiss = check("signature", signature);
   if (amiss.length > 0) refuse("unsigned", `its signature: ${amiss[0]}`);
-  const root = fromBase64Url(signature.root);
-  const machine = fromBase64Url(signature.machine);
   if (!(await certified(signature))) refuse("unsigned", "its root does not answer for its machine");
-  const about = words("envelope");
-  const signed = await verified(
-    machine,
-    fromBase64Url(signature.signed),
-    words("tisty-share.signed.v1\0"),
-    root,
-    machine,
-    bigEndian(about.length),
-    about,
-    await sha256(manifestBytes),
-    index,
-  );
+  const signed = await machineSigned(signature, "envelope", await sha256(manifestBytes), index);
   if (!signed) refuse("unsigned", "its machine did not sign it");
 };
 
@@ -157,24 +164,10 @@ const holdsOwner = async (
   manifestBytes: Bytes,
   index: Bytes,
 ): Promise<void> => {
-  const { root, machine, permit, name_tag: nameTag, signed } = owner as Owner;
+  const { root, permit, name_tag: nameTag } = owner as Owner;
   if (!(await certified(owner as Owner))) refuse("unsigned", "its owner's root does not answer for its machine");
-  const about = words("owner");
-  const idBytes = words(id);
   const permitKey = permit ? fromBase64Url(permit) : NO_PERMIT;
-  const owned = await verified(
-    fromBase64Url(machine),
-    fromBase64Url(signed),
-    words("tisty-share.signed.v1\0"),
-    fromBase64Url(root),
-    fromBase64Url(machine),
-    bigEndian(about.length),
-    about,
-    bigEndian(idBytes.length),
-    idBytes,
-    permitKey,
-    fromBase64Url(nameTag),
-  );
+  const owned = await machineSigned(owner as Owner, "owner", ...sized(id), permitKey, fromBase64Url(nameTag));
   if (!owned) refuse("unsigned", "its owner did not sign who owns it");
   if (root === signature.root) return;
   if (!permit || !signature.permit_signed) return refuse("unsigned", "another root needs its owner's permit");
@@ -190,26 +183,17 @@ const holdsOwner = async (
   if (!allowed) refuse("unsigned", "its token did not sign it");
 };
 
-// An entry answers for itself alone: one that fails is left aside, and never takes the document with it.
 export const editorHolds = async (editor: Editor): Promise<boolean> => {
   try {
-    if (!(await certified(editor))) return false;
-    const about = words("editor");
-    const inBytes = words(editor.in);
-    const name = words(editor.name);
-    return await verified(
-      fromBase64Url(editor.machine),
-      fromBase64Url(editor.signed),
-      words("tisty-share.signed.v1\0"),
-      fromBase64Url(editor.root),
-      fromBase64Url(editor.machine),
-      bigEndian(about.length),
-      about,
-      bigEndian(inBytes.length),
-      inBytes,
-      Uint8Array.of(editor.owned ? 1 : 0),
-      bigEndian(name.length),
-      name,
+    return (
+      (await certified(editor)) &&
+      (await machineSigned(
+        editor,
+        "editor",
+        ...sized(editor.in),
+        Uint8Array.of(editor.owned ? 1 : 0),
+        ...sized(editor.name),
+      ))
     );
   } catch {
     return false;
