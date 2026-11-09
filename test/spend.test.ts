@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { billOf, checkSpend, cycleOf, lineOf, type SpendTools, stageOf, type Usage } from "../src/core/spend";
+import {
+  billOf,
+  checkSpend,
+  cycleOf,
+  lineOf,
+  reviewOrClose,
+  type SpendTools,
+  stageOf,
+  type Usage,
+} from "../src/core/spend";
 import type { Stage } from "../src/core/store";
 
 const quiet: Usage = { requests: 0, rowsRead: 0, rowsWritten: 0, classA: 0, classB: 0, storedGb: 0 };
@@ -150,6 +159,46 @@ describe("checking", () => {
     set.setBlocked = () => Promise.reject(new Error("no rule"));
     await expect(checkSpend(NOW, RENEWAL, set)).rejects.toThrow("no rule");
     expect(steps).toEqual([]);
+  });
+
+  const MINUTE = 60_000;
+  const unreviewed = (was: Stage, spentAt: number | null) => {
+    const { set, steps } = tools(quiet, was);
+    set.usageSince = () => Promise.reject(new Error("no usage"));
+    set.store.spentAt = async () => spentAt;
+    return { set, steps };
+  };
+
+  it("stops uploads once no review has gone through for fifteen minutes", async () => {
+    const { set, steps } = unreviewed("open", NOW - 15 * MINUTE);
+    await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
+    expect(steps).toEqual(["stage:no_uploads"]);
+  });
+
+  it("lets one missed review pass", async () => {
+    const { set, steps } = unreviewed("open", NOW - 5 * MINUTE);
+    await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
+    expect(steps).toEqual([]);
+  });
+
+  it("stops uploads when no review ever went through", async () => {
+    const { set, steps } = unreviewed("warned", null);
+    await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
+    expect(steps).toEqual(["stage:no_uploads"]);
+  });
+
+  it("never loosens a stage already closed while reviews fail", async () => {
+    for (const was of ["no_uploads", "blocked"] as Stage[]) {
+      const { set, steps } = unreviewed(was, null);
+      await expect(reviewOrClose(NOW, RENEWAL, set)).rejects.toThrow("no usage");
+      expect(steps).toEqual([]);
+    }
+  });
+
+  it("opens again on the first review that goes through", async () => {
+    const { set, steps } = tools(quiet, "no_uploads");
+    expect(await reviewOrClose(NOW, RENEWAL, set)).toBe("open");
+    expect(steps).toEqual(["stage:open"]);
   });
 
   it("keeps the stage when the usage cannot be read", async () => {

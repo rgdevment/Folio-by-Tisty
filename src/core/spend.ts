@@ -69,10 +69,28 @@ export const stageOf = (usage: Usage, cycle: Cycle): Stage => {
 };
 
 export interface SpendTools {
-  store: Pick<Store, "stage" | "setStage" | "liftCut"> & Partial<Pick<Store, "noteSpend">>;
+  store: Pick<Store, "stage" | "setStage" | "liftCut"> & Partial<Pick<Store, "noteSpend" | "spentAt">>;
   usageSince: (start: number, now: number) => Promise<Usage>;
   setBlocked: (blocked: boolean) => Promise<void>;
 }
+
+const UNREVIEWED_MS_TO_CLOSE = 15 * 60_000;
+const OPEN_TO_UPLOADS: Stage[] = ["open", "warned", "new_keys_off"];
+
+// Without a review nothing cuts the bill, so once reviews stop arriving for a while uploads stop until one does.
+export const reviewOrClose = async (now: number, renewalDay: number, tools: SpendTools): Promise<Stage> => {
+  try {
+    return await checkSpend(now, renewalDay, tools);
+  } catch (error) {
+    const { store } = tools;
+    const seen = (await store.spentAt?.()) ?? null;
+    const was = await store.stage();
+    if ((seen === null || now - seen >= UNREVIEWED_MS_TO_CLOSE) && OPEN_TO_UPLOADS.includes(was)) {
+      await store.setStage("no_uploads");
+    }
+    throw error;
+  }
+};
 
 export const checkSpend = async (now: number, renewalDay: number, tools: SpendTools): Promise<Stage> => {
   const { store, usageSince, setBlocked } = tools;

@@ -222,6 +222,7 @@ export interface Store {
   sweep(today: number): Promise<Swept>;
   forgetOrphans(now: number): Promise<number>;
   stage(): Promise<Stage>;
+  spentAt(): Promise<number | null>;
   digested(): Promise<{ hour: number; alerted: Stage }>;
   news(after: number, before: number, atMost: number): Promise<News>;
   setDigested(hour: number, stage: Stage): Promise<void>;

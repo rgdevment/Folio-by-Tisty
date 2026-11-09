@@ -191,7 +191,7 @@ describe("each cron", () => {
 
   it("the review of the bill does not sweep, and fails loud without its settings", async () => {
     await dying("gone", DAY - 1);
-    await expect(fire("*/15 * * * *", (DAY + 1) * 86_400_000, { BILLING_DAY: "" })).rejects.toThrow("renewal day");
+    await expect(fire("*/5 * * * *", (DAY + 1) * 86_400_000, { BILLING_DAY: "" })).rejects.toThrow("renewal day");
     expect(await diesOn("gone")).toBe(DAY - 1);
   });
 
