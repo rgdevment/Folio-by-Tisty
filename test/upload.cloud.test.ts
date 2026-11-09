@@ -235,6 +235,111 @@ describe("who may send a new version", () => {
   });
 });
 
+describe("taking an editor back (decision 148)", () => {
+  const STEP = 10 * MINUTE;
+  const setPermit = (id: string, permit: string | null) =>
+    administer({ id, ip: "203.0.113.9", now: LATER, token: "the admin token", action: "permit", permit }, tools);
+  const latest = async (id: string) => (await row(id))?.latest;
+  const byEditor = (id: string, version: number, { permit, pair }: { permit: string; pair: CryptoKeyPair }) =>
+    sealedEnvelope({ id, version, owner: mario, signer: ana, permit, token: pair });
+
+  // The permit changes between the upload reading the document and writing it, as a PUT from the manage link would.
+  const racedBy = (change: () => Promise<unknown>): UploadTools => {
+    let pending = true;
+    const raced = new Proxy(store, {
+      get(target, name) {
+        if (name === "held") {
+          return async (id: string) => {
+            const held = await target.held(id);
+            if (pending) {
+              pending = false;
+              await change();
+            }
+            return held;
+          };
+        }
+        const value = Reflect.get(target, name, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    return { ...tools, store: raced };
+  };
+
+  it("takes a new permit, then the owner's version with its block, and from then on only the new link", async () => {
+    const old = await newToken();
+    const id = await shared({ permit: old.permit });
+    const fresh = await newToken();
+    expect(await setPermit(id, fresh.permit)).toEqual({ done: true });
+    const owners = await sealedEnvelope({ id, version: 2, owner: mario, permit: fresh.permit });
+    expect(await send(id, owners, LATER)).toEqual({ stored: true, version: 2 });
+    expect(await send(id, await byEditor(id, 3, old), LATER + STEP)).toEqual({ refused: "not_yours" });
+    expect(await send(id, await byEditor(id, 3, fresh), LATER + STEP)).toEqual({ stored: true, version: 3 });
+  });
+
+  it("refuses the owner's version under the old block once the permit changed", async () => {
+    const old = await newToken();
+    const id = await shared({ permit: old.permit });
+    await setPermit(id, (await newToken()).permit);
+    const stale = await sealedEnvelope({ id, version: 2, owner: mario, permit: old.permit });
+    expect(await send(id, stale, LATER)).toEqual({ refused: "not_yours" });
+    expect(await latest(id)).toBe(1);
+  });
+
+  it("takes the new link before the owner's version arrives, under the block its owner signed for it", async () => {
+    const old = await newToken();
+    const id = await shared({ permit: old.permit });
+    const fresh = await newToken();
+    await setPermit(id, fresh.permit);
+    const underOldBlock = await sealedEnvelope({
+      id,
+      version: 2,
+      owner: mario,
+      signer: ana,
+      permit: old.permit,
+      token: fresh.pair,
+    });
+    expect(await send(id, underOldBlock, LATER)).toEqual({ refused: "envelope", why: "unsigned" });
+    expect(await send(id, await byEditor(id, 2, fresh), LATER)).toEqual({ stored: true, version: 2 });
+  });
+
+  it("leaves only the owner after a null permit, the owner's next version without a block", async () => {
+    const old = await newToken();
+    const id = await shared({ permit: old.permit });
+    expect(await setPermit(id, null)).toEqual({ done: true });
+    expect(await send(id, await byEditor(id, 2, old), LATER)).toEqual({ refused: "not_yours" });
+    const owners = await sealedEnvelope({ id, version: 2, owner: mario });
+    expect(await send(id, owners, LATER)).toEqual({ stored: true, version: 2 });
+    expect(await send(id, await byEditor(id, 3, old), LATER + STEP)).toEqual({ refused: "not_yours" });
+    expect((await row(id))?.permit).toBeNull();
+  });
+
+  it("answers behind and keeps nothing when the permit changes during an editor's upload, and a retry is refused", async () => {
+    const old = await newToken();
+    const id = await shared({ permit: old.permit });
+    const fresh = await newToken();
+    const edited = await byEditor(id, 2, old);
+    const raced = racedBy(() => store.setPermit(id, fresh.permit));
+    const sending = { id, now: LATER, ip: "203.0.113.9", bytes: async () => edited };
+    expect(await uploadDoc(sending, raced)).toEqual({ refused: "behind" });
+    expect(await latest(id)).toBe(1);
+    expect((await row(id))?.permit).toBe(fresh.permit);
+    expect(await send(id, edited, LATER)).toEqual({ refused: "not_yours" });
+  });
+
+  it("answers behind when the owner's own upload crosses a permit change, and takes it again under the new block", async () => {
+    const old = await newToken();
+    const id = await shared({ permit: old.permit });
+    const fresh = await newToken();
+    const stale = await sealedEnvelope({ id, version: 2, owner: mario, permit: old.permit });
+    const raced = racedBy(() => store.setPermit(id, fresh.permit));
+    const sending = { id, now: LATER, ip: "203.0.113.9", bytes: async () => stale };
+    expect(await uploadDoc(sending, raced)).toEqual({ refused: "behind" });
+    expect(await latest(id)).toBe(1);
+    const owners = await sealedEnvelope({ id, version: 2, owner: mario, permit: fresh.permit });
+    expect(await send(id, owners, LATER)).toEqual({ stored: true, version: 2 });
+  });
+});
+
 describe("the files a version names", () => {
   const sendFiles = (id: string, bytes: Bytes, now = LATER) =>
     uploadFiles({ id, now, ip: "203.0.113.9", bytes: async () => bytes }, tools);
@@ -1156,7 +1261,15 @@ describe("what stops a version", () => {
       const { pair, permit } = await newToken();
       const id = await shared({ permit });
       const before = String(BigInt(TERMS_ACCEPTED) - 1n);
-      const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair, terms: before });
+      const edited = await sealedEnvelope({
+        id,
+        version: 2,
+        owner: mario,
+        signer: ana,
+        permit,
+        token: pair,
+        terms: before,
+      });
       expect(await up(id, edited, LATER, undefined, tools)).toEqual({ refused: "terms", version: TERMS_ACCEPTED });
     });
 
