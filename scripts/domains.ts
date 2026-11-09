@@ -8,12 +8,13 @@ import { holdsSignature, signedFile } from "./limits-key.ts";
 const ROOT = /^[A-Za-z0-9_-]{43}$/;
 const SHARD_FILE = /^[0-9a-f]{2}\.json$/;
 const SHARD_OR_SIGNATURE = /^[0-9a-f]{2}\.json(\.minisig)?$/;
+const HOSTS = "hosts.json";
 const PUBLIC_KEY = "docs/limits.pub";
 const TRIES = 5;
 const BETWEEN_TRIES_MS = 60_000;
 const ASKED_AT_ONCE = 16;
 const USAGE =
-  "node scripts/domains.ts check <domain> <root> | build <private list> <domains branch> | sign <key file> <domains branch> | verify <domains branch> | watch (reads DOMAINS_CLEAR)";
+  "node scripts/domains.ts check <domain> <root> | build <private list> <domains branch> | hosts <private domain> <serial> <domains branch> | sign <key file> <domains branch> | verify <domains branch> | watch (reads DOMAINS_CLEAR)";
 
 export interface Approved {
   domain: string;
@@ -82,6 +83,38 @@ export const shardsOf = async (approved: Approved[]): Promise<Map<string, string
   return written;
 };
 
+export interface Hosts {
+  serial: number;
+  private: string;
+}
+
+const hostsIn = (said: string): Hosts | null => {
+  try {
+    const held: unknown = JSON.parse(said);
+    if (typeof held !== "object" || held === null || Array.isArray(held)) return null;
+    const { serial, private: domain, ...rest } = held as Record<string, unknown>;
+    if (Object.keys(rest).length > 0 || !Number.isSafeInteger(serial) || (serial as number) < 0) return null;
+    return typeof domain === "string" && DOMAIN.test(domain) ? { serial: serial as number, private: domain } : null;
+  } catch {
+    return null;
+  }
+};
+
+// Tisty keeps the highest serial it has read, so a lower one would reach nobody who already has one.
+export const writeHosts = (hosts: Hosts, dir: string): void => {
+  const said = `${JSON.stringify({ serial: hosts.serial, private: hosts.private }, null, 1)}\n`;
+  if (!hostsIn(said)) throw new Error("not a domain and a serial from 0 up, so nothing was written");
+  const file = join(dir, HOSTS);
+  const before = existsSync(file) ? readFileSync(file, "utf8") : null;
+  if (before === said) return;
+  const kept = before === null ? null : hostsIn(before);
+  if (kept && hosts.serial <= kept.serial)
+    throw new Error(`the serial must pass ${kept.serial}, so nothing was written`);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(file, said);
+  rmSync(`${file}.minisig`, { force: true });
+};
+
 // Only shards and their signatures, since the folder is a checkout of the domains branch and holds its .git.
 export const writeShards = (shards: Map<string, string>, dir: string): void => {
   mkdirSync(dir, { recursive: true });
@@ -96,10 +129,10 @@ export const writeShards = (shards: Map<string, string>, dir: string): void => {
   }
 };
 
-export const signShards = (keyFile: string, now: number, dir: string, publicKeyFile = PUBLIC_KEY): number => {
+export const signBranch = (keyFile: string, now: number, dir: string, publicKeyFile = PUBLIC_KEY): number => {
   const secret = readFileSync(keyFile, "utf8").trim();
   const publicKey = readFileSync(publicKeyFile, "utf8");
-  const names = readdirSync(dir).filter((name) => SHARD_FILE.test(name));
+  const names = readdirSync(dir).filter((name) => SHARD_FILE.test(name) || name === HOSTS);
   for (const name of names) {
     const said = readFileSync(join(dir, name));
     const signature = signedFile(said, `domains/${name}`, secret, now);
@@ -111,7 +144,36 @@ export const signShards = (keyFile: string, now: number, dir: string, publicKeyF
   return names.length;
 };
 
-export const shardFaults = (
+const signatureOf = (dir: string, name: string): string =>
+  existsSync(join(dir, `${name}.minisig`)) ? readFileSync(join(dir, `${name}.minisig`), "utf8") : "";
+
+const shardFaults = (dir: string, name: string, publicKey: string): string[] => {
+  const said = readFileSync(join(dir, name));
+  const held: unknown = JSON.parse(said.toString());
+  const proofs = Array.isArray(held) ? held : [];
+  return [
+    ...(Array.isArray(held) && held.length > 0 ? [] : [`domains/${name} is not a list of proofs`]),
+    ...(proofs.every((one) => typeof one === "string" && PROOF.test(one) && one.startsWith(name.slice(0, 2)))
+      ? []
+      : [`domains/${name} holds a proof that is not its own`]),
+    ...(said.length <= SHARD_BYTES_AT_MOST ? [] : [`domains/${name} passes 70 KB`]),
+    ...(holdsSignature(said, signatureOf(dir, name), publicKey, `domains/${name}`)
+      ? []
+      : [`domains/${name} is not signed`]),
+  ];
+};
+
+const hostsFaults = (dir: string, publicKey: string): string[] => {
+  const said = readFileSync(join(dir, HOSTS));
+  return [
+    ...(hostsIn(said.toString()) ? [] : [`domains/${HOSTS} is not a serial and a private domain`]),
+    ...(holdsSignature(said, signatureOf(dir, HOSTS), publicKey, `domains/${HOSTS}`)
+      ? []
+      : [`domains/${HOSTS} is not signed`]),
+  ];
+};
+
+export const branchFaults = (
   dir: string,
   publicKey = existsSync(PUBLIC_KEY) ? readFileSync(PUBLIC_KEY, "utf8") : "",
 ): string[] => {
@@ -119,25 +181,13 @@ export const shardFaults = (
   return readdirSync(dir)
     .filter((name) => !name.endsWith(".minisig") && !name.startsWith("."))
     .flatMap((name) => {
-      if (!SHARD_FILE.test(name)) return [`domains/${name} is not a shard`];
-      const said = readFileSync(join(dir, name));
-      const held: unknown = JSON.parse(said.toString());
-      const proofs = Array.isArray(held) ? held : [];
-      const signature = existsSync(join(dir, `${name}.minisig`))
-        ? readFileSync(join(dir, `${name}.minisig`), "utf8")
-        : "";
-      return [
-        ...(Array.isArray(held) && held.length > 0 ? [] : [`domains/${name} is not a list of proofs`]),
-        ...(proofs.every((one) => typeof one === "string" && PROOF.test(one) && one.startsWith(name.slice(0, 2)))
-          ? []
-          : [`domains/${name} holds a proof that is not its own`]),
-        ...(said.length <= SHARD_BYTES_AT_MOST ? [] : [`domains/${name} passes 70 KB`]),
-        ...(holdsSignature(said, signature, publicKey, `domains/${name}`) ? [] : [`domains/${name} is not signed`]),
-      ];
+      if (name === HOSTS) return hostsFaults(dir, publicKey);
+      if (SHARD_FILE.test(name)) return shardFaults(dir, name, publicKey);
+      return [`domains/${name} is neither a shard nor ${HOSTS}`];
     });
 };
 
-const run = async ([what, first, second]: string[]): Promise<void> => {
+const run = async ([what, first, second, third]: string[]): Promise<void> => {
   if (what === "check" && first && second) {
     const faults = await txtFaults(first, second, dnsLookup);
     console.log(faults.length === 0 ? `ok ${first} names that root` : faults.join("\n"));
@@ -149,11 +199,14 @@ const run = async ([what, first, second]: string[]): Promise<void> => {
     const shards = await shardsOf(approved);
     writeShards(shards, second);
     console.log(`wrote ${approved.length} domains in ${shards.size} shards: sign them next`);
+  } else if (what === "hosts" && first && second && third) {
+    writeHosts({ private: first, serial: Number(second) }, third);
+    console.log(`wrote ${HOSTS} with ${first} at serial ${second}: sign it next`);
   } else if (what === "sign" && first && second) {
-    console.log(`signed ${signShards(first, Date.now(), second)} shards`);
+    console.log(`signed ${signBranch(first, Date.now(), second)} files`);
   } else if (what === "verify" && first) {
-    const faults = shardFaults(first);
-    console.log(faults.length === 0 ? "ok the shards hold, signed with the limits key" : faults.join("\n"));
+    const faults = branchFaults(first);
+    console.log(faults.length === 0 ? "ok the shards and hosts hold, signed with the limits key" : faults.join("\n"));
     if (faults.length > 0) process.exitCode = 1;
   } else if (what === "watch") {
     const approved = approvedIn(process.env.DOMAINS_CLEAR ?? "");
