@@ -50,6 +50,7 @@ describe("the page's words", () => {
     expect(byId("edit-in-tisty").textContent).toBe("Editar en Tisty");
     expect(byId("panels").getAttribute("aria-label")).toBe("Sobre este documento");
     expect(said().verdicts.holds).toBe("Firma válida");
+    expect(page.querySelector(".brand-beta")?.getAttribute("title")).toContain("Folio está en beta");
   });
 
   it("follow an English document, even for a reader whose browser prefers Spanish", () => {
@@ -57,6 +58,7 @@ describe("the page's words", () => {
     speak("en");
     expect(page.documentElement.lang).toBe("en");
     expect(byId("print").textContent).toBe("Print");
+    expect(page.querySelector(".brand-beta")?.getAttribute("title")).toContain("Folio is in beta");
   });
 
   it("follow the reader when the document is in another language, and stay English when the reader says nothing", () => {
