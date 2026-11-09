@@ -56,6 +56,23 @@ const publishedNow = async (): Promise<Published> => {
   return { limits, signature: signature.toString(), es, en };
 };
 
+// What a deploy is about to build with, against the terms of the commit it builds, before anything goes out.
+const here = (): void => {
+  const faults = publishedFaults(
+    {
+      limits: readFileSync(".limits/limits.json"),
+      signature: readFileSync(".limits/limits.json.minisig", "utf8"),
+      es: readFileSync("docs/TERMINOS.md"),
+      en: readFileSync("docs/TERMS.md"),
+    },
+    readFileSync("docs/limits.pub", "utf8"),
+    0,
+  );
+  for (const fault of faults) console.log(`::error::${fault}`);
+  if (faults.length > 0) process.exitCode = 1;
+  else console.log("ok the limits fetched hold, and name the terms this commit carries");
+};
+
 // A cache holds each file five minutes on its own, so a while of faults is expected; a quarter of an hour is not.
 const watch = async (): Promise<void> => {
   const publicKey = readFileSync("docs/limits.pub", "utf8");
@@ -78,4 +95,7 @@ const watch = async (): Promise<void> => {
   }
 };
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await watch();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv[2] === "here") here();
+  else await watch();
+}

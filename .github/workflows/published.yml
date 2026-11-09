@@ -34,14 +34,19 @@ jobs:
           node-version: 22
           package-manager-cache: false
       - run: npm ci --ignore-scripts
-      - run: npm run limits
 
+      # Every commit of the last eight days against the one before, so a run every six hours misses none.
       - name: The limits branch only moves forward
         run: |
-          git fetch --quiet --depth 2 origin limits
-          if git rev-parse --quiet --verify FETCH_HEAD~1 > /dev/null; then
-            bash scripts/limits-serial.sh FETCH_HEAD~1 FETCH_HEAD
-          fi
+          git fetch --quiet origin limits
+          status=0
+          for commit in $(git rev-list --since="8 days ago" FETCH_HEAD); do
+            parent=$(git rev-parse --quiet --verify "$commit~1") || continue
+            bash scripts/limits-serial.sh "$parent" "$commit" || status=1
+          done
+          exit $status
+
+      - run: npm run limits
 
       - run: node scripts/limits-published.ts
 

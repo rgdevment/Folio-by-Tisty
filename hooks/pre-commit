@@ -3,7 +3,7 @@ set -uo pipefail
 
 cd "$(git rev-parse --show-toplevel)" || exit 0
 # The limits and domains branches hold only signed data, with none of main's code to check.
-[ -f scripts/rules.sh ] || exit 0
+case $(git rev-parse --abbrev-ref HEAD) in limits | domains) exit 0 ;; esac
 status=0
 
 # What is about to be committed, not what the working tree happens to hold beside it.

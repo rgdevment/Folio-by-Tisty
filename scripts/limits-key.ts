@@ -31,8 +31,8 @@ interface Terms {
 }
 
 const inDocs = (name: string): string => resolve(fileURLToPath(new URL(`../docs/${name}`, import.meta.url)));
-const PUBLISHED: LimitsFiles = {
-  limits: inDocs("limits.json"),
+// No limits path here: they live on their own branch, and docs/limits.json is a notice nothing signs again.
+const KEY_AND_TERMS: Omit<LimitsFiles, "limits"> = {
   publicKey: inDocs("limits.pub"),
   termsEs: inDocs("TERMINOS.md"),
   termsEn: inDocs("TERMS.md"),
@@ -149,7 +149,10 @@ const termsOf = (files: LimitsFiles, held: Terms | undefined): Terms => {
   return { version: String(Number(held?.version ?? 0) + 1), es, en };
 };
 
-export const createKeys = (keyFile: string, files: LimitsFiles = PUBLISHED): string => {
+export const createKeys = (
+  keyFile: string,
+  files: Partial<LimitsFiles> & Pick<LimitsFiles, "publicKey"> = KEY_AND_TERMS,
+): string => {
   if (existsSync(files.publicKey)) {
     throw new Error(
       `${files.publicKey} is the key Tisty is built with. Every copy built with it would stop hearing the limits, so remove it by hand if that is what you want.`,
@@ -165,8 +168,8 @@ export const signLimits = (
   keyFile: string,
   haltedDays: string | undefined,
   now: number,
-  server: Published = publishedLimits(LEVEL_ONE),
-  files: LimitsFiles = PUBLISHED,
+  server: Published,
+  files: LimitsFiles,
 ): void => {
   const current = existsSync(files.limits)
     ? (JSON.parse(readFileSync(files.limits, "utf8")) as Record<string, unknown>)
@@ -204,7 +207,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (what === "new" && keyFile) {
     console.log(createKeys(keyFile));
   } else if (what === "sign" && keyFile && branch) {
-    const files = { ...PUBLISHED, limits: join(branch, "limits.json") };
+    const files = { ...KEY_AND_TERMS, limits: join(branch, "limits.json") };
     const unpublished = await domainFaults(makerIn(files.limits) ?? { root: "" }, dnsLookup);
     if (unpublished.length > 0) {
       console.error(`the maker's domain does not hold, so nothing was signed: ${unpublished.join("; ")}`);

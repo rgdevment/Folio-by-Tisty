@@ -93,6 +93,9 @@ jobs:
       # Taken once here, so the page, the Worker and the panel are all built with the same signed limits.
       - id: limits
         run: npm run limits
+      # Signed ahead of a terms change still under review, they would ask for terms this commit does not serve.
+      - name: The limits name the terms this commit carries
+        run: node scripts/limits-published.ts here
       # Kept on their own branch, as Tisty keeps its manifest, and absent until a first domain is approved.
       - name: Take the domains from their branch
         run: |
@@ -484,6 +487,9 @@ jobs:
           git fetch --quiet origin limits
           if [[ "$limits" =~ ^[0-9a-f]{8}$ ]]; then
             then_maker=$(git show "$limits:limits.json" | jq -c '.maker // null')
+          elif git cat-file -e "$commit:scripts/limits-fetch.sh" 2> /dev/null; then
+            echo "::error::$BACK_TO was built from the limits branch but does not say which commit: put it back by hand"
+            exit 1
           else
             then_maker=$(git show "$commit:docs/limits.json" | jq -c '.maker // null')
           fi
