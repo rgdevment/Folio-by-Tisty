@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -8,6 +8,7 @@ import {
   branchFaults,
   failingLines,
   listFaults,
+  serialIn,
   shardsOf,
   signBranch,
   writeHosts,
@@ -151,6 +152,22 @@ ana.dev ${OTHER}`),
     writeFileSync(join(dir, "3f.json"), JSON.stringify(Array(2200).fill("3f000000000000000000000000000000")));
     expect(branchFaults(dir, "")).toContain("domains/3f.json passes 70 KB");
   });
+
+  it("are reported, not thrown, when they are not JSON", () => {
+    const dir = join(place, "domains");
+    writeShards(
+      new Map([
+        ["3f", '["3f00'],
+        ["40", '["40000000000000000000000000000000"]\n'],
+      ]),
+      dir,
+    );
+    expect(branchFaults(dir, "")).toEqual([
+      "domains/3f.json is not a list of proofs",
+      "domains/3f.json is not signed",
+      "domains/40.json is not signed",
+    ]);
+  });
 });
 
 describe("the private host", () => {
@@ -199,6 +216,9 @@ describe("the private host", () => {
       '{"serial": "1", "private": "tisty.cl"}',
       '{"serial": -1, "private": "tisty.cl"}',
       '{"serial": 1.5, "private": "tisty.cl"}',
+      '{\n "serial": 1.0,\n "private": "tisty.cl"\n}\n',
+      '{\n "serial": 9,\n "serial": 1,\n "private": "tisty.cl"\n}\n',
+      '{"serial":1,"private":"tisty.cl"}',
       '{"serial": 1, "private": "tisty.cl", "public": "tisty.app"}',
       '["tisty.cl"]',
       "not json",
@@ -225,6 +245,20 @@ describe("the private host", () => {
     writeHosts({ private: "folio.example", serial: 2 }, dir);
     expect(existsSync(join(dir, "hosts.json.minisig"))).toBe(false);
     expect(JSON.parse(readFileSync(join(dir, "hosts.json"), "utf8")).private).toBe("folio.example");
+  });
+
+  it("is written again in its own form at the same serial and domain", () => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "hosts.json"), '{"serial":3,"private":"tisty.cl"}');
+    writeHosts({ private: "tisty.cl", serial: 3 }, dir);
+    signed();
+    expect(faults()).toEqual([]);
+    expect(() => writeHosts({ private: "tisty.cl", serial: 2 }, dir)).toThrow("the serial must pass 3");
+  });
+
+  it("takes its serial as typed digits only", () => {
+    expect(serialIn("42")).toBe(42);
+    for (const typed of ["0x10", "1e3", " 7", "-1", "1.0", ""]) expect(serialIn(typed)).toBeNaN();
   });
 
   it("stays, with its signature, when the shards are written again", async () => {

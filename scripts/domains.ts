@@ -88,27 +88,44 @@ export interface Hosts {
   private: string;
 }
 
-const hostsIn = (said: string): Hosts | null => {
+const jsonOf = (said: string): unknown => {
   try {
-    const held: unknown = JSON.parse(said);
-    if (typeof held !== "object" || held === null || Array.isArray(held)) return null;
-    const { serial, private: domain, ...rest } = held as Record<string, unknown>;
-    if (Object.keys(rest).length > 0 || !Number.isSafeInteger(serial) || (serial as number) < 0) return null;
-    return typeof domain === "string" && DOMAIN.test(domain) ? { serial: serial as number, private: domain } : null;
+    return JSON.parse(said);
   } catch {
-    return null;
+    return undefined;
   }
 };
 
+const hostsText = ({ serial, private: domain }: Hosts): string =>
+  `${JSON.stringify({ serial, private: domain }, null, 1)}\n`;
+
+const parsedHosts = (said: string): Hosts | null => {
+  const held = jsonOf(said);
+  if (typeof held !== "object" || held === null || Array.isArray(held)) return null;
+  const { serial, private: domain, ...rest } = held as Record<string, unknown>;
+  if (Object.keys(rest).length > 0 || typeof serial !== "number" || !Number.isSafeInteger(serial) || serial < 0) {
+    return null;
+  }
+  return typeof domain === "string" && DOMAIN.test(domain) ? { serial, private: domain } : null;
+};
+
+// Only the form writeHosts gives, since Tisty's reader refuses a serial like 1.0 and a key said twice.
+const hostsIn = (said: string): Hosts | null => {
+  const hosts = parsedHosts(said);
+  return hosts && hostsText(hosts) === said ? hosts : null;
+};
+
+export const serialIn = (typed: string): number => (/^\d+$/.test(typed) ? Number(typed) : Number.NaN);
+
 // Tisty keeps the highest serial it has read, so a lower one would reach nobody who already has one.
 export const writeHosts = (hosts: Hosts, dir: string): void => {
-  const said = `${JSON.stringify({ serial: hosts.serial, private: hosts.private }, null, 1)}\n`;
+  const said = hostsText(hosts);
   if (!hostsIn(said)) throw new Error("not a domain and a serial from 0 up, so nothing was written");
   const file = join(dir, HOSTS);
   const before = existsSync(file) ? readFileSync(file, "utf8") : null;
   if (before === said) return;
-  const kept = before === null ? null : hostsIn(before);
-  if (kept && hosts.serial <= kept.serial)
+  const kept = before === null ? null : parsedHosts(before);
+  if (kept && (hosts.serial < kept.serial || (hosts.serial === kept.serial && hosts.private !== kept.private)))
     throw new Error(`the serial must pass ${kept.serial}, so nothing was written`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(file, said);
@@ -149,7 +166,7 @@ const signatureOf = (dir: string, name: string): string =>
 
 const shardFaults = (dir: string, name: string, publicKey: string): string[] => {
   const said = readFileSync(join(dir, name));
-  const held: unknown = JSON.parse(said.toString());
+  const held = jsonOf(said.toString());
   const proofs = Array.isArray(held) ? held : [];
   return [
     ...(Array.isArray(held) && held.length > 0 ? [] : [`domains/${name} is not a list of proofs`]),
@@ -200,7 +217,7 @@ const run = async ([what, first, second, third]: string[]): Promise<void> => {
     writeShards(shards, second);
     console.log(`wrote ${approved.length} domains in ${shards.size} shards: sign them next`);
   } else if (what === "hosts" && first && second && third) {
-    writeHosts({ private: first, serial: Number(second) }, third);
+    writeHosts({ private: first, serial: serialIn(second) }, third);
     console.log(`wrote ${HOSTS} with ${first} at serial ${second}: sign it next`);
   } else if (what === "sign" && first && second) {
     console.log(`signed ${signBranch(first, Date.now(), second)} files`);
