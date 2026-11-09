@@ -17,9 +17,8 @@ sus promesas. Sus links viven en tisty.cl, y su sitio es
 ## Cómo funciona
 
 - **Se comparte desde Tisty,** con la fila *Compartido* del panel de un
-  documento, desde la versión 1.42.0. Mientras Folio no abre, Tisty lo dice y no
-  sube nada. No hay otra forma de compartir, y no hay cuentas: el link es el
-  permiso.
+  documento, desde la versión 1.42.0. No hay otra forma de compartir, y no hay
+  cuentas: el link es el permiso.
 - **Cada documento tiene tres links:** uno para leer, uno para editar y uno
   para administrar.
 - **Lo que compartes se cifra en tu Tisty antes de salir.** La llave viaja en
@@ -56,7 +55,7 @@ público. No hay una empresa detrás y nadie gana dinero con él. Contacto:
 ## Su código
 
 Se está escribiendo de nuevo desde cero en TypeScript, sobre Cloudflare Workers,
-D1 y R2, y el servicio todavía no está abierto: [folio.tisty.app](https://folio.tisty.app)
+D1 y R2, y el servicio está abierto, en beta: [folio.tisty.app](https://folio.tisty.app)
 dice qué es. Se entiende con la
 [app Tisty](https://github.com/rgdevment/Tisty) por un contrato que guarda el
 repositorio de la app: los formatos de lo que viaja y las reglas de estilo de la

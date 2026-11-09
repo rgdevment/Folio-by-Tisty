@@ -55,10 +55,10 @@ describe("the public page", () => {
 
   it("does not contradict what Tisty says about Folio", () => {
     expect(flat).toContain(
-      "Folio te permite compartir documentos en privado con quien quieras, con un link y cifrados de forma segura. Todavía no está disponible.",
+      "Folio te permite compartir documentos en privado con quien quieras, con un link y cifrados de forma segura. Se comparte desde Tisty.",
     );
     expect(flat).toContain(
-      "Folio lets you share documents privately with anyone, using an encrypted link. It isn't available yet.",
+      "Folio lets you share documents privately with anyone, using an encrypted link. You share from Tisty.",
     );
   });
 
