@@ -288,9 +288,10 @@ paths:
               schema: { $ref: "#/components/schemas/BadEnvelope" }
         "428":
           description: |
-            Whoever signs has not accepted the terms in force: its manifest's `terms` is missing, more than one
-            behind, or more than one ahead. The version just before is still taken, so nobody waits for a cached
-            `limits.json` to catch up. Nothing was kept. Accept the version it names, as `limits.json` says it, and send it again.
+            Whoever signs has not accepted the terms in force: its manifest's `terms` is missing, behind, or more
+            than one ahead. One ahead is taken while the server's deploy catches up with `limits.json`; none behind,
+            so new terms are accepted once by everyone. Nothing was kept. Read `limits.json` again, accept the version
+            it names, and send it again.
             A files envelope is not asked: the version that names it already answered for them.
           content:
             application/json:

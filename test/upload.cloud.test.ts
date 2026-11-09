@@ -1050,7 +1050,8 @@ describe("what stops a version", () => {
 
     it.each([
       ["says nothing of them", ""],
-      ["accepted one older than the last", "7"],
+      ["accepted the ones before these", "8"],
+      ["accepted older ones still", "7"],
       ["is more than one ahead", "11"],
       ["names a version that will never exist", "9999999999999999"],
     ])("refuses a new document that %s, names the version, and keeps nothing", async (_what, terms) => {
@@ -1061,10 +1062,9 @@ describe("what stops a version", () => {
       expect(await keyRow(rootOf(fresh))).toBeNull();
     });
 
-    it("takes the version in force, the next while a deploy catches up, and the last while caches do", async () => {
+    it("takes the version in force, and the next while a deploy catches up", async () => {
       expect((await sharing(await newPerson(), "9")).answer).toEqual({ stored: true, version: 1 });
       expect((await sharing(await newPerson(), "10")).answer).toEqual({ stored: true, version: 1 });
-      expect((await sharing(await newPerson(), "8")).answer).toEqual({ stored: true, version: 1 });
     });
 
     it("keeps the version beside a new key, to the hour, so it names no upload", async () => {
@@ -1141,10 +1141,23 @@ describe("what stops a version", () => {
       expect((await keyRow(rootOf(fresh)))?.terms_version).toBe("9");
     });
 
-    it("refuses the next version of what is shared when the terms moved on twice", async () => {
+    it("refuses the next version of what is shared once the terms moved on, so everyone accepts them once", async () => {
       const fresh = await newPerson();
       const { id } = await sharing(fresh, "9");
-      expect(await nextVersion(id, fresh, "7")).toEqual({ refused: "terms", version: "9" });
+      const moved = { ...UNDER, termsVersion: "10" };
+      const next = await sealedEnvelope({ id, version: 2, owner: fresh, terms: "9" });
+      expect(await up(id, next, LATER, undefined, moved)).toEqual({ refused: "terms", version: "10" });
+      const accepted = await sealedEnvelope({ id, version: 2, owner: fresh, terms: "10" });
+      expect(await up(id, accepted, LATER, undefined, moved)).toEqual({ stored: true, version: 2 });
+      expect(await keyRow(rootOf(fresh))).toEqual({ terms_version: "10", terms_hour: HOUR_LATER });
+    });
+
+    it("refuses an edit link's version under older terms, though its owner accepted the ones in force", async () => {
+      const { pair, permit } = await newToken();
+      const id = await shared({ permit });
+      const before = String(BigInt(TERMS_ACCEPTED) - 1n);
+      const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair, terms: before });
+      expect(await up(id, edited, LATER, undefined, tools)).toEqual({ refused: "terms", version: TERMS_ACCEPTED });
     });
 
     it("keeps reading what was shared under older terms", async () => {
