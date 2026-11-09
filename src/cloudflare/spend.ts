@@ -64,7 +64,8 @@ export class CloudSpend {
   readonly #bindings: SpendBindings;
   readonly #fetch: typeof fetch;
 
-  constructor(bindings: SpendBindings, fetcher: typeof fetch = fetch) {
+  // Wrapped, since workerd refuses fetch when called as a method of anything but the global.
+  constructor(bindings: SpendBindings, fetcher: typeof fetch = (input, init) => fetch(input, init)) {
     this.#bindings = bindings;
     this.#fetch = fetcher;
   }
