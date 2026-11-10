@@ -193,6 +193,25 @@ describe("the page of a link that is gone", () => {
   it("is kept out of every search", () => {
     expect(MISSING).toContain('<meta name="robots" content="noindex" />');
   });
+
+  it("names its language switch, and each of its buttons", () => {
+    expect(MISSING).toMatch(/<fieldset class="languages" aria-label="[^"]+">/);
+    expect(MISSING).toContain('lang="es" aria-label="Español">ES</button>');
+    expect(MISSING).toContain('lang="en" aria-label="English">EN</button>');
+  });
+});
+
+describe("the stylesheet of the home and the missing page", () => {
+  const SITE = read(`${PLACE}/site.css`);
+
+  it("rings the focus in the ink that stands out on either background", () => {
+    expect(SITE).toMatch(/:focus-visible \{\s+outline: 2px solid var\(--flame-ink\);/);
+  });
+
+  it("moves nothing in a loop, so every animation ends on its own", () => {
+    expect(SITE).toContain("animation");
+    expect(SITE).not.toContain("infinite");
+  });
 });
 
 describe("the language of the page of a link that is gone", () => {

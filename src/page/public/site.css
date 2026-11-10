@@ -69,7 +69,7 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--flame);
+  outline: 2px solid var(--flame-ink);
   outline-offset: 3px;
 }
 
@@ -112,10 +112,11 @@ a {
   padding: 0.2rem;
   border: 1px solid var(--line);
   border-radius: 999px;
+  margin: 0;
   background: var(--surface);
 }
 
-html:not([data-shown]) .languages[role="group"] {
+html:not([data-shown]) fieldset.languages {
   display: none;
 }
 
@@ -177,7 +178,7 @@ html[data-shown="en"] body .languages [lang="es"] {
   height: 0.5rem;
   border-radius: 50%;
   background: var(--flame);
-  animation: breathe 2.4s ease-in-out infinite;
+  animation: breathe 2.4s ease-in-out 2;
 }
 
 h1 {
@@ -251,26 +252,26 @@ h1 {
   stroke: var(--sheet-line);
   stroke-width: 6;
   stroke-dasharray: 1;
-  animation: write 7s ease-in-out infinite;
+  animation: write 0.8s ease-in-out both;
 }
 
 .second {
-  animation-name: write-second;
+  animation-delay: 0.8s;
 }
 
 .third {
-  animation-name: write-third;
+  animation-delay: 1.6s;
 }
 
 .last {
   stroke: var(--flame);
-  animation-name: write-last;
+  animation-delay: 2.4s;
 }
 
 .seal {
   transform-box: fill-box;
   transform-origin: center;
-  animation: seal 7s ease-in-out infinite;
+  animation: seal 0.7s ease-in-out 3.2s both;
 }
 
 .seal circle {
@@ -353,7 +354,7 @@ h1 {
 .zzz text {
   fill: var(--muted);
   font-weight: 700;
-  animation: doze 3.2s ease-in-out infinite;
+  animation: doze 1.6s ease-in-out 2;
 }
 
 .zzz text:nth-child(2) {
@@ -488,13 +489,8 @@ h1 {
 }
 
 @keyframes doze {
-  0%,
-  100% {
-    opacity: 0.25;
-    transform: translateY(0);
-  }
   50% {
-    opacity: 1;
+    opacity: 0.25;
     transform: translateY(-3px);
   }
 }
@@ -506,90 +502,20 @@ h1 {
 }
 
 @keyframes write {
-  0% {
-    stroke-dashoffset: 1;
-    opacity: 0;
-  }
-  12%,
-  90% {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-  100% {
-    stroke-dashoffset: 1;
-    opacity: 0;
-  }
-}
-
-@keyframes write-second {
-  0%,
-  12% {
-    stroke-dashoffset: 1;
-    opacity: 0;
-  }
-  24%,
-  90% {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-  100% {
-    stroke-dashoffset: 1;
-    opacity: 0;
-  }
-}
-
-@keyframes write-third {
-  0%,
-  24% {
-    stroke-dashoffset: 1;
-    opacity: 0;
-  }
-  34%,
-  90% {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-  100% {
-    stroke-dashoffset: 1;
-    opacity: 0;
-  }
-}
-
-@keyframes write-last {
-  0%,
-  34% {
-    stroke-dashoffset: 1;
-    opacity: 0;
-  }
-  42%,
-  90% {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-  100% {
+  from {
     stroke-dashoffset: 1;
     opacity: 0;
   }
 }
 
 @keyframes seal {
-  0%,
-  44% {
+  from {
     opacity: 0;
     transform: scale(0.4);
   }
-  50% {
+  60% {
     opacity: 1;
     transform: scale(1.08);
-  }
-  54%,
-  90% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.9);
   }
 }
 
@@ -599,32 +525,5 @@ h1 {
   .seal,
   .zzz text {
     animation: none;
-  }
-
-  .line {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-}
-
-@media (max-width: 52rem) {
-  .tisto {
-    left: -1.5rem;
-  }
-
-  .hero {
-    grid-template-columns: minmax(0, 1fr);
-    padding-block: 1rem 2.5rem;
-  }
-
-  .scene {
-    order: -1;
-    width: min(52%, 11rem);
-    margin-bottom: 0.75rem;
-  }
-
-  .facts,
-  .reasons {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
