@@ -10,7 +10,6 @@ export interface HeldLanguage {
   document: string;
   lang: string;
   print: Bytes;
-  ownersOwn: boolean;
 }
 
 const LANGUAGE_REVIEW = "language-review";
@@ -75,9 +74,10 @@ export const keptBy = async (
 ): Promise<Review[]> => {
   // What is public has no key, no editors and no reviews: only its signer's languages show (contract, review.sealed_only).
   if (anchorKey === undefined || !(await reviewsCount(anchor, owner, reviews, served))) return [];
+  const holding = await Promise.all(reviews.map((one) => reviewHolds(anchor, owner, anchorKey, one)));
   const latest = new Map<string, Review>();
-  for (const one of reviews) {
-    if (newer(one, latest.get(one.of)) && (await reviewHolds(anchor, owner, anchorKey, one))) latest.set(one.of, one);
+  for (const [at, one] of reviews.entries()) {
+    if (holding[at] && newer(one, latest.get(one.of))) latest.set(one.of, one);
   }
   return [...latest.values()].filter((one) => one.kept);
 };
@@ -93,8 +93,7 @@ export const reachedBy = (map: readonly Translation[], kept: readonly Review[]):
   return [...signed, ...map.filter((one) => !one.pending && !reviewed.has(one.document))];
 };
 
-export const shows = ({ document, lang, print, ownersOwn }: HeldLanguage, kept: readonly Review[]): boolean =>
-  ownersOwn ||
+export const keptAsRead = ({ document, lang, print }: HeldLanguage, kept: readonly Review[]): boolean =>
   kept.some(
     (one) => one.document === document && one.lang === lang && sameBytes(fromBase64Url(one.print ?? ""), print),
   );

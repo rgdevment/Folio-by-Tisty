@@ -6,7 +6,7 @@ import { editorHolds, refuse } from "../rules/envelope";
 import { isChecked, type ShardLoader } from "./checked";
 import { MAKER } from "./maker";
 import { documentIn, openEnvelope } from "./open";
-import { keptBy, printOf } from "./reviews";
+import { keptBy } from "./reviews";
 import { fingerprintOf, verdictOf, worseOf } from "./verdict";
 
 export interface Arrived {
@@ -30,7 +30,7 @@ export interface Opened {
   editors: readonly ShownEditor[];
   diesOn: number;
   owner: string;
-  print: Bytes;
+  parts: readonly Bytes[];
   ownerKeeps: readonly Review[];
 }
 
@@ -93,12 +93,11 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived, lo
   const owner = manifest.owner;
   const ownerRoot = owner?.root ?? signature.root;
   const ownerVerdict = owner ? await verdictOf(owner, served) : signer;
-  const [signerStanding, ownerStanding, editors, ownerKeeps, print] = await Promise.all([
+  const [signerStanding, ownerStanding, editors, ownerKeeps] = await Promise.all([
     standingFor(signature.root, signer, held.signed_as, load),
     standingFor(ownerRoot, ownerVerdict, held.owner_name, load),
     editorsOf(held, served),
     keptBy(id, ownerRoot, key, held.reviews ?? [], served),
-    printOf(open.opened),
   ]);
   // held.editors goes unshown until each entry has its own check under signing.editor: unchecked, one could name someone who never edited it.
   return {
@@ -112,7 +111,7 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived, lo
     editors,
     diesOn: arrived.diesOn,
     owner: ownerRoot,
-    print,
+    parts: open.opened,
     ownerKeeps,
   };
 };

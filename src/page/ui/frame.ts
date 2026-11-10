@@ -289,8 +289,9 @@ export interface Credit {
 export const drawCredit = (credit: Credit | null): void => {
   const shown = element("credit");
   shown.hidden = credit === null;
-  for (const slot of credit ? shown.querySelectorAll<HTMLElement>("[data-credit]") : []) {
-    named(slot, credit?.[slot.dataset.credit as keyof Credit] as ShownEditor);
+  if (!credit) return;
+  for (const slot of shown.querySelectorAll<HTMLElement>("[data-credit]")) {
+    named(slot, credit[slot.dataset.credit as keyof Credit]);
   }
 };
 

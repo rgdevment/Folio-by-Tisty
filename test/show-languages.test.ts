@@ -3,6 +3,7 @@ import type { Document, Review } from "@tisty/contracts";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Opened, openLink } from "../src/page/read";
+import { printOf } from "../src/page/reviews";
 import { showLink } from "../src/page/ui/show";
 import { refuse } from "../src/rules/envelope";
 
@@ -40,7 +41,8 @@ const SPANISH: Document = {
   ],
 };
 
-const PRINT = new Uint8Array(32).fill(7);
+const PARTS = [new Uint8Array([7])];
+const PRINT = await printOf(PARTS);
 
 const keeps = (document: string, lang: string, print = PRINT): Review => ({
   of: "of",
@@ -61,7 +63,7 @@ const keeps = (document: string, lang: string, print = PRINT): Review => ({
 const openedOf = (held: Document, fingerprint: string, ownerFingerprint: string | null = null): Opened => ({
   held,
   owner: ownerFingerprint ?? fingerprint,
-  print: PRINT,
+  parts: PARTS,
   ownerKeeps: [],
   pictures: [],
   signerStanding: "plain",
@@ -279,11 +281,11 @@ describe("a document in several languages", () => {
     });
 
     it.each([
-      ["changed since its owner read it", { print: new Uint8Array(32).fill(8) }],
+      ["changed since its owner read it", { parts: [new Uint8Array([8])] }],
       ["in another lang than its owner read", { lang: "fr-CA" }],
     ])("never shows it %s", async (_, change) => {
       const changed = { ...translation(FRENCH, "Promenades", change.lang ?? "fr"), signed_as: "Ana" };
-      opens[FRENCH] = { ...openedOf(changed, "stranger"), print: change.print ?? PRINT };
+      opens[FRENCH] = { ...openedOf(changed, "stranger"), parts: change.parts ?? PARTS };
       await opened(["fr"]);
       expect(place.document.title).toBe("Paseos · Folio");
     });

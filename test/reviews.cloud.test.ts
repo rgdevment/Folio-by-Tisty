@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { type Bytes, fromBase64Url } from "../src/core/bytes";
 import { toBase64Url } from "../src/core/start";
 import { openEnvelope } from "../src/page/open";
-import { keptBy, printOf, reachedBy, reviewHolds, reviewsCount, shows } from "../src/page/reviews";
+import { keptAsRead, keptBy, printOf, reachedBy, reviewHolds, reviewsCount } from "../src/page/reviews";
 
 interface Held {
   document: string;
@@ -85,7 +85,7 @@ describe("the languages a reader shows (contract, review.shown)", () => {
       const showing = languages.filter(
         (one) =>
           reached.includes(one.document) &&
-          shows({ ...one, print: fromBase64Url(one.print), ownersOwn: one.root === owner }, kept),
+          (one.root === owner || keptAsRead({ ...one, print: fromBase64Url(one.print) }, kept)),
       );
       expect(showing.map((one) => one.document)).toEqual(shown);
     },

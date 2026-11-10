@@ -7,7 +7,7 @@ import type { CaseLink } from "../link";
 import { OPERATOR_KEY } from "../operator-key";
 import type { Arrived, Opened, ShownEditor } from "../read";
 import { openLink } from "../read";
-import { reachedBy, shows } from "../reviews";
+import { keptAsRead, printOf, reachedBy } from "../reviews";
 import { askFor, askForCase, asking, type NotArrived, notArrived } from "./ask";
 import { domPurifyCleaner } from "./clean";
 import { drawClosed } from "./closed";
@@ -45,8 +45,8 @@ const opening = async (id: string, linkKey: string, arrived: Arrived): Promise<S
 
 const ownerNamed = ({ held, ownerFingerprint, signerStanding, ownerStanding }: Opened): ShownEditor =>
   ownerFingerprint === null
-    ? { name: held.signed_as ?? "", standing: signerStanding }
-    : { name: held.owner_name ?? "", standing: ownerStanding };
+    ? { name: held.signed_as ?? said().noName, standing: signerStanding }
+    : { name: held.owner_name ?? said().noName, standing: ownerStanding };
 
 const shownOf = ({ id, linkKey, opened }: Showing, caseToken?: string): Shown => {
   const { held, pictures } = opened;
@@ -82,12 +82,13 @@ const translated = async ({ document: id, key = "" }: Translation): Promise<Show
 };
 
 // Only what the anchor's owner keeps, as its owner read it, shows under another root (contract, review.shown).
-const showsHere = (anchor: Showing, translation: Translation, { opened }: Showing, ownersOwn: boolean): boolean =>
+const showsHere = async (anchor: Showing, translation: Translation, { opened }: Showing, ownersOwn: boolean) =>
   belongs(opened, translation, anchor.id, ownersOwn) &&
-  shows(
-    { document: translation.document, lang: opened.held.lang ?? "", print: opened.print, ownersOwn },
-    anchor.opened.ownerKeeps,
-  );
+  (ownersOwn ||
+    keptAsRead(
+      { document: translation.document, lang: opened.held.lang ?? "", print: await printOf(opened.parts) },
+      anchor.opened.ownerKeeps,
+    ));
 
 const credited = (anchor: Showing, { showing, byAnother }: Language): void =>
   drawCredit(byAnother ? { translator: ownerNamed(showing.opened), owner: ownerNamed(anchor.opened) } : null);
@@ -105,7 +106,7 @@ const shownInLanguages = async (anchor: Showing): Promise<void> => {
     const showing = await translated(translation);
     if (!showing) return undefined;
     const ownersOwn = showing.opened.owner === opened.owner;
-    if (!showsHere(anchor, translation, showing, ownersOwn)) return undefined;
+    if (!(await showsHere(anchor, translation, showing, ownersOwn))) return undefined;
     const language = { lang: chosen, showing, shown: shownOf(showing), byAnother: !ownersOwn };
     kept.set(chosen, language);
     return language;
