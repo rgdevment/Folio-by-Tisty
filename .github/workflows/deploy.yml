@@ -304,7 +304,11 @@ jobs:
               "200 "*javascript*) ;;
               *) return 1 ;;
             esac
-            curl -s --max-time 10 "$FOLIO_URL/robots.txt" | grep -qx 'Disallow: /' || return 1
+            curl -s --max-time 10 "$FOLIO_URL/robots.txt" | grep -qx 'Disallow: /api/' || return 1
+            case "$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' "$FOLIO_URL/sitemap.xml")" in
+              "200 "*xml*) ;;
+              *) return 1 ;;
+            esac
           }
           export -f answers
           bash scripts/wait-for.sh "$FOLIO_URL" 10 6 answers
