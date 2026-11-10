@@ -6,6 +6,12 @@
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   Cache-Control: public, max-age=0, must-revalidate, no-transform
 
+/
+  ! X-Robots-Tag
+
+/en/
+  ! X-Robots-Tag
+
 /widget-frame
   ! Content-Security-Policy
   Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'

@@ -49,10 +49,17 @@ describe("the page's headers", () => {
     expect(assets).not.toContain("no-transform");
   });
 
-  it("keep tisty.cl out of every search (decision 63)", () => {
-    expect(HEADERS).toContain("X-Robots-Tag: noindex");
+  it("keep every shared document out of every search, and let in only the home in each language", () => {
+    const rules = HEADERS.split("\n\n");
+    expect(rules.find((one) => one.startsWith("/*\n"))).toContain("X-Robots-Tag: noindex");
+    expect(rules.filter((one) => one.includes("! X-Robots-Tag"))).toEqual([
+      "/\n  ! X-Robots-Tag",
+      "/en/\n  ! X-Robots-Tag",
+    ]);
     expect(HTML).toContain('<meta name="robots" content="noindex" />');
-    expect(ROBOTS.split("\n\n").at(-1)).toBe("User-agent: *\nDisallow: /\n");
+    expect(ROBOTS.split("\n\n").at(-1)).toBe(
+      "User-agent: *\nAllow: /$\nAllow: /en/$\nAllow: /site.css$\nAllow: /icon.svg$\nAllow: /tisto.svg$\nDisallow: /\n",
+    );
   });
 });
 
