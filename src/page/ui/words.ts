@@ -178,8 +178,6 @@ const es = {
     caution: "Cuidado",
   } as Record<string, string>,
 
-  missedTheReaders: "No se pudo abrir el documento en tu idioma, así que lo ves en el idioma del link.",
-  couldNotSwitch: "No se pudo abrir ese idioma, así que sigues en este.",
   original: "Original",
 };
 
@@ -357,8 +355,6 @@ const en: Words = {
     caution: "Caution",
   },
 
-  missedTheReaders: "The document could not be opened in your language, so you see it in the link's language.",
-  couldNotSwitch: "That language could not be opened, so you stay in this one.",
   original: "Original",
 };
 

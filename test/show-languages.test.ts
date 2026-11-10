@@ -27,6 +27,11 @@ const page = (id: string, title: string, lang: string): Document => ({
   files_hash: HASH,
 });
 
+const translation = (id: string, title: string, lang: string, anchor: string | null = ANCHOR): Document => ({
+  ...page(id, title, lang),
+  ...(anchor === null ? {} : { anchor }),
+});
+
 const SPANISH: Document = {
   ...page(ANCHOR, "Paseos", "es"),
   languages: [
@@ -85,8 +90,8 @@ beforeEach(() => {
   place.Element.prototype.scrollIntoView = vi.fn();
   opens = {
     [ANCHOR]: openedOf(SPANISH, "owner"),
-    [ENGLISH]: openedOf(page(ENGLISH, "Walks", "en"), "editor", "owner"),
-    [FRENCH]: openedOf(page(FRENCH, "Promenades", "fr"), "owner"),
+    [ENGLISH]: openedOf(translation(ENGLISH, "Walks", "en"), "editor", "owner"),
+    [FRENCH]: openedOf(translation(FRENCH, "Promenades", "fr"), "owner"),
   };
   vi.mocked(openLink).mockImplementation(async (id) => opens[id] ?? refuse("unsigned", "not in this test"));
   fetched = vi.fn(async (path: string) => {
@@ -106,6 +111,7 @@ beforeEach(() => {
   vi.stubGlobal("requestAnimationFrame", vi.fn());
   vi.stubGlobal("scrollTo", vi.fn());
   vi.stubGlobal("innerHeight", 900);
+  vi.stubGlobal("localStorage", place.localStorage);
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -146,7 +152,7 @@ describe("a document in several languages", () => {
     await opened(["en"]);
     expect(place.document.title).toBe("Paseos · Folio");
     expect(byId<HTMLSelectElement>("language").value).toBe("es");
-    expect(byId("language-said").textContent).toContain("tu idioma");
+    expect(byId("missed-the-readers").hidden).toBe(false);
   });
 
   it("never shows a translation whose envelope does not open", async () => {
@@ -154,7 +160,7 @@ describe("a document in several languages", () => {
     await opened(["en"]);
     expect(place.document.title).toBe("Paseos · Folio");
     expect(root.textContent).not.toContain("Walks");
-    expect(byId("language-said").textContent).toContain("tu idioma");
+    expect(byId("missed-the-readers").hidden).toBe(false);
   });
 
   it("switches in place, and back without asking again", async () => {
@@ -173,29 +179,60 @@ describe("a document in several languages", () => {
     await choose("fr");
     expect(place.document.title).toBe("Walks · Folio");
     expect(byId<HTMLSelectElement>("language").value).toBe("en");
-    expect(byId("language-said").textContent).toContain("you stay in this one");
+    expect(byId("could-not-switch").hidden).toBe(false);
   });
 
   it.each([
-    ["another owner", () => openedOf(page(FRENCH, "Promenades", "fr"), "stranger")],
-    [
-      "another owner who let the anchor's owner sign",
-      () => openedOf(page(FRENCH, "Promenades", "fr"), "owner", "stranger"),
-    ],
-    ["another language than it says", () => openedOf(page(FRENCH, "Spaziergänge", "de"), "owner")],
-  ])("refuses a translation with %s, and stays on what was shown", async (_, opening) => {
+    ["no anchor", () => openedOf(translation(FRENCH, "Promenades", "fr", null), "owner")],
+    ["another anchor", () => openedOf(translation(FRENCH, "Promenades", "fr", "otroAncl"), "owner")],
+    ["another language than it says", () => openedOf(translation(FRENCH, "Spaziergänge", "de"), "owner")],
+  ])("refuses a translation that names %s, and stays on what was shown", async (_, opening) => {
     opens[FRENCH] = opening();
     await opened(["es"]);
     await choose("fr");
     expect(place.document.title).toBe("Paseos · Folio");
     expect(byId<HTMLSelectElement>("language").value).toBe("es");
-    expect(byId("language-said").textContent).toContain("sigues en este");
+    expect(byId("could-not-switch").hidden).toBe(false);
   });
 
-  it("does not open a translation with another owner, even in the reader's language", async () => {
-    opens[FRENCH] = openedOf(page(FRENCH, "Promenades", "fr"), "stranger");
+  it("does not open a translation that names another anchor, even in the reader's language", async () => {
+    opens[FRENCH] = openedOf(translation(FRENCH, "Promenades", "fr", "otroAncl"), "owner");
     await opened(["fr"]);
     expect(place.document.title).toBe("Paseos · Folio");
+  });
+
+  it.each([
+    ["another owner", () => openedOf(translation(FRENCH, "Promenades", "fr"), "stranger")],
+    [
+      "another owner who let the anchor's owner sign",
+      () => openedOf(translation(FRENCH, "Promenades", "fr"), "owner", "stranger"),
+    ],
+  ])(
+    "opens a language with %s, saying beside it and in the switch that its owner has not reviewed it",
+    async (_, opening) => {
+      opens[FRENCH] = opening();
+      await opened(["fr"]);
+      expect(place.document.title).toBe("Promenades · Folio");
+      expect(byId("unreviewed").hidden).toBe(false);
+      expect(byId("unreviewed").querySelector('[lang="es"]')?.textContent).toBe(
+        "Este idioma lo sumó alguien que edita, y su dueño todavía no lo revisa.",
+      );
+      expect(byId("unreviewed").querySelector('[lang="en"]')?.textContent).toBe(
+        "This language was added by someone who edits, and its owner has not reviewed it yet.",
+      );
+      const french = [...byId<HTMLSelectElement>("language").options].find((one) => one.value === "fr");
+      expect(french?.text).toMatch(/⚠$/);
+      await choose("es");
+      expect(byId("unreviewed").hidden).toBe(true);
+      await choose("fr");
+      expect(french?.text.match(/⚠/g)).toHaveLength(1);
+    },
+  );
+
+  it("says nothing of a language its owner added", async () => {
+    await opened(["fr"]);
+    expect(byId("unreviewed").hidden).toBe(true);
+    expect([...byId<HTMLSelectElement>("language").options].map((one) => one.text).join()).not.toContain("⚠");
   });
 
   it("takes a translation an editor signed for the same owner", async () => {
@@ -215,6 +252,32 @@ describe("a document in several languages", () => {
     await vi.waitFor(() => expect(askedFor().at(-1)).toBe(`/api/v1/docs/${ENGLISH}/report`));
     const [, sent] = fetched.mock.calls.at(-1) as [string, RequestInit];
     expect(JSON.parse(sent.body as string)).toMatchObject({ category: "spam", version: 7 });
+  });
+
+  it("keeps the language the reader chooses, only in their browser and only for this link", async () => {
+    await opened(["es"]);
+    await choose("fr");
+    expect(place.localStorage.getItem(`language ${ANCHOR}`)).toBe("fr");
+  });
+
+  it("opens the language the reader last chose in this link, before their browser's", async () => {
+    place.localStorage.setItem(`language ${ANCHOR}`, "fr");
+    await opened(["en"]);
+    expect(place.document.title).toBe("Promenades · Folio");
+    expect(vi.mocked(openLink)).toHaveBeenLastCalledWith(FRENCH, "FRKEY", expect.anything());
+  });
+
+  it("stays in the anchor's language when the reader chose it in this link, asking for nothing else", async () => {
+    place.localStorage.setItem(`language ${ANCHOR}`, "es");
+    await opened(["en"]);
+    expect(place.document.title).toBe("Paseos · Folio");
+    expect(askedFor()).toEqual([]);
+  });
+
+  it("takes no choice the reader made in another link", async () => {
+    place.localStorage.setItem("language otroAncl", "fr");
+    await opened(["en"]);
+    expect(place.document.title).toBe("Walks · Folio");
   });
 
   it("asks for the files of the document being shown", async () => {

@@ -457,6 +457,16 @@ body::before {
   max-width: 100%;
 }
 
+.unreviewed {
+  max-width: var(--page-width, var(--sheet-width));
+  margin: 0 auto 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  color: var(--warn);
+  font-size: 13px;
+}
+
 .one-line {
   display: block;
   min-width: 0;
@@ -742,10 +752,6 @@ body::before {
 .language-said {
   flex: 0 0 100%;
   margin: 0;
-}
-
-.language-said:empty {
-  display: none;
 }
 
 .paper {

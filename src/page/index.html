@@ -67,6 +67,7 @@
 
     <main class="desk" id="desk" hidden>
       <div class="sheet-column" id="sheet-column">
+        <p class="unreviewed in-two" id="unreviewed" role="note" hidden><span lang="en">This language was added by someone who edits, and its owner has not reviewed it yet.</span><span lang="es">Este idioma lo sumó alguien que edita, y su dueño todavía no lo revisa.</span></p>
         <div class="sheet-host" id="sheet"></div>
         <nav class="pages-card" id="pages-card" aria-labelledby="title-pages" hidden>
           <h2 id="title-pages"><span data-say="pages">Pages</span> <span class="pages-count" id="pages-count"></span></h2>
@@ -80,7 +81,8 @@
           <div class="language" id="language-choice" hidden>
             <label for="language" data-say="language">Language</label>
             <select id="language"></select>
-            <p class="language-said" id="language-said" role="status"></p>
+            <p class="language-said in-two" id="missed-the-readers" role="status" hidden><span lang="en">The document could not be opened in your language, so you see it in the link's language.</span><span lang="es">No se pudo abrir el documento en tu idioma, así que lo ves en el idioma del link.</span></p>
+            <p class="language-said in-two" id="could-not-switch" role="status" hidden><span lang="en">That language could not be opened, so you stay in this one.</span><span lang="es">No se pudo abrir ese idioma, así que sigues en este.</span></p>
           </div>
           <a class="action action-main" id="edit-in-tisty" href="tisty://edit" data-say="editInTisty">Edit in Tisty</a>
           <button class="action" id="print" type="button" data-say="print">Print</button>
