@@ -74,6 +74,7 @@ a {
 }
 
 .top,
+.offer,
 .hero,
 .facts,
 .caveat,
@@ -149,6 +150,22 @@ html[data-shown="en"] body .languages [lang="es"] {
   display: flex;
   flex: 1;
   flex-direction: column;
+}
+
+.offer {
+  display: none;
+  margin-block: 0;
+  font-size: 0.9rem;
+}
+
+html[data-offer] .offer {
+  display: block;
+}
+
+.offer a {
+  color: var(--flame-ink);
+  font-weight: 500;
+  text-underline-offset: 0.2em;
 }
 
 .hero {

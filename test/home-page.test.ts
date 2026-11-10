@@ -11,6 +11,7 @@ const ADDRESS: Record<Language, string> = { es: "https://tisty.cl/", en: "https:
 const PAGES = ["home.html", "en/index.html", "404.html"];
 const REDIRECTS = read(`${PLACE}/_redirects`);
 const LANGUAGE = read(`${PLACE}/language.js`);
+const OFFER = read(`${PLACE}/language-offer.js`);
 const MISSING = read(`${PLACE}/404.html`);
 const flat = (html: string): string => html.replace(/\s+/g, " ");
 const meta = (html: string, property: string): string | undefined =>
@@ -129,7 +130,7 @@ describe("the home page", () => {
     expect(html).toMatch(/<a href="\/" hreflang="es" lang="es" aria-label="Español"/);
     expect(html).toMatch(/<a href="\/en\/" hreflang="en" lang="en" aria-label="English"/);
     expect(/<a href="([^"]+)"[^>]*aria-current="page"/.exec(html)?.[1]).toBe(new URL(ADDRESS[language]).pathname);
-    expect(html).not.toContain("<script");
+    expect([...html.matchAll(/<script[^>]*>/g)].map(([tag]) => tag)).toEqual(['<script src="/language-offer.js">']);
   });
 
   it("is named by both privacy policies", () => {
@@ -150,6 +151,41 @@ describe("the home page", () => {
     ]) {
       expect(read(told.startsWith("README") ? told : `docs/${told}`)).not.toContain("folio.tisty.app");
     }
+  });
+});
+
+describe("the offer of the home in the other language", () => {
+  const offered = (page: string, browser: string | undefined): string => {
+    const root = { lang: page, dataset: {} as Record<string, string> };
+    runInNewContext(OFFER, { document: { documentElement: root }, navigator: { language: browser } });
+    return root.dataset.offer ?? "nothing";
+  };
+
+  it.each(LANGUAGES)("in %s leads to the other page, in the other language", (language) => {
+    const other = language === "es" ? "en" : "es";
+    expect(HOME[language]).toContain(
+      `<p class="offer" lang="${other}"><a href="${new URL(ADDRESS[other]).pathname}" hreflang="${other}">`,
+    );
+  });
+
+  it.each([
+    ["es", "en-US", "en"],
+    ["es", "pt-BR", "en"],
+    ["es", undefined, "en"],
+    ["es", "es-CL", "nothing"],
+    ["es", "ES", "nothing"],
+    ["en", "es-CL", "es"],
+    ["en", "en-GB", "nothing"],
+    ["en", "pt-BR", "nothing"],
+  ])("on the page in %s, for a browser in %s, offers %s", (page, browser, offer) => {
+    expect(offered(page, browser)).toBe(offer);
+  });
+
+  it("stays hidden until the browser asks for it, and keeps nothing in the browser", () => {
+    const site = read(`${PLACE}/site.css`);
+    expect(site).toMatch(/\.offer \{\s+display: none;/);
+    expect(site).toMatch(/html\[data-offer\] \.offer \{\s+display: block;/);
+    expect(OFFER).not.toMatch(/Storage|cookie/);
   });
 });
 
