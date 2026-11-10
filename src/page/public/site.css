@@ -562,6 +562,29 @@ h1 {
   }
 }
 
+@media (max-width: 60rem) {
+  .tisto {
+    left: -1.25rem;
+  }
+}
+
+@media (max-width: 48rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3rem;
+    padding-block: 1.75rem 4rem;
+  }
+
+  .scene {
+    width: min(70%, 15rem);
+  }
+
+  .facts,
+  .reasons {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dot,
   .line,

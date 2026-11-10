@@ -244,6 +244,12 @@ describe("the stylesheet of the home and the missing page", () => {
     expect(SITE).toMatch(/:focus-visible \{\s+outline: 2px solid var\(--flame-ink\);/);
   });
 
+  it("lays the hero, the facts and the reasons in a single column on a phone", () => {
+    const phone = /@media \(max-width: 48rem\) \{([\s\S]*?)\n\}/.exec(SITE)?.[1] ?? "";
+    expect(phone).toMatch(/\.hero \{\s+grid-template-columns: minmax\(0, 1fr\);/);
+    expect(phone).toMatch(/\.facts,\s+\.reasons \{\s+grid-template-columns: minmax\(0, 1fr\);/);
+  });
+
   it("moves nothing in a loop, so every animation ends on its own", () => {
     expect(SITE).toContain("animation");
     expect(SITE).not.toContain("infinite");
