@@ -1635,6 +1635,16 @@ describe("what stops a version", () => {
     });
   });
 
+  it("a version sealed under a contract before 1.8.0, which Folio's own floor now refuses", async () => {
+    const id = await shared();
+    const older = await sealedEnvelope({ id, version: 2, owner: mario, contract: "1.7.3" });
+    expect(await send(id, older, LATER)).toEqual({ refused: "outdated" });
+    expect(await send(id, await sealedEnvelope({ id, version: 2, owner: mario }), LATER)).toEqual({
+      stored: true,
+      version: 2,
+    });
+  });
+
   it("a contract under the floor, once there is one", async () => {
     const id = await shared();
     const floored = { ...tools, limits: { ...LIMITS, oldestContractTaken: "2.0.0" } };

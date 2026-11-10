@@ -123,6 +123,16 @@ const NOT_LIMITS = new Set(["serial", "uploads_halted_until", "terms", "sharing_
 const limitsIn = (said: Record<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(Object.entries(said).filter(([name]) => !NOT_LIMITS.has(name)));
 
+// Only a number or a list can ask for less than the server takes; any other limit is the server's to say, as a raised floor.
+const tunedIn = (said: Record<string, unknown>, server: Published): Record<string, unknown> => {
+  const held = server as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.entries(limitsIn(said)).filter(
+      ([name]) => !Object.hasOwn(held, name) || typeof held[name] === "number" || Array.isArray(held[name]),
+    ),
+  );
+};
+
 const passedAlong = (said: Record<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(PASSED_ALONG.flatMap((name) => (said[name] === undefined ? [] : [[name, said[name]]])));
 
@@ -182,7 +192,7 @@ export const signLimits = (
   const next = {
     serial: (serial as number) + 1,
     ...server,
-    ...limitsIn(current),
+    ...tunedIn(current, server),
     terms: termsOf(files, terms as Terms | undefined),
     sharing_open: sharingOpen,
     ...passedAlong(current),

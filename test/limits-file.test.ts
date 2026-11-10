@@ -253,6 +253,14 @@ describe("signing the limits", () => {
     ).toBe(true);
   });
 
+  it("takes a raised contract floor from the server, while a number the file lowered stays lowered", () => {
+    signing();
+    writeFileSync(files.limits, JSON.stringify({ ...read(), oldest_contract_taken: null, shares_at_most: 5 }));
+    signing(undefined, NOW, { ...SERVER, oldest_contract_taken: "1.8.0" });
+    expect(read()).toMatchObject({ oldest_contract_taken: "1.8.0", shares_at_most: 5 });
+    expect(read().oldest_contract_served).toBe(SERVER.oldest_contract_served);
+  });
+
   it("keeps the maker it was given, and refuses one that is not a maker", () => {
     signing();
     const maker = { root: "A".repeat(43), name: "rgdevment", domain: "rgdevment.dev" };
