@@ -183,10 +183,10 @@ describe("a document in several languages", () => {
   });
 
   it.each([
-    ["no anchor", () => openedOf(translation(FRENCH, "Promenades", "fr", null), "owner")],
+    ["no anchor and another owner", () => openedOf(translation(FRENCH, "Promenades", "fr", null), "stranger")],
     ["another anchor", () => openedOf(translation(FRENCH, "Promenades", "fr", "otroAncl"), "owner")],
     ["another language than it says", () => openedOf(translation(FRENCH, "Spaziergänge", "de"), "owner")],
-  ])("refuses a translation that names %s, and stays on what was shown", async (_, opening) => {
+  ])("refuses a translation with %s, and stays on what was shown", async (_, opening) => {
     opens[FRENCH] = opening();
     await opened(["es"]);
     await choose("fr");
@@ -272,6 +272,45 @@ describe("a document in several languages", () => {
     await opened(["en"]);
     expect(place.document.title).toBe("Paseos · Folio");
     expect(askedFor()).toEqual([]);
+  });
+
+  it("takes a translation from before contract 1.8.0, with no anchor, under its anchor's owner", async () => {
+    opens[FRENCH] = openedOf(translation(FRENCH, "Promenades", "fr", null), "owner");
+    await opened(["fr"]);
+    expect(place.document.title).toBe("Promenades · Folio");
+    expect(byId("unreviewed").hidden).toBe(true);
+  });
+
+  it("goes to the reader's browser when the language kept for this link is no longer in the group", async () => {
+    place.localStorage.setItem(`language ${ANCHOR}`, "de");
+    await opened(["en"]);
+    expect(place.document.title).toBe("Walks · Folio");
+    expect(byId("missed-the-readers").hidden).toBe(true);
+  });
+
+  it("goes to the reader's browser when the language kept for this link no longer opens", async () => {
+    delete opens[FRENCH];
+    place.localStorage.setItem(`language ${ANCHOR}`, "fr");
+    await opened(["en"]);
+    expect(place.document.title).toBe("Walks · Folio");
+    expect(byId("missed-the-readers").hidden).toBe(true);
+  });
+
+  it("stops saying the reader's language failed once another one opens", async () => {
+    delete opens[ENGLISH];
+    await opened(["en"]);
+    expect(byId("missed-the-readers").hidden).toBe(false);
+    await choose("fr");
+    expect(place.document.title).toBe("Promenades · Folio");
+    expect(byId("missed-the-readers").hidden).toBe(true);
+    expect(byId("could-not-switch").hidden).toBe(true);
+  });
+
+  it("says its messages inside a region that is always there, so a screen reader hears them appear", () => {
+    const region = byId("missed-the-readers").parentElement as HTMLElement;
+    expect(region.getAttribute("role")).toBe("status");
+    expect(region.hidden).toBe(false);
+    expect(byId("could-not-switch").parentElement).toBe(region);
   });
 
   it("takes no choice the reader made in another link", async () => {

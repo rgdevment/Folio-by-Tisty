@@ -159,6 +159,13 @@ describe("who edited it", () => {
   });
 });
 
+describe("a language its owner has not reviewed", () => {
+  it("says so on screen, and not on paper, which carries only the document", () => {
+    expect(HTML).toContain('id="unreviewed"');
+    expect(read("src/page/ui/frame.css")).toMatch(/@media print[\s\S]*\.loading,\s+\.unreviewed,\s+\.pages-card,/);
+  });
+});
+
 describe("the button that hands a link to Tisty", () => {
   it("writes the address as the contract's own example does, with the # of the key encoded", () => {
     const { link, address } = (CONTRACTS.link as { values: { edit_example: { link: string; address: string } } }).values

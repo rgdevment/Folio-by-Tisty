@@ -14,11 +14,11 @@ import { element } from "./element";
 import { filePresser, saved } from "./files";
 import { finished, pictureAddresses } from "./finish";
 import { drawFrame, type Shown } from "./frame";
+import { keep } from "./kept";
 import { markUnreviewed, offerLanguages } from "./language-switch";
 import { offerReport, type Reportable } from "./report";
 import { answeringProof } from "./solve";
 import { said } from "./speak";
-import { keep } from "./theme";
 
 const KEY_IN_WHAT_WAS_PASTED = /[A-Za-z0-9_-]{43}/;
 
@@ -65,9 +65,9 @@ const reportableOf = ({ id, linkKey, arrived: { version } }: Showing): Reportabl
 });
 
 // Whatever keeps a translation from opening, the reader stays on what was already checked.
-// A map can name any document, so only one that names this anchor back, in the tongue it says, is one of its languages.
-const belongs = ({ opened }: Showing, { lang }: Translation, anchor: string): boolean =>
-  opened.held.anchor === anchor && opened.held.lang === lang;
+// Before contract 1.8.0 no language could name its anchor, so one without it holds only under its anchor's owner.
+const belongs = ({ held }: Opened, { lang }: Translation, anchor: string, reviewed: boolean): boolean =>
+  held.lang === lang && (held.anchor === undefined ? reviewed : held.anchor === anchor);
 
 const translated = async ({ document: id, key = "" }: Translation): Promise<Showing | undefined> => {
   try {
@@ -94,19 +94,23 @@ const shownInLanguages = async (anchor: Showing): Promise<void> => {
     const translation = languages.find((one) => one.lang === chosen);
     if (known || !translation) return known;
     const showing = await translated(translation);
-    if (!showing || !belongs(showing, translation, id)) return undefined;
+    if (!showing) return undefined;
     const reviewed = ownerOf(showing.opened) === ownerOf(opened);
+    if (!belongs(showing.opened, translation, id, reviewed)) return undefined;
     const language = { lang: chosen, showing, shown: shownOf(showing), reviewed };
     kept.set(chosen, language);
     return language;
   };
-  // The language the reader last chose in this link, kept only in their browser, comes before their browser's.
   const chosenAt = `language ${id}`;
-  let asked = preferredTranslation(navigator.languages ?? [], lang, languages)?.lang;
+  const preferred = preferredTranslation(navigator.languages ?? [], lang, languages)?.lang;
+  let recalled = null as string | null;
   keep((stored) => {
-    asked = stored.getItem(chosenAt) ?? asked;
+    recalled = stored.getItem(chosenAt);
   });
-  const first = asked === undefined ? undefined : await languageOf(asked);
+  const first =
+    (recalled !== null && (await languageOf(recalled))) ||
+    (preferred !== undefined && (await languageOf(preferred))) ||
+    undefined;
   let current = first ?? anchorLanguage;
   const show = drawFrame(current.shown);
   offerReport(() => reportableOf(current.showing));
@@ -114,7 +118,7 @@ const shownInLanguages = async (anchor: Showing): Promise<void> => {
   offerLanguages({
     langs: [lang, ...languages.map((one) => one.lang)],
     shown: current.lang,
-    missedTheReaders: asked !== undefined && first === undefined,
+    missedTheReaders: preferred !== undefined && first === undefined,
     choose: async (chosen) => {
       const next = await languageOf(chosen);
       if (!next) return false;

@@ -1,3 +1,4 @@
+import { keep } from "./kept";
 import { onSpeechChange, said } from "./speak";
 
 type Theme = "light" | "dark";
@@ -5,13 +6,6 @@ type Theme = "light" | "dark";
 // The key and values www.tisty.app uses, and the key public/theme.js reads before anything is painted.
 const CHOSEN = "theme";
 const DARK = "(prefers-color-scheme: dark)";
-
-// A browser that keeps nothing still reads: the choice just lasts until the page is closed.
-export const keep = (change: (kept: Storage) => void): void => {
-  try {
-    change(localStorage);
-  } catch {}
-};
 
 export const offerThemes = (): void => {
   const root = document.documentElement;
