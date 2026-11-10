@@ -2,6 +2,9 @@
 set -uo pipefail
 
 action=${1:?sums, served or detects}
+# Cloudflare carries a new deploy's assets to every edge within seconds, so a miss right after it is tried again.
+TRIES=${SERVED_TRIES:-6}
+WAIT=${SERVED_WAIT:-10}
 
 # As a browser asks, because Cloudflare adds its analytics script only for one.
 as_browser() {
@@ -18,8 +21,8 @@ sums() {
   code_files | (cd "$page" && xargs sha256sum)
 }
 
-served() {
-  local address=${1:?the address that serves the page}
+served_once() {
+  local address=$1 last=$2
   local received headers file challenged=0 prefetches=0 asset
   local differs=()
   received=$(mktemp)
@@ -66,10 +69,23 @@ served() {
     echo "::warning::Cloudflare adds Speculation-Rules to $address, so a browser prefetches pages a reader only hovered over: turn off Speed Brain in that zone"
   fi
   if [ "${#differs[@]}" -gt 0 ]; then
-    echo "::error::$address serves something else than what was attested: ${differs[*]}"
+    if [ "$last" = 1 ]; then
+      echo "::error::$address serves something else than what was attested: ${differs[*]}"
+    else
+      echo "$address does not serve yet what was attested: ${differs[*]}; trying again in ${WAIT}s"
+    fi
     return 1
   fi
   echo "$address serves what was attested"
+}
+
+served() {
+  local address=${1:?the address that serves the page} try
+  for ((try = 1; try < TRIES; try++)); do
+    served_once "$address" 0 && return 0
+    sleep "$WAIT"
+  done
+  served_once "$address" 1
 }
 
 detects() {

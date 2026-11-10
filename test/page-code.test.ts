@@ -29,7 +29,11 @@ curl() {
     404) file=404.html ;;
     widget-frame) file=widget-frame.html ;;
   esac
-  if [ "$out" = /dev/null ]; then :; else cat "$SITE/$file" > "$out"; fi
+  if [ "$out" = /dev/null ]; then :
+  elif [ -n "\${LATE:-}" ] && [ -f "$LATE" ] && [ "\${file#assets/}" != "$file" ]; then
+    rm "$LATE"
+    echo "the version before" > "$out"
+  else cat "$SITE/$file" > "$out"; fi
   if [ "$browser" = 1 ] && [ -n "\${ADDS_SCRIPT:-}" ]; then echo cloudflareinsights >> "$out"; fi
   printf 'HTTP/2 200\\n' > "$head"
   case $file in
@@ -46,7 +50,7 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
   const run = (said: string, env: NodeJS.ProcessEnv = {}) =>
     spawnSync("bash", ["-c", `${CLOUDFLARE}\nbash scripts/page-code.sh ${said}`], {
       encoding: "utf8",
-      env: { ...process.env, SITE: site, ...env },
+      env: { ...process.env, SITE: site, SERVED_TRIES: "1", SERVED_WAIT: "0", ...env },
     });
 
   beforeEach(() => {
@@ -69,6 +73,25 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     const answer = run(`served "${site}" ${ADDRESS}`);
     expect(answer.status).toBe(0);
     expect(answer.stdout).toContain("serves what was attested");
+  });
+
+  it("takes a site whose assets reach its edge a moment after the deploy", () => {
+    writeFileSync(join(site, "late"), "");
+    const answer = run(`served "${site}" ${ADDRESS}`, {
+      LATE: join(site, "late").replaceAll("\\", "/"),
+      SERVED_TRIES: "2",
+    });
+    expect(answer.status).toBe(0);
+    expect(answer.stdout).toContain("does not serve yet what was attested: assets/app.js; trying again");
+    expect(answer.stdout).not.toContain("::error::");
+    expect(answer.stdout).toContain("serves what was attested");
+  });
+
+  it("fails only after its last try, with one error that says what still differs", () => {
+    const answer = run(`served "${site}" ${ADDRESS}`, { ADDS_SCRIPT: "1", SERVED_TRIES: "3" });
+    expect(answer.status).toBe(1);
+    expect(answer.stdout.match(/trying again/g)).toHaveLength(2);
+    expect(answer.stdout.match(/::error::/g)).toHaveLength(1);
   });
 
   it("lists the frame's page, the home in each language and the missing page among what is attested", () => {
