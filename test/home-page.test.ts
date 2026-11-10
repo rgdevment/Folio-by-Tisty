@@ -6,9 +6,9 @@ const read = (name: string): string => readFileSync(name, "utf8");
 const PLACE = "src/page/public";
 const LANGUAGES = ["es", "en"] as const;
 type Language = (typeof LANGUAGES)[number];
-const HOME: Record<Language, string> = { es: read(`${PLACE}/home.html`), en: read(`${PLACE}/en/index.html`) };
-const ADDRESS: Record<Language, string> = { es: "https://tisty.cl/", en: "https://tisty.cl/en/" };
-const PAGES = ["home.html", "en/index.html", "404.html"];
+const HOME: Record<Language, string> = { es: read(`${PLACE}/es/index.html`), en: read(`${PLACE}/home.html`) };
+const ADDRESS: Record<Language, string> = { es: "https://tisty.cl/es/", en: "https://tisty.cl/" };
+const PAGES = ["home.html", "es/index.html", "404.html"];
 const REDIRECTS = read(`${PLACE}/_redirects`);
 const LANGUAGE = read(`${PLACE}/language.js`);
 const OFFER = read(`${PLACE}/language-offer.js`);
@@ -92,8 +92,8 @@ describe("the home page", () => {
     expect(html.match(/<main[\s>]/g)).toHaveLength(1);
   });
 
-  it("is what tisty.cl shows at its root, without sending anyone away", () => {
-    expect(REDIRECTS).toBe("/ /home 200\n");
+  it("is at tisty.cl's root in English, as on Tisty's site, and the old English address leads there", () => {
+    expect(REDIRECTS).toBe("/ /home 200\n/en/ / 301\n/en / 301\n");
     for (const language of LANGUAGES) {
       expect(HOME[language]).toContain(`<link rel="canonical" href="${ADDRESS[language]}" />`);
     }
@@ -106,9 +106,9 @@ describe("the home page", () => {
   it.each(LANGUAGES)("in %s can be found, and tells search engines where the other language lives", (language) => {
     const html = HOME[language];
     expect(html).not.toMatch(/<meta\s+name="robots"/);
-    expect(html).toContain('<link rel="alternate" hreflang="es" href="https://tisty.cl/" />');
-    expect(html).toContain('<link rel="alternate" hreflang="en" href="https://tisty.cl/en/" />');
-    expect(html).toContain('<link rel="alternate" hreflang="x-default" href="https://tisty.cl/en/" />');
+    expect(html).toContain('<link rel="alternate" hreflang="es" href="https://tisty.cl/es/" />');
+    expect(html).toContain('<link rel="alternate" hreflang="en" href="https://tisty.cl/" />');
+    expect(html).toContain('<link rel="alternate" hreflang="x-default" href="https://tisty.cl/" />');
   });
 
   it.each(LANGUAGES)("in %s is described in its own words when found or shared", (language) => {
@@ -127,8 +127,8 @@ describe("the home page", () => {
   it.each(LANGUAGES)("in %s changes language with links, so the choice stays in the address", (language) => {
     const html = HOME[language];
     expect(html).toMatch(/<nav class="languages" aria-label="[^"]+">/);
-    expect(html).toMatch(/<a href="\/" hreflang="es" lang="es" aria-label="Español"/);
-    expect(html).toMatch(/<a href="\/en\/" hreflang="en" lang="en" aria-label="English"/);
+    expect(html).toMatch(/<a href="\/es\/" hreflang="es" lang="es" aria-label="Español"/);
+    expect(html).toMatch(/<a href="\/" hreflang="en" lang="en" aria-label="English"/);
     expect(/<a href="([^"]+)"[^>]*aria-current="page"/.exec(html)?.[1]).toBe(new URL(ADDRESS[language]).pathname);
     expect([...html.matchAll(/<script[^>]*>/g)].map(([tag]) => tag)).toEqual(['<script src="/language-offer.js">']);
   });

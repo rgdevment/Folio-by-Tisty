@@ -66,11 +66,11 @@ describe("the page's headers", () => {
       expect(marked(path)).toBe(true);
     }
     expect(marked("/")).toBe(false);
-    expect(marked("/en/")).toBe(false);
+    expect(marked("/es/")).toBe(false);
     expect(HEADERS).not.toContain("! X-Robots-Tag");
     expect(HTML).toContain('<meta name="robots" content="noindex" />');
     expect(ROBOTS.split("\n\n").at(-1)).toBe(
-      "User-agent: *\nAllow: /$\nAllow: /en/$\nAllow: /site.css$\nAllow: /icon.svg$\nAllow: /tisto.svg$\nDisallow: /\n",
+      "User-agent: *\nAllow: /$\nAllow: /es/$\nAllow: /en/$\nAllow: /site.css$\nAllow: /icon.svg$\nAllow: /tisto.svg$\nDisallow: /\n",
     );
   });
 });

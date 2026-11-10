@@ -25,7 +25,7 @@ curl() {
   case $file in
     AAAAAAAA) file=index.html ;;
     "") file=home.html ;;
-    en/) file=en/index.html ;;
+    es/) file=es/index.html ;;
     404) file=404.html ;;
     widget-frame) file=widget-frame.html ;;
   esac
@@ -52,11 +52,11 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
   beforeEach(() => {
     site = mkdtempSync(join(tmpdir(), "page-code-")).replaceAll("\\", "/");
     mkdirSync(join(site, "assets"));
-    mkdirSync(join(site, "en"));
+    mkdirSync(join(site, "es"));
     writeFileSync(join(site, "index.html"), "<p>page</p>\n");
     writeFileSync(join(site, "widget-frame.html"), "<p>frame</p>\n");
     writeFileSync(join(site, "home.html"), "<p>home</p>\n");
-    writeFileSync(join(site, "en/index.html"), "<p>home in English</p>\n");
+    writeFileSync(join(site, "es/index.html"), "<p>home in Spanish</p>\n");
     writeFileSync(join(site, "404.html"), "<p>missing</p>\n");
     writeFileSync(join(site, "assets/app.js"), "code\n");
   });
@@ -75,7 +75,7 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     const listed = run(`sums "${site}"`).stdout;
     expect(listed).toContain("widget-frame.html");
     expect(listed).toContain("home.html");
-    expect(listed).toContain("en/index.html");
+    expect(listed).toContain("es/index.html");
     expect(listed).toContain("404.html");
   });
 
@@ -85,7 +85,7 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     expect(answer.stdout).toContain("index.html");
     expect(answer.stdout).toContain("widget-frame.html");
     expect(answer.stdout).toContain("home.html");
-    expect(answer.stdout).toContain("en/index.html");
+    expect(answer.stdout).toContain("es/index.html");
     expect(answer.stdout).toContain("404.html");
     expect(answer.stdout).not.toContain("app.js");
   });
