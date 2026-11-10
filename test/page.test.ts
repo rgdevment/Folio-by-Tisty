@@ -49,11 +49,12 @@ describe("the page's headers", () => {
     expect(assets).not.toContain("no-transform");
   });
 
-  it("keep every shared document out of every search, and let in only the home in each language", () => {
+  it("keep every shared document out of every search, and let in only the home, whose root Cloudflare serves with the rules of /home", () => {
     const rules = HEADERS.split("\n\n");
     expect(rules.find((one) => one.startsWith("/*\n"))).toContain("X-Robots-Tag: noindex");
     expect(rules.filter((one) => one.includes("! X-Robots-Tag"))).toEqual([
       "/\n  ! X-Robots-Tag",
+      "/home\n  ! X-Robots-Tag",
       "/en/\n  ! X-Robots-Tag",
     ]);
     expect(HTML).toContain('<meta name="robots" content="noindex" />');
