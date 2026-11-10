@@ -1,6 +1,6 @@
 # Folio by Tisty privacy policy
 
-**Version 5, in force since November 9, 2026.**
+**Version 6, in force since November 10, 2026.**
 
 ## The short version
 
@@ -87,7 +87,8 @@ The home of tisty.cl, and the page it shows for a link that is gone, only
 explain what Folio is. They are fixed files: they keep nothing about you, on the
 server or in your browser. Cloudflare also receives your IP and your requests
 when you visit them. On the page that reads a link, if you choose the light or
-dark mode, your browser remembers that choice; it never leaves your device.
+dark mode, or a document's language, your browser remembers that choice, the
+language next to that link's identifier; it never leaves your device.
 
 Three others take part, each with a policy of its own:
 
