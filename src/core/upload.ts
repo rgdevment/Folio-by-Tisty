@@ -140,7 +140,10 @@ const reviewedOf = async (
     return { refused: "reviewed" };
   }
   if (head.seq <= (held?.reviewedSeq ?? 0)) return { refused: "behind" };
-  if (await store.isRevoked(head.root, head.machine, now)) return { refused: "revoked" };
+  // The version's own machine was weighed just before, so only another one costs a read.
+  if (head.machine !== signature.machine && (await store.isRevoked(head.root, head.machine, now))) {
+    return { refused: "revoked" };
+  }
   return { said: JSON.stringify(head), seq: head.seq };
 };
 

@@ -283,6 +283,15 @@ describe("the owner's word on an anchor's reviews (contract 1.9.0)", () => {
     expect(await heldWord(first.id)).toBeNull();
   });
 
+  it("asks once whether the machine was taken back, when the version's machine signed the word too", async () => {
+    const id = await shared();
+    const asked = vi.spyOn(store, "isRevoked");
+    const word = await reviewedBy(mario, { anchor: id, seq: 1 });
+    expect(await sendWith(id, await owners(id, 2), LATER, word)).toEqual({ stored: true, version: 2 });
+    expect(asked).toHaveBeenCalledTimes(1);
+    asked.mockRestore();
+  });
+
   it("comes with a first version too", async () => {
     const first = await started();
     const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
