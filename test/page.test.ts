@@ -49,14 +49,25 @@ describe("the page's headers", () => {
     expect(assets).not.toContain("no-transform");
   });
 
-  it("keep every shared document out of every search, and let in only the home, whose root Cloudflare serves with the rules of /home", () => {
-    const rules = HEADERS.split("\n\n");
-    expect(rules.find((one) => one.startsWith("/*\n"))).toContain("X-Robots-Tag: noindex");
-    expect(rules.filter((one) => one.includes("! X-Robots-Tag"))).toEqual([
-      "/\n  ! X-Robots-Tag",
-      "/home\n  ! X-Robots-Tag",
-      "/en/\n  ! X-Robots-Tag",
-    ]);
+  it("keep every one-segment page, a shared document among them, out of search, and never mark the home, whatever order Cloudflare runs the rules in", () => {
+    const marking = HEADERS.split("\n\n")
+      .filter((one) => one.includes("\n  X-Robots-Tag: noindex"))
+      .map((one) => new RegExp(`^${(one.split("\n")[0] ?? "").replaceAll("*", ".*").replace(/:\w+/g, "[^/]+")}$`));
+    const marked = (path: string) => marking.some((rule) => rule.test(path));
+    for (const path of [
+      "/AAAAAAAA",
+      "/404",
+      "/home",
+      "/widget-frame",
+      "/robots.txt",
+      "/assets/app.js",
+      "/domains/ab.json",
+    ]) {
+      expect(marked(path)).toBe(true);
+    }
+    expect(marked("/")).toBe(false);
+    expect(marked("/en/")).toBe(false);
+    expect(HEADERS).not.toContain("! X-Robots-Tag");
     expect(HTML).toContain('<meta name="robots" content="noindex" />');
     expect(ROBOTS.split("\n\n").at(-1)).toBe(
       "User-agent: *\nAllow: /$\nAllow: /en/$\nAllow: /site.css$\nAllow: /icon.svg$\nAllow: /tisto.svg$\nDisallow: /\n",
