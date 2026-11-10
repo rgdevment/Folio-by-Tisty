@@ -313,6 +313,17 @@ describe("taking an editor back (decision 148)", () => {
     expect((await row(id))?.permit).toBeNull();
   });
 
+  it("gives a permit to a document that had none, as a language that joins an anchor shared to edit", async () => {
+    const id = await shared({});
+    const fresh = await newToken();
+    expect(await send(id, await byEditor(id, 2, fresh), LATER)).toEqual({ refused: "not_yours" });
+    expect(await setPermit(id, fresh.permit)).toEqual({ done: true });
+    const owners = await sealedEnvelope({ id, version: 2, owner: mario, permit: fresh.permit });
+    expect(await send(id, owners, LATER)).toEqual({ stored: true, version: 2 });
+    expect(await send(id, await byEditor(id, 3, fresh), LATER + STEP)).toEqual({ stored: true, version: 3 });
+    expect((await row(id))?.permit).toBe(fresh.permit);
+  });
+
   it("answers behind and keeps nothing when the permit changes during an editor's upload, and a retry is refused", async () => {
     const old = await newToken();
     const id = await shared({ permit: old.permit });

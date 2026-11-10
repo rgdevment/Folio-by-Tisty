@@ -1,6 +1,6 @@
 # Privacidad de Folio by Tisty
 
-**Versión 5, vigente desde el 9 de noviembre de 2026.**
+**Versión 6, vigente desde el 10 de noviembre de 2026.**
 
 ## En corto
 
@@ -85,8 +85,9 @@ Nunca recibe la llave del `#`, así que tampoco puede leer lo que compartes.
 La portada de tisty.cl, y la página que muestra cuando un link ya no está, solo
 explican qué es Folio. Son archivos fijos: no guardan nada de ti, ni en el
 servidor ni en tu navegador. Cloudflare también recibe tu IP y tus peticiones al
-visitarlas. En la página que lee un link, si eliges el modo claro u oscuro, tu
-navegador recuerda esa elección; no sale de tu equipo.
+visitarlas. En la página que lee un link, si eliges el modo claro u oscuro, o el
+idioma de un documento, tu navegador recuerda esa elección, el idioma junto al
+identificador de ese link; no sale de tu equipo.
 
 También participan otros tres, cada uno con su propia política:
 

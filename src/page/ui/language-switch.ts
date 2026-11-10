@@ -25,21 +25,28 @@ const optionOf = (lang: string): HTMLOptionElement => {
   return option;
 };
 
+export const markUnreviewed = (lang: string): void => {
+  for (const option of element<HTMLSelectElement>("language").options) {
+    if (option.value === lang) option.text = `${nameOf(lang)} ⚠`;
+  }
+};
+
 export const offerLanguages = ({ langs, shown, missedTheReaders, choose }: LanguageSwitch): void => {
   const select = element<HTMLSelectElement>("language");
-  const told = element("language-said");
+  const missed = element("missed-the-readers");
+  const couldNot = element("could-not-switch");
   select.replaceChildren(...langs.map(optionOf));
   select.value = shown;
   element("language-choice").hidden = false;
-  if (missedTheReaders) told.textContent = said().missedTheReaders;
+  missed.hidden = !missedTheReaders;
   let reading = shown;
   select.addEventListener("change", async () => {
     select.disabled = true;
-    told.textContent = "";
+    missed.hidden = couldNot.hidden = true;
     if (await choose(select.value)) reading = select.value;
     else {
       select.value = reading;
-      told.textContent = said().couldNotSwitch;
+      couldNot.hidden = false;
     }
     select.disabled = false;
   });

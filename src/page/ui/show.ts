@@ -10,10 +10,12 @@ import { openLink } from "../read";
 import { askFor, askForCase, asking, type NotArrived, notArrived } from "./ask";
 import { domPurifyCleaner } from "./clean";
 import { drawClosed } from "./closed";
+import { element } from "./element";
 import { filePresser, saved } from "./files";
 import { finished, pictureAddresses } from "./finish";
 import { drawFrame, type Shown } from "./frame";
-import { offerLanguages } from "./language-switch";
+import { keep } from "./kept";
+import { markUnreviewed, offerLanguages } from "./language-switch";
 import { offerReport, type Reportable } from "./report";
 import { answeringProof } from "./solve";
 import { said } from "./speak";
@@ -31,6 +33,7 @@ interface Language {
   lang: string;
   showing: Showing;
   shown: Shown;
+  reviewed: boolean;
 }
 
 const opening = async (id: string, linkKey: string, arrived: Arrived): Promise<Showing> => ({
@@ -62,9 +65,9 @@ const reportableOf = ({ id, linkKey, arrived: { version } }: Showing): Reportabl
 });
 
 // Whatever keeps a translation from opening, the reader stays on what was already checked.
-// The server keeps a language under its anchor's owner, so a translation by anyone else, or in another tongue, is a lie.
-const belongs = ({ opened }: Showing, { lang }: Translation, anchor: Opened): boolean =>
-  ownerOf(opened) === ownerOf(anchor) && opened.held.lang === lang;
+// Before contract 1.8.0 no language could name its anchor, so one without it holds only under its anchor's owner.
+const belongs = ({ held }: Opened, { lang }: Translation, anchor: string, reviewed: boolean): boolean =>
+  held.lang === lang && (held.anchor === undefined ? reviewed : held.anchor === anchor);
 
 const translated = async ({ document: id, key = "" }: Translation): Promise<Showing | undefined> => {
   try {
@@ -75,22 +78,39 @@ const translated = async ({ document: id, key = "" }: Translation): Promise<Show
   }
 };
 
+// Its owner did not add one whose owner is another root, so it says so where it is read (contract, language_not_reviewed).
+const marked = ({ lang, reviewed }: Language): void => {
+  element("unreviewed").hidden = reviewed;
+  if (!reviewed) markUnreviewed(lang);
+};
+
 const shownInLanguages = async (anchor: Showing): Promise<void> => {
-  const { lang = "", languages = [] } = anchor.opened.held;
-  const anchorLanguage = { lang, showing: anchor, shown: shownOf(anchor) };
+  const { id, opened } = anchor;
+  const { lang = "", languages = [] } = opened.held;
+  const anchorLanguage = { lang, showing: anchor, shown: shownOf(anchor), reviewed: true };
   const kept = new Map<string, Language>([[lang, anchorLanguage]]);
   const languageOf = async (chosen: string): Promise<Language | undefined> => {
     const known = kept.get(chosen);
     const translation = languages.find((one) => one.lang === chosen);
     if (known || !translation) return known;
     const showing = await translated(translation);
-    if (!showing || !belongs(showing, translation, anchor.opened)) return undefined;
-    const language = { lang: chosen, showing, shown: shownOf(showing) };
+    if (!showing) return undefined;
+    const reviewed = ownerOf(showing.opened) === ownerOf(opened);
+    if (!belongs(showing.opened, translation, id, reviewed)) return undefined;
+    const language = { lang: chosen, showing, shown: shownOf(showing), reviewed };
     kept.set(chosen, language);
     return language;
   };
-  const preferred = preferredTranslation(navigator.languages ?? [], anchor.opened.held.lang, languages);
-  const first = preferred && (await languageOf(preferred.lang));
+  const chosenAt = `language ${id}`;
+  const preferred = preferredTranslation(navigator.languages ?? [], lang, languages)?.lang;
+  let recalled = null as string | null;
+  keep((stored) => {
+    recalled = stored.getItem(chosenAt);
+  });
+  const first =
+    (recalled !== null && (await languageOf(recalled))) ||
+    (preferred !== undefined && (await languageOf(preferred))) ||
+    undefined;
   let current = first ?? anchorLanguage;
   const show = drawFrame(current.shown);
   offerReport(() => reportableOf(current.showing));
@@ -104,9 +124,12 @@ const shownInLanguages = async (anchor: Showing): Promise<void> => {
       if (!next) return false;
       current = next;
       show(next.shown);
+      marked(next);
+      keep((stored) => stored.setItem(chosenAt, chosen));
       return true;
     },
   });
+  marked(current);
 };
 
 const shown = async (id: string, linkKey: string, arrived: Arrived, caseToken?: string): Promise<void> => {

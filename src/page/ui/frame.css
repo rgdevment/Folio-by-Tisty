@@ -457,6 +457,16 @@ body::before {
   max-width: 100%;
 }
 
+.unreviewed {
+  max-width: var(--page-width, var(--sheet-width));
+  margin: 0 auto 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  color: var(--warn);
+  font-size: 13px;
+}
+
 .one-line {
   display: block;
   min-width: 0;
@@ -721,7 +731,7 @@ body::before {
   flex: 0 0 100%;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 0 8px;
   margin-bottom: 2px;
   color: var(--tisty-soft);
   font-size: 12.5px;
@@ -739,13 +749,13 @@ body::before {
   cursor: pointer;
 }
 
+/* Always there, so a screen reader announces a message as it appears; the row gap is the message's own. */
 .language-said {
   flex: 0 0 100%;
-  margin: 0;
 }
 
-.language-said:empty {
-  display: none;
+.language-said > p {
+  margin: 8px 0 0;
 }
 
 .paper {
@@ -1674,6 +1684,7 @@ html[lang="es"] .in-two [lang="en"] {
 
   .bar,
   .loading,
+  .unreviewed,
   .pages-card,
   .panels,
   .page-foot,
