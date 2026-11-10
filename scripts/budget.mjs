@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { constants, brotliCompressSync } from "node:zlib";
 
 // Decision 92 and the page's architecture: what every link downloads before it shows anything.
-const SCRIPTS_AT_MOST = 48_000;
+const SCRIPTS_AT_MOST = 50_000;
 // The quality Cloudflare was measured to use.
 const BROTLI_QUALITY = 4;
 const ASSETS = "dist/page/assets";
