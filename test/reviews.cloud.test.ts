@@ -54,9 +54,9 @@ describe("a review of a language (contract 1.9.0)", () => {
     expect(await reviewHolds(anchor, owner, fromBase64Url(linkKey), { ...review, since: "x" })).toBe(false);
   });
 
-  it("names no kept language under an anchor with no key", async () => {
+  it("names no kept language under another anchor's key", async () => {
     const [kept] = cases;
-    expect(await reviewHolds(anchor, owner, undefined, kept?.review as Review)).toBe(false);
+    expect(await reviewHolds(anchor, owner, new Uint8Array(32), kept?.review as Review)).toBe(false);
   });
 });
 
@@ -90,6 +90,15 @@ describe("the languages a reader shows (contract, review.shown)", () => {
       expect(showing.map((one) => one.document)).toEqual(shown);
     },
   );
+
+  it("takes no review beside a public anchor, which has no key (contract, review.sealed_only)", async () => {
+    const kept = SAMPLES.languages_shown.find(
+      ({ says }) => says === "a language its owner keeps, as its owner read it",
+    );
+    const { anchor, owner, link_key: linkKey, reviews, served = {} } = kept as Scenario;
+    expect(await keptBy(anchor, owner, fromBase64Url(linkKey), reviews, served)).toHaveLength(1);
+    expect(await keptBy(anchor, owner, undefined, reviews, served)).toEqual([]);
+  });
 
   it("leaves out what the map says waits for its owner's review, whatever it is", () => {
     const map: Translation[] = [

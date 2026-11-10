@@ -18,6 +18,7 @@ import {
   uploadFiles,
 } from "../src/core/upload";
 import { keptVersions, listFreesAt, uploadAllowedAt } from "../src/core/versions";
+import { readEnvelope } from "../src/rules/envelope";
 import {
   anotherMachine,
   filesHashOf,
@@ -268,6 +269,18 @@ describe("the owner's word on an anchor's reviews (contract 1.9.0)", () => {
       served: true,
       reviewed: { seq: 1, at: LATER },
     });
+  });
+
+  it("never comes with what is public, which has no owner and which Folio does not take", async () => {
+    const first = await started();
+    const open = await sealedEnvelope({ id: first.id, version: 1, owner: mario, open: true });
+    expect((await readEnvelope(open, { id: first.id, kind: "main" })).manifest.sealed).toBe(false);
+    const word = await reviewedBy(mario, { anchor: first.id, seq: 1 });
+    expect(await sendWith(first.id, open, NOW, word, first.adminToken, first)).toEqual({
+      refused: "envelope",
+      why: "damaged",
+    });
+    expect(await heldWord(first.id)).toBeNull();
   });
 
   it("comes with a first version too", async () => {

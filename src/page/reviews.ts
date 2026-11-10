@@ -21,12 +21,10 @@ const reviewSaid = (anchor: string, review: Review): Bytes[] => {
   return [...sized(anchor), fromBase64Url(of), bigEndian(seq), Uint8Array.of(kept ? 1 : 0), ...(kept ? naming : [])];
 };
 
-const namesItsLanguage = (anchorKey: Bytes | undefined, { of, document = "" }: Review): Promise<boolean> =>
-  anchorKey === undefined
-    ? Promise.resolve(false)
-    : macHolds(anchorKey, of, words("tisty-language-review\0"), words(document));
+const namesItsLanguage = (anchorKey: Bytes, { of, document = "" }: Review): Promise<boolean> =>
+  macHolds(anchorKey, of, words("tisty-language-review\0"), words(document));
 
-export const reviewHolds = async (anchor: string, owner: string, anchorKey: Bytes | undefined, review: Review) => {
+export const reviewHolds = async (anchor: string, owner: string, anchorKey: Bytes, review: Review) => {
   try {
     return (
       check("review", review).length === 0 &&
@@ -75,7 +73,8 @@ export const keptBy = async (
   reviews: readonly Review[],
   served: Served,
 ): Promise<Review[]> => {
-  if (!(await reviewsCount(anchor, owner, reviews, served))) return [];
+  // What is public has no key, no editors and no reviews: only its signer's languages show (contract, review.sealed_only).
+  if (anchorKey === undefined || !(await reviewsCount(anchor, owner, reviews, served))) return [];
   const latest = new Map<string, Review>();
   for (const one of reviews) {
     if (newer(one, latest.get(one.of)) && (await reviewHolds(anchor, owner, anchorKey, one))) latest.set(one.of, one);
