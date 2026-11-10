@@ -1,6 +1,6 @@
 # Folio by Tisty privacy policy
 
-**Version 6, in force since November 10, 2026.**
+**Version 7, in force since November 10, 2026.**
 
 ## The short version
 
@@ -29,6 +29,7 @@ runs Folio as a non-profit. Contact: <rgdevment@tisty.app>.
 | The manifest in the clear: how many parts, what each weighs, their kind and the version | To hold the limits without reading the content | As long as the document |
 | The manage link, kept as a digest (hash), and the public key of the edit link's token, which never reaches the server | To check who may change or delete it | As long as the document |
 | Your public key and its certificate, in what you share, with the exact time each version arrived | So readers know it is yours and since when | As long as the document |
+| If you review the languages someone else added to what you share, your word on them, signed with your key: only how many times you reviewed and a digest (hash) of the reviews, never which languages, with the exact time it arrived | So readers show only the languages you kept | As long as the document |
 | Your public key on its own, the day Folio first saw it, which version of the terms it accepted and in what hour the server heard it, and whether the operator blocked it, tied to no network and no document | So limits and reputation stay with it, and a new key starts from the lowest | For good, even after your documents are gone |
 | How many times it was read, counted once a day per visitor, and in which hours on a day with 5 or more | To show you the reads in Tisty | As long as the document |
 | A line for each read served: the link's id (without its key, so it opens nothing), the country and the Cloudflare data center, never your IP | To know how much each document is read and where from, and size the service | Up to 7 days, in Cloudflare's Workers Logs |

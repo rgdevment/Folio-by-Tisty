@@ -50,6 +50,7 @@ export const STATUS: Record<Refused["refused"], number> = {
   terms: 428,
   envelope: 422,
   revoked: 403,
+  reviewed: 422,
   key_blocked: 403,
   bad_revocation: 400,
 };
@@ -120,6 +121,9 @@ const versionHeaders = (answer: Served): Record<string, string> => ({
   "Folio-Arrived": String(answer.version.at),
   "Folio-Dies-On": String(answer.diesOn),
   "Folio-Revocations": JSON.stringify(answer.revocations),
+  ...(answer.reviewed
+    ? { "Folio-Reviewed": answer.reviewed.said, "Folio-Reviewed-Arrived": String(answer.reviewed.at) }
+    : {}),
 });
 
 const answerRead = async (request: Request, id: string, api: Api): Promise<Response> => {
@@ -201,8 +205,18 @@ const answerUpload = async (request: Request, id: string, { tools, now }: Api): 
   const bytes = bytesUpTo(request, tools.limits.envelopeBytesAtMost);
   const first = firstUploadOf(request);
   const files = request.headers.get("Folio-Files");
+  const reviewed = request.headers.get("Folio-Reviewed");
+  const admin = request.headers.get("Folio-Admin");
   const answer = await uploadDoc(
-    { id, now, ip: ipOf(request), bytes, ...(first ? { first } : {}), ...(files === null ? {} : { files }) },
+    {
+      id,
+      now,
+      ip: ipOf(request),
+      bytes,
+      ...(first ? { first } : {}),
+      ...(files === null ? {} : { files }),
+      ...(reviewed === null ? {} : { reviewed, admin: admin ?? "" }),
+    },
     tools,
   );
   return "refused" in answer ? refusal(answer, now) : json(200, answer);

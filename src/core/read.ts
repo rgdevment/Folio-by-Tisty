@@ -4,7 +4,7 @@ import { dayOf, type Limits } from "./limits";
 import { netDigest } from "./net";
 import { askForProof, type Refused, tooFast } from "./refused";
 import { proofIsFresh } from "./start";
-import type { Reading, Shown, Store, Version } from "./store";
+import type { Reading, ServedReviewed, Shown, Store, Version } from "./store";
 import { waitEndsAt } from "./versions";
 
 export interface Asked {
@@ -42,6 +42,7 @@ export interface Served {
   diesOn: number;
   body: ReadableStream;
   revocations: Revocation[];
+  reviewed?: ServedReviewed;
   // What is written once the answer left, so a read never waits for a write (decision 105).
   note?: Reading;
 }
@@ -64,6 +65,7 @@ interface AdmittedReader {
 export interface Latest {
   version: number;
   hash: string;
+  reviewedSeq?: number;
   nextAt?: number;
 }
 
@@ -77,7 +79,11 @@ export const latestVersion = async (
   const shown = await store.shown(id, today);
   const refused = refusalOfState(shown, limits);
   if (refused || !shown?.version) return refused ?? { refused: "missing" };
-  const latest = { version: shown.version.n, hash: shown.version.hash };
+  const latest = {
+    version: shown.version.n,
+    hash: shown.version.hash,
+    ...(shown.reviewed ? { reviewedSeq: shown.reviewed.seq } : {}),
+  };
   // Its languages too, since a Sync sends them together and another device or editor may have just sent one.
   const lasts = await store.lastVersionsWithLanguages(id, shown.owner, limits.uploadWaitsMinutes.length);
   const nextAt = Math.max(now, ...lasts.map((versions) => waitEndsAt(versions, now, limits)));
@@ -122,6 +128,7 @@ export const readDoc = async (asked: Asked, tools: ReadTools): Promise<Served | 
     diesOn: shown.diesOn,
     body,
     revocations: shown.revocations,
+    ...(shown.reviewed ? { reviewed: shown.reviewed } : {}),
     ...(note ? { note } : {}),
   };
 };

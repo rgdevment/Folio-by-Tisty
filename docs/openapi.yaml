@@ -167,9 +167,20 @@ paths:
               required: true
               schema: { type: integer }
             Folio-Revocations:
-              description: Whether the machine that signed it or its owner's was taken back, as JSON. A reader checks each one.
+              description: |
+                Whether the machine that signed it, its owner's, or the one that signed its owner's word on the reviews
+                was taken back, as JSON. A reader checks each one.
               required: true
               schema: { type: string }
+            Folio-Reviewed:
+              description: |
+                Only beside an anchor whose owner has written one: the owner's latest word on its reviews, as JSON, as it
+                came with the owner's version (contract, `reviewed`). A reader takes the reviews inside only while they
+                are what it names.
+              schema: { type: string }
+            Folio-Reviewed-Arrived:
+              description: When that word arrived, in milliseconds, with the version it came in. The server's word.
+              schema: { type: integer }
           content:
             application/octet-stream:
               schema: { type: string, format: binary }
@@ -216,8 +227,23 @@ paths:
         minutes, the last one repeating for versions in a row. Each signer also sends at most
         `uploads_of_a_root_an_hour` versions of it an hour. Sooner, it gets `slow` with `until`, and nothing is
         written.
+
+        A version whose contract is below the one of the version held for that id gets `outdated`: a writer that
+        knows less never seals over what one that knows more wrote. Versions are weighed by major, minor and patch,
+        and a draft is below the version it leads to.
+
+        The owner's word on an anchor's reviews travels only with the owner's own version that carries them, in
+        `Folio-Reviewed`, under the admin token in `Folio-Admin`: the server keeps both or neither. A version that
+        brings none, as an editor's, leaves the one held as it was.
       parameters:
         - $ref: "#/components/parameters/Proof"
+        - name: Folio-Reviewed
+          in: header
+          description: |
+            The owner's word on this anchor's reviews, as JSON (contract, `reviewed`), with `Folio-Admin`. Its anchor is
+            this id, its root is the owner's, its signature holds and its seq is above the one held; its machine is not
+            one its root took back.
+          schema: { type: string }
         - name: Folio-Files
           in: header
           description: |
@@ -231,7 +257,7 @@ paths:
           schema: { type: string }
         - name: Folio-Admin
           in: header
-          description: The first version only. The token of the admin link, of which only a hash is kept.
+          description: The first version, and any version that brings `Folio-Reviewed`. The token of the admin link, of which only a hash is kept.
           schema: { type: string }
         - name: Folio-Ttl-Days
           in: header
@@ -258,7 +284,10 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/BadUpload" }
         "403":
-          description: It is paused or blocked, this signer may not send a version of it, its id is someone else's, or its root took back the machine that signed it.
+          description: |
+            It is paused or blocked, this signer may not send a version of it, its id is someone else's, its root took
+            back the machine that signed it or the word on its reviews, or that word came without the admin token or
+            with a version that is not its owner's.
           content:
             application/json:
               schema:
@@ -269,7 +298,10 @@ paths:
                   - $ref: "#/components/schemas/KeyBlocked"
         "404": { $ref: "#/components/responses/Missing" }
         "409":
-          description: Another version arrived first, or this person keeps as many documents, or as many languages of this one, as they may, or the key that owns the document would hold more than it may.
+          description: |
+            Another version arrived first, or the word on the reviews has a seq not above the one held, or this person
+            keeps as many documents, or as many languages of this one, as they may, or the key that owns the document
+            would hold more than it may.
           content:
             application/json:
               schema:
@@ -282,10 +314,15 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/TooBig" }
         "422":
-          description: The envelope does not hold, and `why` says how.
+          description: |
+            The envelope does not hold, and `why` says how; or the owner's word on the reviews does not: another anchor
+            or root, or a certificate or signature that does not hold. Nothing was kept.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/BadEnvelope" }
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/BadEnvelope"
+                  - $ref: "#/components/schemas/BadReviewed"
         "428":
           description: |
             Whoever signs has not accepted the terms in force: its manifest's `terms` is missing, behind, or more
@@ -297,7 +334,9 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/TermsNotAccepted" }
         "426":
-          description: Written under a contract older than the oldest the server takes. Tisty sends it again.
+          description: |
+            Written under a contract older than the oldest the server takes, or below the contract of the version it
+            holds for that id. Tisty asks to update, or sends it again.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Outdated" }
@@ -811,6 +850,11 @@ components:
       required: [refused]
       properties:
         refused: { const: revoked }
+    BadReviewed:
+      type: object
+      required: [refused]
+      properties:
+        refused: { const: reviewed }
     FilesStored:
       type: object
       required: [stored, hash]
@@ -846,6 +890,9 @@ components:
       properties:
         version: { type: integer }
         hash: { type: string }
+        reviewedSeq:
+          type: integer
+          description: The seq of the owner's latest word on this anchor's reviews, when there is one.
         nextAt: { type: integer, description: "When a new version is taken again, in milliseconds." }
     BadUpload:
       type: object

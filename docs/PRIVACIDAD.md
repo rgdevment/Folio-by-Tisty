@@ -1,6 +1,6 @@
 # Privacidad de Folio by Tisty
 
-**Versión 6, vigente desde el 10 de noviembre de 2026.**
+**Versión 7, vigente desde el 10 de noviembre de 2026.**
 
 ## En corto
 
@@ -28,6 +28,7 @@ opera Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 | El manifiesto en claro: cuántas partes tiene, cuánto pesa cada una, de qué tipo son y su versión | Aplicar los topes sin leer el contenido | Lo mismo que el documento |
 | El link de administrar, guardado como resumen (hash), y la llave pública del token del link de editar, que nunca llega al servidor | Comprobar quién puede cambiar o borrar | Lo mismo que el documento |
 | Tu llave pública y su certificado, en lo que compartes, con la hora exacta en que llegó cada versión | Que quien lee sepa que es tuyo y desde cuándo | Lo mismo que el documento |
+| Si revisas los idiomas que otra persona sumó a lo tuyo, tu palabra sobre ellos, firmada con tu llave: solo cuántas veces revisaste y un resumen (hash) de las revisiones, nunca qué idiomas, con la hora exacta en que llegó | Que quien lee muestre solo los idiomas que mantuviste | Lo mismo que el documento |
 | Tu llave pública sola, el día en que Folio la vio por primera vez, qué versión de los términos aceptó y en qué hora lo supo el servidor, y si el operador la bloqueó, sin relación con ninguna red ni documento | Que los topes y la reputación sigan con ella, y que una llave nueva parta con los más bajos | Para siempre, aunque tus documentos ya no estén |
 | Cuántas veces se leyó, contando una vez por día y por visitante, y en qué horas en un día con 5 o más | Mostrarte las lecturas en Tisty | Lo mismo que el documento |
 | Una línea por cada lectura servida: el id del link (sin su llave, así que no abre nada), el país y el centro de datos de Cloudflare, nunca tu IP | Saber cuánto se lee cada documento y desde dónde, y dimensionar el servicio | Hasta 7 días, en los registros de Workers de Cloudflare |

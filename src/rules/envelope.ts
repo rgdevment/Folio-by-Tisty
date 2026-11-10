@@ -1,4 +1,4 @@
-import type { Editor, Envelope, EnvelopeKind, Opening, Owner, Signature } from "@tisty/contracts";
+import type { Editor, Envelope, EnvelopeKind, Opening, Owner, Reviewed, Signature } from "@tisty/contracts";
 import { check, VERSION } from "@tisty/contracts/check";
 import { type Bytes, bigEndian, fromBase64Url, joined, sameBytes, sha256, words } from "../core/bytes";
 
@@ -68,6 +68,23 @@ const underALaterMinor = (version: string): boolean => {
   return !version.includes("-") && numbers?.major === OURS?.major && (numbers?.minor ?? 0) > (OURS?.minor ?? 0);
 };
 
+const DRAFTED = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[a-z]+\.(0|[1-9]\d*))?$/;
+
+const placeOf = (version: string): number[] | null => {
+  const [, major, minor, patch, draft] = DRAFTED.exec(version) ?? [];
+  if (major === undefined || minor === undefined || patch === undefined) return null;
+  return [Number(major), Number(minor), Number(patch), draft === undefined ? Number.POSITIVE_INFINITY : Number(draft)];
+};
+
+// By major, minor and patch, and a draft below the version it leads to (contract, never_lower).
+export const contractBelow = (version: string, held: string): boolean => {
+  const said = placeOf(version);
+  const was = placeOf(held);
+  if (!said || !was) return false;
+  const differs = said.findIndex((one, at) => one !== was[at]);
+  return differs !== -1 && (said[differs] as number) < (was[differs] as number);
+};
+
 export const isBelowVersion = (version: string, floor: string): boolean => {
   const said = numbersOf(version);
   const least = numbersOf(floor);
@@ -110,7 +127,7 @@ const verified = async (key: Bytes, signature: Bytes, ...signed: Bytes[]): Promi
 
 const secondsOf = (moment: string): Bytes => bigEndian(Date.parse(moment) / 1000);
 
-const certified = ({
+export const certified = ({
   root,
   machine,
   certificate,
@@ -127,25 +144,23 @@ const certified = ({
   );
 };
 
-const sized = (said: string): Bytes[] => {
+export const sized = (said: string): Bytes[] => {
   const bytes = words(said);
   return [bigEndian(bytes.length), bytes];
 };
 
-const machineSigned = (
-  { root, machine, signed }: Pick<Signature, "root" | "machine" | "signed">,
+export const signedRow = (
+  { root, machine }: Pick<Signature, "root" | "machine">,
+  about: string,
+  ...rest: Bytes[]
+): Bytes[] => [words("tisty-share.signed.v1\0"), fromBase64Url(root), fromBase64Url(machine), ...sized(about), ...rest];
+
+export const machineSigned = (
+  who: Pick<Signature, "root" | "machine" | "signed">,
   about: string,
   ...rest: Bytes[]
 ): Promise<boolean> =>
-  verified(
-    fromBase64Url(machine),
-    fromBase64Url(signed),
-    words("tisty-share.signed.v1\0"),
-    fromBase64Url(root),
-    fromBase64Url(machine),
-    ...sized(about),
-    ...rest,
-  );
+  verified(fromBase64Url(who.machine), fromBase64Url(who.signed), ...signedRow(who, about, ...rest));
 
 const holdsSignature = async (signature: Signature, manifestBytes: Bytes, index: Bytes): Promise<void> => {
   const amiss = check("signature", signature);
@@ -181,6 +196,18 @@ const holdsOwner = async (
     index,
   );
   if (!allowed) refuse("unsigned", "its token did not sign it");
+};
+
+export const reviewedHolds = async (head: Reviewed): Promise<boolean> => {
+  try {
+    return (
+      check("reviewed", head).length === 0 &&
+      (await certified(head)) &&
+      (await machineSigned(head, "reviewed", ...sized(head.anchor), bigEndian(head.seq), fromBase64Url(head.reviews)))
+    );
+  } catch {
+    return false;
+  }
 };
 
 export const editorHolds = async (editor: Editor): Promise<boolean> => {

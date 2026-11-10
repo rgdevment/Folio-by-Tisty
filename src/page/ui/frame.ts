@@ -271,11 +271,28 @@ const drawOwner = (held: Document, { ownerFingerprint, ownerStanding }: Seal): v
 };
 
 // Its tag and its warning travel in both tongues in the HTML, so they cost the scripts nothing; frame.css picks by standing.
-const editorItem = ({ name, standing }: ShownEditor): Node => {
-  const item = element<HTMLTemplateElement>("editor").content.firstElementChild?.cloneNode(true) as HTMLElement;
+const named = (item: HTMLElement, { name, standing }: ShownEditor): HTMLElement => {
+  const said = element<HTMLTemplateElement>("editor").content.firstElementChild?.cloneNode(true) as HTMLElement;
   item.dataset.standing = standing;
+  item.replaceChildren(...said.childNodes);
   (item.firstElementChild as HTMLElement).textContent = name;
   return item;
+};
+
+const editorItem = (editor: ShownEditor): Node => named(document.createElement("li"), editor);
+
+export interface Credit {
+  translator: ShownEditor;
+  owner: ShownEditor;
+}
+
+export const drawCredit = (credit: Credit | null): void => {
+  const shown = element("credit");
+  shown.hidden = credit === null;
+  if (!credit) return;
+  for (const slot of shown.querySelectorAll<HTMLElement>("[data-credit]")) {
+    named(slot, credit[slot.dataset.credit as keyof Credit]);
+  }
 };
 
 const drawEditors = ({ editors }: Seal): void => {

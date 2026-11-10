@@ -32,7 +32,7 @@ const inflated = async (bytes: Bytes, size: number): Promise<Bytes> => {
   return joined(...pieces);
 };
 
-const macHolds = async (linkKey: Bytes, mac: string, ...said: Bytes[]): Promise<boolean> => {
+export const macHolds = async (linkKey: Bytes, mac: string, ...said: Bytes[]): Promise<boolean> => {
   const held = await crypto.subtle.importKey("raw", linkKey, { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
   return crypto.subtle.verify("HMAC", held, fromBase64Url(mac), joined(...said));
 };

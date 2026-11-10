@@ -40,6 +40,12 @@ export interface Upload {
   filesBytes?: number;
   newKey?: boolean;
   roomAtMost?: number;
+  reviewed?: HeldReviewed;
+}
+
+export interface HeldReviewed {
+  said: string;
+  seq: number;
 }
 
 export interface KeptFiles {
@@ -55,6 +61,8 @@ export type Appealed = "accepted" | "review";
 
 export interface Held {
   owner: string;
+  adminHash: string;
+  reviewed: HeldReviewed | null;
   permit: string | null;
   ownerMark: string;
   anchor: string | null;
@@ -117,6 +125,13 @@ export interface Shown {
   blockedAt: number | null;
   fixBy: number | null;
   revocations: Revocation[];
+  reviewed: ServedReviewed | null;
+}
+
+export interface ServedReviewed {
+  said: string;
+  seq: number;
+  at: number;
 }
 
 // What the admin link shows, and never an order that keeps a document (decision 42).
@@ -193,6 +208,7 @@ export interface Store {
   setPermit(id: string, permit: string | null): Promise<void>;
   revoke(revocations: Revocation[]): Promise<boolean>;
   isRevoked(root: string, machine: string, now: number): Promise<boolean>;
+  keepReviewed(id: string, latest: number, reviewed: HeldReviewed, at: number): Promise<boolean>;
   haveSigned(roots: string[]): Promise<boolean>;
   newRootsOf(roots: string[], day: number): Promise<string[]>;
   anyBlocked(roots: string[]): Promise<boolean>;

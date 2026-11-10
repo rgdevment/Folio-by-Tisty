@@ -5,17 +5,17 @@ import { EnvelopeRefused } from "../../rules/envelope";
 import { preferredTranslation } from "../languages";
 import type { CaseLink } from "../link";
 import { OPERATOR_KEY } from "../operator-key";
-import type { Arrived, Opened } from "../read";
+import type { Arrived, Opened, ShownEditor } from "../read";
 import { openLink } from "../read";
+import { keptAsRead, printOf, reachedBy } from "../reviews";
 import { askFor, askForCase, asking, type NotArrived, notArrived } from "./ask";
 import { domPurifyCleaner } from "./clean";
 import { drawClosed } from "./closed";
-import { element } from "./element";
 import { filePresser, saved } from "./files";
 import { finished, pictureAddresses } from "./finish";
-import { drawFrame, type Shown } from "./frame";
+import { drawCredit, drawFrame, type Shown } from "./frame";
 import { keep } from "./kept";
-import { markUnreviewed, offerLanguages } from "./language-switch";
+import { offerLanguages } from "./language-switch";
 import { offerReport, type Reportable } from "./report";
 import { answeringProof } from "./solve";
 import { said } from "./speak";
@@ -33,7 +33,7 @@ interface Language {
   lang: string;
   showing: Showing;
   shown: Shown;
-  reviewed: boolean;
+  byAnother: boolean;
 }
 
 const opening = async (id: string, linkKey: string, arrived: Arrived): Promise<Showing> => ({
@@ -43,7 +43,10 @@ const opening = async (id: string, linkKey: string, arrived: Arrived): Promise<S
   opened: await openLink(id, linkKey, arrived),
 });
 
-const ownerOf = ({ fingerprint, ownerFingerprint }: Opened): string => ownerFingerprint ?? fingerprint;
+const ownerNamed = ({ held, ownerFingerprint, signerStanding, ownerStanding }: Opened): ShownEditor =>
+  ownerFingerprint === null
+    ? { name: held.signed_as ?? said().noName, standing: signerStanding }
+    : { name: held.owner_name ?? said().noName, standing: ownerStanding };
 
 const shownOf = ({ id, linkKey, opened }: Showing, caseToken?: string): Shown => {
   const { held, pictures } = opened;
@@ -66,8 +69,8 @@ const reportableOf = ({ id, linkKey, arrived: { version } }: Showing): Reportabl
 
 // Whatever keeps a translation from opening, the reader stays on what was already checked.
 // Before contract 1.8.0 no language could name its anchor, so one without it holds only under its anchor's owner.
-const belongs = ({ held }: Opened, { lang }: Translation, anchor: string, reviewed: boolean): boolean =>
-  held.lang === lang && (held.anchor === undefined ? reviewed : held.anchor === anchor);
+const belongs = ({ held }: Opened, { lang }: Translation, anchor: string, ownersOwn: boolean): boolean =>
+  held.lang === lang && (held.anchor === undefined ? ownersOwn : held.anchor === anchor);
 
 const translated = async ({ document: id, key = "" }: Translation): Promise<Showing | undefined> => {
   try {
@@ -78,31 +81,38 @@ const translated = async ({ document: id, key = "" }: Translation): Promise<Show
   }
 };
 
-// Its owner did not add one whose owner is another root, so it says so where it is read (contract, language_not_reviewed).
-const marked = ({ lang, reviewed }: Language): void => {
-  element("unreviewed").hidden = reviewed;
-  if (!reviewed) markUnreviewed(lang);
-};
+// Only what the anchor's owner keeps, as its owner read it, shows under another root (contract, review.shown).
+const showsHere = async (anchor: Showing, translation: Translation, { opened }: Showing, ownersOwn: boolean) =>
+  belongs(opened, translation, anchor.id, ownersOwn) &&
+  (ownersOwn ||
+    keptAsRead(
+      { document: translation.document, lang: opened.held.lang ?? "", print: await printOf(opened.parts) },
+      anchor.opened.ownerKeeps,
+    ));
+
+const credited = (anchor: Showing, { showing, byAnother }: Language): void =>
+  drawCredit(byAnother ? { translator: ownerNamed(showing.opened), owner: ownerNamed(anchor.opened) } : null);
 
 const shownInLanguages = async (anchor: Showing): Promise<void> => {
   const { id, opened } = anchor;
   const { lang = "", languages = [] } = opened.held;
-  const anchorLanguage = { lang, showing: anchor, shown: shownOf(anchor), reviewed: true };
+  const offered = reachedBy(languages, opened.ownerKeeps);
+  const anchorLanguage = { lang, showing: anchor, shown: shownOf(anchor), byAnother: false };
   const kept = new Map<string, Language>([[lang, anchorLanguage]]);
   const languageOf = async (chosen: string): Promise<Language | undefined> => {
     const known = kept.get(chosen);
-    const translation = languages.find((one) => one.lang === chosen);
+    const translation = offered.find((one) => one.lang === chosen);
     if (known || !translation) return known;
     const showing = await translated(translation);
     if (!showing) return undefined;
-    const reviewed = ownerOf(showing.opened) === ownerOf(opened);
-    if (!belongs(showing.opened, translation, id, reviewed)) return undefined;
-    const language = { lang: chosen, showing, shown: shownOf(showing), reviewed };
+    const ownersOwn = showing.opened.owner === opened.owner;
+    if (!(await showsHere(anchor, translation, showing, ownersOwn))) return undefined;
+    const language = { lang: chosen, showing, shown: shownOf(showing), byAnother: !ownersOwn };
     kept.set(chosen, language);
     return language;
   };
   const chosenAt = `language ${id}`;
-  const preferred = preferredTranslation(navigator.languages ?? [], lang, languages)?.lang;
+  const preferred = preferredTranslation(navigator.languages ?? [], lang, offered)?.lang;
   let recalled = null as string | null;
   keep((stored) => {
     recalled = stored.getItem(chosenAt);
@@ -114,9 +124,10 @@ const shownInLanguages = async (anchor: Showing): Promise<void> => {
   let current = first ?? anchorLanguage;
   const show = drawFrame(current.shown);
   offerReport(() => reportableOf(current.showing));
-  if (languages.length === 0) return;
+  credited(anchor, current);
+  if (offered.length === 0) return;
   offerLanguages({
-    langs: [lang, ...languages.map((one) => one.lang)],
+    langs: [...new Set([lang, ...offered.map((one) => one.lang)])],
     shown: current.lang,
     missedTheReaders: preferred !== undefined && first === undefined,
     choose: async (chosen) => {
@@ -124,12 +135,11 @@ const shownInLanguages = async (anchor: Showing): Promise<void> => {
       if (!next) return false;
       current = next;
       show(next.shown);
-      marked(next);
+      credited(anchor, next);
       keep((stored) => stored.setItem(chosenAt, chosen));
       return true;
     },
   });
-  marked(current);
 };
 
 const shown = async (id: string, linkKey: string, arrived: Arrived, caseToken?: string): Promise<void> => {

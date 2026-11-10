@@ -159,15 +159,15 @@ describe("who edited it", () => {
   it("shows an editor's tag only for the maker, and its warning only for a name that imitates it", () => {
     expect(HTML).toContain('<template id="editor">');
     expect(read("src/page/ui/frame.css")).toMatch(
-      /\.editors li:not\(\[data-standing="verified"\]\) \.name-tag,\s+\.editors li:not\(\[data-standing="imitates"\]\) \.fact-note \{\s+display: none;/,
+      /\.credited:not\(\[data-standing="verified"\]\) \.name-tag,\s+\.credited:not\(\[data-standing="imitates"\]\) \.fact-note,\s+\.editors li:not\(\[data-standing="verified"\]\) \.name-tag,\s+\.editors li:not\(\[data-standing="imitates"\]\) \.fact-note \{\s+display: none;/,
     );
   });
 });
 
-describe("a language its owner has not reviewed", () => {
-  it("says so on screen, and not on paper, which carries only the document", () => {
-    expect(HTML).toContain('id="unreviewed"');
-    expect(read("src/page/ui/frame.css")).toMatch(/@media print[\s\S]*\.loading,\s+\.unreviewed,\s+\.pages-card,/);
+describe("a language someone else translated", () => {
+  it("says who translated it and who reviewed it on screen, and not on paper, which carries only the document", () => {
+    expect(HTML).toContain('id="credit"');
+    expect(read("src/page/ui/frame.css")).toMatch(/@media print[\s\S]*\.loading,\s+\.credit,\s+\.pages-card,/);
   });
 });
 

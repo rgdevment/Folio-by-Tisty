@@ -6,7 +6,7 @@ import { type Bytes, bigEndian, fromBase64Url, joined, sha256, words } from "../
 import { toBase64Url } from "../src/core/start";
 import { documentIn, openEnvelope, openFiles, pictureHolds } from "../src/page/open";
 import { fingerprintOf, verdictOf } from "../src/page/verdict";
-import { type Asked, EnvelopeRefused, readEnvelope, revocationHolds } from "../src/rules/envelope";
+import { type Asked, contractBelow, EnvelopeRefused, readEnvelope, revocationHolds } from "../src/rules/envelope";
 
 // biome-ignore lint/suspicious/noExplicitAny: these are the contract's own samples, in the shape it writes them.
 const SAMPLES = VECTORS as any;
@@ -192,9 +192,27 @@ describe("what only one rule refuses, on an envelope whose signature holds", () 
   });
 });
 
+describe("which contract is below another (never_lower)", () => {
+  it.each([
+    ["1.8.0", "1.9.0", true],
+    ["1.9.0", "1.9.0", false],
+    ["1.9.1", "1.9.0", false],
+    ["1.9.0", "1.9.1", true],
+    ["1.10.0", "1.9.0", false],
+    ["1.99.0", "2.0.0", true],
+    ["1.9.0-draft.3", "1.9.0", true],
+    ["1.9.0", "1.9.0-draft.3", false],
+    ["1.9.0-draft.3", "1.9.0-draft.4", true],
+    ["1.9.0-draft.10", "1.9.0-draft.9", false],
+    ["not a version", "1.9.0", false],
+  ])("%s under %s: %s", (version, held, below) => {
+    expect(contractBelow(version, held)).toBe(below);
+  });
+});
+
 describe("the contract in use", () => {
   it("is the version Folio fixed, and these samples are written under it", async () => {
-    expect(VERSION).toBe("1.8.0");
+    expect(VERSION).toBe("1.9.0");
     const { manifest } = await readEnvelope(hex(SAMPLES.main.envelope), MAIN);
     expect(manifest.contract).toBe(VERSION);
   });

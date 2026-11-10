@@ -33,6 +33,30 @@ describe("asking for an envelope", () => {
     expect(fetched).toHaveBeenCalledWith(`/api/v1/docs/${ID}`, { credentials: "omit", cache: "no-store" });
   });
 
+  it("takes beside an anchor its owner's word on the reviews and when it came", async () => {
+    const word = { anchor: ID, seq: 2 };
+    answering(
+      new Response(new Uint8Array([1]), {
+        headers: {
+          "Folio-Arrived": "5",
+          "Folio-Dies-On": "7",
+          "Folio-Reviewed": JSON.stringify(word),
+          "Folio-Reviewed-Arrived": "4",
+        },
+      }),
+    );
+    expect(await askFor(ID)).toMatchObject({ reviewed: word, reviewedAt: 4 });
+  });
+
+  it.each(["not json", "3", "null"])("takes no word on the reviews from %s", async (said) => {
+    answering(
+      new Response(new Uint8Array([1]), {
+        headers: { "Folio-Arrived": "5", "Folio-Dies-On": "7", "Folio-Reviewed": said },
+      }),
+    );
+    expect(await askFor(ID)).not.toHaveProperty("reviewed");
+  });
+
   it("sends the proof only when it has one", async () => {
     const fetched = answering(new Response(JSON.stringify({ refused: "slow" }), { status: 429 }));
     await askFor(ID, "42");

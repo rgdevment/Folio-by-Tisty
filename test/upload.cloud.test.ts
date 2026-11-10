@@ -18,12 +18,15 @@ import {
   uploadFiles,
 } from "../src/core/upload";
 import { keptVersions, listFreesAt, uploadAllowedAt } from "../src/core/versions";
+import { readEnvelope } from "../src/rules/envelope";
 import {
+  anotherMachine,
   filesHashOf,
   machineOf,
   newPerson,
   newToken,
   type Person,
+  reviewedBy,
   revocationBy,
   rootOf,
   sealedEnvelope,
@@ -232,6 +235,208 @@ describe("who may send a new version", () => {
       nameTag: new Uint8Array(32).fill(9),
     });
     expect(await send(id, bytes, LATER)).toEqual({ refused: "not_yours" });
+  });
+});
+
+describe("the owner's word on an anchor's reviews (contract 1.9.0)", () => {
+  const STEP = 10 * MINUTE;
+  const IP = "203.0.113.9";
+  const sendWith = (
+    id: string,
+    bytes: Bytes,
+    now: number,
+    word: object,
+    admin = "the admin token",
+    first?: FirstUpload,
+  ) =>
+    uploadDoc(
+      { id, now, ip: IP, bytes: async () => bytes, reviewed: JSON.stringify(word), admin, ...(first ? { first } : {}) },
+      tools,
+    );
+  const heldWord = async (id: string) => (await store.shown(id, dayOf(LATER)))?.reviewed ?? null;
+  const owners = (id: string, version: number, permit?: string) =>
+    sealedEnvelope({ id, version, owner: mario, ...(permit ? { permit } : {}) });
+
+  it("keeps it with the owner's version, and serves it with when it came", async () => {
+    const id = await shared();
+    const word = await reviewedBy(mario, { anchor: id, seq: 1 });
+    expect(await sendWith(id, await owners(id, 2), LATER, word)).toEqual({ stored: true, version: 2 });
+    const held = await heldWord(id);
+    expect(JSON.parse(held?.said ?? "null")).toEqual(word);
+    expect(held).toMatchObject({ seq: 1, at: LATER });
+    expect(await latestVersion({ id, now: LATER, ip: IP }, tools)).toMatchObject({ version: 2, reviewedSeq: 1 });
+    expect(await readDoc({ id, ip: IP, now: LATER }, tools)).toMatchObject({
+      served: true,
+      reviewed: { seq: 1, at: LATER },
+    });
+  });
+
+  it("never comes with what is public, which has no owner and which Folio does not take", async () => {
+    const first = await started();
+    const open = await sealedEnvelope({ id: first.id, version: 1, owner: mario, open: true });
+    expect((await readEnvelope(open, { id: first.id, kind: "main" })).manifest.sealed).toBe(false);
+    const word = await reviewedBy(mario, { anchor: first.id, seq: 1 });
+    expect(await sendWith(first.id, open, NOW, word, first.adminToken, first)).toEqual({
+      refused: "envelope",
+      why: "damaged",
+    });
+    expect(await heldWord(first.id)).toBeNull();
+  });
+
+  it("asks once whether the machine was taken back, when the version's machine signed the word too", async () => {
+    const id = await shared();
+    const asked = vi.spyOn(store, "isRevoked");
+    const word = await reviewedBy(mario, { anchor: id, seq: 1 });
+    expect(await sendWith(id, await owners(id, 2), LATER, word)).toEqual({ stored: true, version: 2 });
+    expect(asked).toHaveBeenCalledTimes(1);
+    asked.mockRestore();
+  });
+
+  it("comes with a retry of a version already kept, which keeps the word its first try lost", async () => {
+    const id = await shared();
+    const version = await owners(id, 2);
+    expect(await send(id, version, LATER)).toEqual({ stored: true, version: 2 });
+    const word = await reviewedBy(mario, { anchor: id, seq: 1 });
+    expect(await sendWith(id, version, LATER, word)).toEqual({ stored: true, version: 2 });
+    expect(JSON.parse((await heldWord(id))?.said ?? "null")).toEqual(word);
+  });
+
+  it("answers a retry that brings the word it already left as kept, and one below it as behind", async () => {
+    const id = await shared();
+    const version = await owners(id, 2);
+    const word = await reviewedBy(mario, { anchor: id, seq: 2 });
+    expect(await sendWith(id, version, LATER, word)).toEqual({ stored: true, version: 2 });
+    expect(await sendWith(id, version, LATER, word)).toEqual({ stored: true, version: 2 });
+    const lower = await reviewedBy(mario, { anchor: id, seq: 1 });
+    expect(await sendWith(id, version, LATER, lower)).toEqual({ refused: "behind" });
+    expect(await sendWith(id, version, LATER, word, "another token")).toEqual({ stored: true, version: 2 });
+    expect((await heldWord(id))?.seq).toBe(2);
+  });
+
+  it("never comes with a language, since only an anchor holds reviews", async () => {
+    const anchor = await shared();
+    const first = { ...(await started()), anchor };
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+    const word = await reviewedBy(mario, { anchor: first.id, seq: 1 });
+    expect(await sendWith(first.id, bytes, NOW, word, first.adminToken, first)).toEqual({ refused: "reviewed" });
+    expect(await heldWord(first.id)).toBeNull();
+  });
+
+  it("comes with a first version too", async () => {
+    const first = await started();
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+    const word = await reviewedBy(mario, { anchor: first.id, seq: 1 });
+    expect(await sendWith(first.id, bytes, NOW, word, first.adminToken, first)).toEqual({ stored: true, version: 1 });
+    expect((await heldWord(first.id))?.seq).toBe(1);
+  });
+
+  it("stays as it was under a version that brings none, as an editor's", async () => {
+    const token = await newToken();
+    const id = await shared({ permit: token.permit });
+    const word = await reviewedBy(mario, { anchor: id, seq: 1 });
+    expect(await sendWith(id, await owners(id, 2, token.permit), LATER, word)).toEqual({ stored: true, version: 2 });
+    const editors = await sealedEnvelope({
+      id,
+      version: 3,
+      owner: mario,
+      signer: ana,
+      permit: token.permit,
+      token: token.pair,
+    });
+    expect(await send(id, editors, LATER + STEP)).toEqual({ stored: true, version: 3 });
+    expect(JSON.parse((await heldWord(id))?.said ?? "null")).toEqual(word);
+  });
+
+  it("comes only under the admin token and with the owner's version, or neither is kept", async () => {
+    const token = await newToken();
+    const id = await shared({ permit: token.permit });
+    const word = await reviewedBy(mario, { anchor: id, seq: 1 });
+    const version = await owners(id, 2, token.permit);
+    expect(await sendWith(id, version, LATER, word, "")).toEqual({ refused: "not_yours" });
+    expect(await sendWith(id, version, LATER, word, "another token")).toEqual({ refused: "not_yours" });
+    const editors = await sealedEnvelope({
+      id,
+      version: 2,
+      owner: mario,
+      signer: ana,
+      permit: token.permit,
+      token: token.pair,
+    });
+    expect(await sendWith(id, editors, LATER, word)).toEqual({ refused: "not_yours" });
+    expect((await row(id))?.latest).toBe(1);
+    expect(await heldWord(id)).toBeNull();
+  });
+
+  it.each([
+    ["another anchor", (_id: string) => reviewedBy(mario, { anchor: "otroAncl", seq: 1 })],
+    ["another root", (id: string) => reviewedBy(ana, { anchor: id, seq: 1 })],
+    [
+      "a signature that does not hold",
+      async (id: string) => ({ ...(await reviewedBy(mario, { anchor: id, seq: 1 })), seq: 2 }),
+    ],
+    ["no shape the contract takes", async (id: string) => ({ anchor: id, seq: 1 })],
+  ])("refuses a word with %s, and keeps neither", async (_, wordFor) => {
+    const id = await shared();
+    expect(await sendWith(id, await owners(id, 2), LATER, await wordFor(id))).toEqual({ refused: "reviewed" });
+    expect((await row(id))?.latest).toBe(1);
+    expect(await heldWord(id)).toBeNull();
+  });
+
+  it("takes a seq only above the one it holds, and the version goes back with it", async () => {
+    const id = await shared();
+    const second = await reviewedBy(mario, { anchor: id, seq: 2 });
+    expect(await sendWith(id, await owners(id, 2), LATER, second)).toEqual({ stored: true, version: 2 });
+    for (const seq of [1, 2]) {
+      const word = await reviewedBy(mario, { anchor: id, seq });
+      expect(await sendWith(id, await owners(id, 3), LATER + STEP, word)).toEqual({ refused: "behind" });
+    }
+    expect((await row(id))?.latest).toBe(2);
+    const higher = await reviewedBy(mario, { anchor: id, seq: 3 });
+    expect(await sendWith(id, await owners(id, 3), LATER + STEP, higher)).toEqual({ stored: true, version: 3 });
+    expect((await heldWord(id))?.seq).toBe(3);
+  });
+
+  it("takes a word from any machine of the owner's root, and refuses one its root took back", async () => {
+    const id = await shared();
+    const laptop = await anotherMachine(mario);
+    await store.revoke([await revocationBy(laptop, "2026-11-01T00:00:00Z")]);
+    const word = await reviewedBy(laptop, { anchor: id, seq: 1 });
+    expect(await sendWith(id, await owners(id, 2), LATER, word)).toEqual({ refused: "revoked" });
+    const desk = await anotherMachine(mario);
+    const fromDesk = await reviewedBy(desk, { anchor: id, seq: 1 });
+    expect(await sendWith(id, await owners(id, 2), LATER, fromDesk)).toEqual({ stored: true, version: 2 });
+  });
+
+  it("serves the revocation of the machine that signed the word, beside the anchor", async () => {
+    const id = await shared();
+    const laptop = await anotherMachine(mario);
+    const word = await reviewedBy(laptop, { anchor: id, seq: 1 });
+    expect(await sendWith(id, await owners(id, 2), LATER, word)).toEqual({ stored: true, version: 2 });
+    await store.revoke([await revocationBy(laptop, "2026-12-01T00:00:00Z")]);
+    const shown = await store.shown(id, dayOf(LATER));
+    expect(shown?.revocations.map((one) => one.machine)).toContain(machineOf(laptop));
+  });
+});
+
+describe("a version under a lower contract than the one held (contract, never_lower)", () => {
+  const STEP = 10 * MINUTE;
+
+  it("is refused as outdated, while the same contract is taken", async () => {
+    const id = await shared();
+    const lower = await sealedEnvelope({ id, version: 2, owner: mario, contract: "1.8.0" });
+    expect(await send(id, lower, LATER)).toEqual({ refused: "outdated" });
+    const same = await sealedEnvelope({ id, version: 2, owner: mario });
+    expect(await send(id, same, LATER)).toEqual({ stored: true, version: 2 });
+  });
+
+  it("lets a writer that knows more seal over what one that knew less wrote, and never back", async () => {
+    const first = await started();
+    const older = await sealedEnvelope({ id: first.id, version: 1, owner: mario, contract: "1.8.0" });
+    expect(await send(first.id, older, NOW, first)).toEqual({ stored: true, version: 1 });
+    const newer = await sealedEnvelope({ id: first.id, version: 2, owner: mario });
+    expect(await send(first.id, newer, LATER)).toEqual({ stored: true, version: 2 });
+    const back = await sealedEnvelope({ id: first.id, version: 3, owner: mario, contract: "1.8.0" });
+    expect(await send(first.id, back, LATER + STEP)).toEqual({ refused: "outdated" });
   });
 });
 

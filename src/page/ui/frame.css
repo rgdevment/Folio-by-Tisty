@@ -457,13 +457,10 @@ body::before {
   max-width: 100%;
 }
 
-.unreviewed {
+.credit {
   max-width: var(--page-width, var(--sheet-width));
   margin: 0 auto 12px;
-  padding: 8px 12px;
-  border: 1px solid var(--warn);
-  border-radius: 8px;
-  color: var(--warn);
+  color: var(--tisty-soft);
   font-size: 13px;
 }
 
@@ -1070,6 +1067,13 @@ html[lang="es"] .in-two [lang="en"] {
   list-style: none;
 }
 
+.credited .fact-note {
+  display: inline;
+  margin-left: 6px;
+}
+
+.credited:not([data-standing="verified"]) .name-tag,
+.credited:not([data-standing="imitates"]) .fact-note,
 .editors li:not([data-standing="verified"]) .name-tag,
 .editors li:not([data-standing="imitates"]) .fact-note {
   display: none;
@@ -1684,7 +1688,7 @@ html[lang="es"] .in-two [lang="en"] {
 
   .bar,
   .loading,
-  .unreviewed,
+  .credit,
   .pages-card,
   .panels,
   .page-foot,

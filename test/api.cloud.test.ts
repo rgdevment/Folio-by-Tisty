@@ -16,6 +16,7 @@ import {
   machineOf,
   newPerson,
   type Person,
+  reviewedBy,
   revocationBy,
   rootOf,
   SIGNED_BY_THE_OWNER,
@@ -85,10 +86,11 @@ interface Scenario {
   first?: boolean;
   anchor?: string;
   said?: object;
+  reviewed?: string;
 }
 
 const send = async (
-  { method, path, admin, caseToken, body, braked, broken, upload, first, anchor }: Scenario,
+  { method, path, admin, caseToken, body, braked, broken, upload, first, anchor, reviewed }: Scenario,
   proof?: string,
   ip?: string,
 ) => {
@@ -100,6 +102,7 @@ const send = async (
   }
   if (anchor) headers.set("Folio-Anchor", anchor);
   if (admin) headers.set("Folio-Admin", admin);
+  if (reviewed) headers.set("Folio-Reviewed", reviewed);
   if (caseToken) headers.set("Folio-Case", caseToken);
   if (proof) headers.set("Folio-Proof", proof);
   const limit = async () => {
@@ -524,6 +527,16 @@ const UPLOADING: Scenario[] = [
     upload: async () => new Uint8Array(8),
     ready: shareSigned,
   },
+  {
+    method: "PUT",
+    path: UPLOAD_PATH,
+    status: 422,
+    refused: "reviewed",
+    upload: envelope(2),
+    admin: TOKEN,
+    reviewed: "{}",
+    ready: shareSigned,
+  },
   { method: "PUT", path: UPLOAD_PATH, status: 429, refused: "slow", upload: envelope(1), braked: true },
   { method: "PUT", path: UPLOAD_PATH, status: 429, refused: "proof", upload: envelope(1), first: true, admin: TOKEN },
   {
@@ -878,6 +891,34 @@ describe("the written API", () => {
     const response = await send({ method: "GET", path: "/docs/{id}", status: 200 });
     await response.body?.cancel();
     expect(JSON.parse(response.headers.get("Folio-Revocations") ?? "null")).toEqual([said]);
+  });
+
+  it("serves beside an anchor its owner's word on the reviews and when it came, and its seq on latest", async () => {
+    await shareSigned();
+    const word = await reviewedBy(owner, { anchor: ID, seq: 4 });
+    const uploaded = await send({
+      method: "PUT",
+      path: UPLOAD_PATH,
+      status: 200,
+      upload: envelope(2),
+      admin: TOKEN,
+      reviewed: JSON.stringify(word),
+    });
+    expect(uploaded.status).toBe(200);
+    const response = await send({ method: "GET", path: "/docs/{id}", status: 200 });
+    await response.body?.cancel();
+    expect(JSON.parse(response.headers.get("Folio-Reviewed") ?? "null")).toEqual(word);
+    expect(Number(response.headers.get("Folio-Reviewed-Arrived"))).toBeGreaterThan(0);
+    const latest = await send({ method: "GET", path: LATEST_PATH, status: 200 });
+    expect(await latest.json()).toMatchObject({ version: 2, reviewedSeq: 4 });
+  });
+
+  it("serves no word on the reviews beside a document whose owner wrote none", async () => {
+    await shareSigned();
+    const response = await send({ method: "GET", path: "/docs/{id}", status: 200 });
+    await response.body?.cancel();
+    expect(response.headers.has("Folio-Reviewed")).toBe(false);
+    expect(response.headers.has("Folio-Reviewed-Arrived")).toBe(false);
   });
 
   it("says on latest when the next version is taken, while the wait runs", async () => {

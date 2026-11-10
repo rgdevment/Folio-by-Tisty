@@ -10,6 +10,7 @@ import type {
   Appealed,
   Created,
   Held,
+  HeldReviewed,
   KeptFiles,
   KeyAdmitted,
   NewDoc,
@@ -33,12 +34,14 @@ import { acceptAppeal, CLAIMED, mayCorrect } from "./moderation";
 import { HELD_BYTES, HOLDS_ROOM } from "./room";
 import { addProvedTo, NEW_KEYS_NET, PROVED, PROVED_COLUMN, seenTable } from "./seen";
 
-// Two rows by their key at most: the machine that signed the last version and its owner's, the start of owner_mark.
+// Three rows by their key at most: the machine that signed the last version, its owner's, the start of owner_mark,
+// and the one that signed the owner's word on the reviews, which a reader weighs alone (contract, review.current).
 const revocationsOf = (version: string): string => `(
   SELECT json_group_array(json_object('root', r.root, 'machine', r.machine, 'at', r.at, 'signed', r.signed))
   FROM revocations r
   WHERE (r.root = json_extract(${version}, '$.signer') AND r.machine = json_extract(${version}, '$.machine'))
     OR (r.root = d.owner AND r.machine = substr(d.owner_mark, 1, instr(d.owner_mark, '.') - 1))
+    OR (r.root = d.owner AND r.machine = json_extract(d.reviewed, '$.machine'))
 )`;
 const REVOCATIONS_OF_THE_LAST_VERSION = revocationsOf("json_extract(d.versions, '$[#-1]')");
 
@@ -56,6 +59,8 @@ export interface Bindings {
 interface DocRow {
   owner: string;
   admin_hash: string;
+  reviewed: string | null;
+  reviewed_seq: number | null;
   permit: string | null;
   owner_mark: string;
   anchor: string | null;
@@ -261,10 +266,12 @@ export class Cloud implements Store {
         .prepare(
           `UPDATE docs SET latest = ?2, versions = ?3, bytes = ?4, files_bytes = ?11,
              owner_mark = CASE WHEN ?7 THEN ?8 ELSE owner_mark END, fix_by = NULL,
+             reviewed = COALESCE(?14, reviewed), reviewed_at = CASE WHEN ?14 IS NULL THEN reviewed_at ELSE ?15 END,
              dies_on = CASE WHEN blocked_at IS NULL THEN ${LIVES_ON} WHEN paused_at IS NULL THEN ?1 + ttl_days ELSE paused_at + ?10 END,
              active_day = MAX(active_day, ?1),
              blocked_at = NULL, blocked_hour = NULL, appealed_hour = NULL
            WHERE id = ?5 AND latest = ?6 AND permit IS ?9
+             AND (?14 IS NULL OR COALESCE(json_extract(reviewed, '$.seq'), 0) < ?16)
              AND ((blocked_at IS NULL AND paused_at IS NULL) OR (?7 AND blocked_at IS NOT NULL AND blocked_by_operator = 0 AND counts_from = ?2))
              AND (?12 IS NULL OR ?13 + (SELECT COALESCE(SUM(${HELD_BYTES}), 0) FROM docs d
                WHERE d.owner = docs.owner AND d.id <> docs.id AND ${HOLDS_ROOM("?1")}) <= ?12)`,
@@ -283,6 +290,9 @@ export class Cloud implements Store {
           upload.filesBytes ?? 0,
           upload.roomAtMost ?? null,
           bytes + (upload.filesBytes ?? 0),
+          upload.reviewed?.said ?? null,
+          upload.at,
+          upload.reviewed?.seq ?? 0,
         ),
       // A new version of a language is activity of the whole group (decisions 50 and 69 bis).
       ...(held.anchor
@@ -338,6 +348,8 @@ export class Cloud implements Store {
     if (!row || row.latest === CLAIMED) return null;
     return {
       owner: row.owner,
+      adminHash: row.admin_hash,
+      reviewed: row.reviewed === null ? null : { said: row.reviewed, seq: row.reviewed_seq ?? 0 },
       permit: row.permit,
       ownerMark: row.owner_mark,
       anchor: row.anchor,
@@ -389,6 +401,17 @@ export class Cloud implements Store {
     return found !== null;
   }
 
+  async keepReviewed(id: string, latest: number, { said, seq }: HeldReviewed, at: number): Promise<boolean> {
+    const kept = await this.#db
+      .prepare(
+        `UPDATE docs SET reviewed = ?3, reviewed_at = ?4
+           WHERE id = ?1 AND latest = ?2 AND COALESCE(json_extract(reviewed, '$.seq'), 0) < ?5`,
+      )
+      .bind(id, latest, said, at, seq)
+      .run();
+    return kept.meta.changes > 0;
+  }
+
   async haveSigned(roots: string[]): Promise<boolean> {
     const asked = [...new Set(roots)];
     const found = await this.#db
@@ -435,7 +458,7 @@ export class Cloud implements Store {
   #row(id: string): Promise<DocRow | null> {
     return this.#db
       .prepare(
-        "SELECT owner, admin_hash, permit, owner_mark, anchor, latest, versions, files_bytes, blocked_at, paused_at, counts_from, blocked_by_operator FROM docs WHERE id = ?",
+        "SELECT owner, admin_hash, reviewed, json_extract(reviewed, '$.seq') AS reviewed_seq, permit, owner_mark, anchor, latest, versions, files_bytes, blocked_at, paused_at, counts_from, blocked_by_operator FROM docs WHERE id = ?",
       )
       .bind(id)
       .first<DocRow>();
@@ -649,6 +672,7 @@ export class Cloud implements Store {
     const row = await this.#db
       .prepare(
         `SELECT d.owner, d.latest, json_extract(d.versions, '$[#-1]') AS last_version, d.dies_on, d.paused_at, d.blocked_at, d.fix_by,
+           d.reviewed, json_extract(d.reviewed, '$.seq') AS reviewed_seq, d.reviewed_at,
            ${REVOCATIONS_OF_THE_LAST_VERSION} AS revocations,
            CASE WHEN d.latest = ${CLAIMED} OR (d.paused_at IS NOT NULL AND d.dies_on < ?2) THEN 0
              ELSE EXISTS (SELECT 1 FROM holds h WHERE h.held = d.id) OR CASE WHEN a.id IS NULL THEN d.dies_on >= ?2
@@ -665,6 +689,9 @@ export class Cloud implements Store {
         paused_at: number | null;
         blocked_at: number | null;
         fix_by: number | null;
+        reviewed: string | null;
+        reviewed_seq: number | null;
+        reviewed_at: number | null;
         revocations: string;
         alive: number;
       }>();
@@ -678,6 +705,10 @@ export class Cloud implements Store {
       blockedAt: row.blocked_at,
       fixBy: row.fix_by,
       revocations: revocationsIn(row.revocations),
+      reviewed:
+        row.reviewed === null || row.reviewed_seq === null || row.reviewed_at === null
+          ? null
+          : { said: row.reviewed, seq: row.reviewed_seq, at: row.reviewed_at },
     };
   }
 
