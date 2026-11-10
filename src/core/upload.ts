@@ -1,12 +1,19 @@
-import type { Envelope, EnvelopeKind, Owner } from "@tisty/contracts";
-import { EnvelopeRefused, isBelowVersion, type ReadEnvelope, readEnvelope } from "../rules/envelope";
+import type { Envelope, EnvelopeKind, Owner, Reviewed } from "@tisty/contracts";
+import {
+  contractBelow,
+  EnvelopeRefused,
+  isBelowVersion,
+  type ReadEnvelope,
+  readEnvelope,
+  reviewedHolds,
+} from "../rules/envelope";
 import { type Bytes, sha256 } from "./bytes";
 import { DAY_MS, dayOf, type Limits } from "./limits";
 import { netDigest } from "./net";
 import type { ReadTools } from "./read";
 import { askForProof, type Refused, tooFast } from "./refused";
-import { hourEnds, hourOf, proofIsFresh, startHolds, toBase64Url, tokenHash } from "./start";
-import type { AcceptedTerms, Created, Held, Stage, Uploaded } from "./store";
+import { hourEnds, hourOf, proofIsFresh, sameText, startHolds, toBase64Url, tokenHash } from "./start";
+import type { AcceptedTerms, Created, Held, HeldReviewed, Stage, Uploaded } from "./store";
 import { listFreesAt, uploadAllowedAt, waitEndsAt } from "./versions";
 
 export interface FirstUpload {
@@ -24,6 +31,8 @@ export interface Uploading {
   bytes: () => Promise<Bytes | null>;
   first?: FirstUpload;
   files?: string;
+  reviewed?: string;
+  admin?: string;
 }
 
 export interface UploadTools extends ReadTools {
@@ -104,6 +113,35 @@ const mayShare = async (
   if (!first.adminToken || !(await startHolds(secret, id, first.start, now))) return { refused: "bad_upload" };
   const proved = await proofIsFresh(secret, id, first.proof, limits.proofBits, now);
   return proved ? null : askForProof(secret, id, limits.proofBits, now);
+};
+
+const headOf = (said: string): Reviewed | null => {
+  try {
+    const head: unknown = JSON.parse(said);
+    return typeof head === "object" && head !== null ? (head as Reviewed) : null;
+  } catch {
+    return null;
+  }
+};
+
+// Only with the owner's own version, under the admin link, and kept with it or not at all (contract, reviewed.written).
+const reviewedOf = async (
+  { id, now, reviewed, admin = "" }: Uploading,
+  { signature }: ReadEnvelope,
+  owner: string,
+  held: Held | null,
+  { store }: UploadTools,
+): Promise<HeldReviewed | Refused | null> => {
+  if (reviewed === undefined) return null;
+  if (!admin || (held && !sameText(await tokenHash(admin), held.adminHash))) return { refused: "not_yours" };
+  if (signature.root !== owner) return { refused: "not_yours" };
+  const head = headOf(reviewed);
+  if (!head || head.anchor !== id || head.root !== owner || !(await reviewedHolds(head))) {
+    return { refused: "reviewed" };
+  }
+  if (head.seq <= (held?.reviewedSeq ?? 0)) return { refused: "behind" };
+  if (await store.isRevoked(head.root, head.machine, now)) return { refused: "revoked" };
+  return { said: JSON.stringify(head), seq: head.seq };
 };
 
 const sharesToday = (now: number): Refused => ({ refused: "shares_today", until: (dayOf(now) + 1) * DAY_MS });
@@ -287,8 +325,12 @@ const storeVersion = async (
     if (version !== null && !(await keys.admit(roots, accepted))) await keys.keep();
     return { stored: true, version: manifest.version };
   }
+  const before = held?.versions.at(-1)?.contract;
+  if (before !== undefined && contractBelow(manifest.contract, before)) return { refused: "outdated" };
   if (await store.isRevoked(signature.root, signature.machine, now)) return { refused: "revoked" };
   if (version === null) return { refused: "terms", version: tools.termsVersion };
+  const reviewed = await reviewedOf(uploading, read, held?.owner ?? (manifest.owner as Owner).root, held, tools);
+  if (reviewed && "refused" in reviewed) return reviewed;
   // The terms promise that an owner's own version lifts a block, however new the key.
   const correcting = held?.correctable && signature.root === held.owner;
   const fresh = correcting ? [] : await newRootsOf(read, now, tools);
@@ -353,6 +395,7 @@ const storeVersion = async (
       ...(files === undefined ? {} : { files }),
       filesBytes,
       ...(correcting ? {} : { roomAtMost: limits.keyBytesAtMost }),
+      ...(reviewed ? { reviewed } : {}),
     },
     today,
     held,

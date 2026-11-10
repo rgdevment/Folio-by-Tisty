@@ -40,6 +40,13 @@ export interface Upload {
   filesBytes?: number;
   newKey?: boolean;
   roomAtMost?: number;
+  reviewed?: HeldReviewed;
+}
+
+// The owner's word on an anchor's reviews, as it came, and its seq, which only grows.
+export interface HeldReviewed {
+  said: string;
+  seq: number;
 }
 
 export interface KeptFiles {
@@ -55,6 +62,8 @@ export type Appealed = "accepted" | "review";
 
 export interface Held {
   owner: string;
+  adminHash: string;
+  reviewedSeq: number;
   permit: string | null;
   ownerMark: string;
   anchor: string | null;
@@ -117,6 +126,13 @@ export interface Shown {
   blockedAt: number | null;
   fixBy: number | null;
   revocations: Revocation[];
+  reviewed: ServedReviewed | null;
+}
+
+export interface ServedReviewed {
+  said: string;
+  seq: number;
+  at: number;
 }
 
 // What the admin link shows, and never an order that keeps a document (decision 42).

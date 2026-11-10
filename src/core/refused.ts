@@ -21,6 +21,7 @@ export type Refused =
         | "uploads_off"
         | "outdated"
         | "revoked"
+        | "reviewed"
         | "key_blocked"
         | "bad_revocation";
     }
