@@ -4,12 +4,20 @@ import { describe, expect, it } from "vitest";
 
 const read = (name: string): string => readFileSync(name, "utf8");
 const PLACE = "src/page/public";
-const PAGES = ["home.html", "404.html"];
-const HTML = read(`${PLACE}/home.html`);
+const LANGUAGES = ["es", "en"] as const;
+type Language = (typeof LANGUAGES)[number];
+const HOME: Record<Language, string> = { es: read(`${PLACE}/home.html`), en: read(`${PLACE}/en/index.html`) };
+const ADDRESS: Record<Language, string> = { es: "https://tisty.cl/", en: "https://tisty.cl/en/" };
+const PAGES = ["home.html", "en/index.html", "404.html"];
 const REDIRECTS = read(`${PLACE}/_redirects`);
 const LANGUAGE = read(`${PLACE}/language.js`);
 const MISSING = read(`${PLACE}/404.html`);
-const flat = HTML.replace(/\s+/g, " ");
+const flat = (html: string): string => html.replace(/\s+/g, " ");
+const meta = (html: string, property: string): string | undefined =>
+  new RegExp(`<meta\\s+(?:property|name)="${property}"\\s+content="([^"]*)"`).exec(html)?.[1];
+const title = (html: string): string | undefined => /<title>([^<]*)<\/title>/.exec(html)?.[1];
+const tags = (html: string): string[] =>
+  [...(html.split("<body>")[1] ?? "").matchAll(/<(\/?\w+)/g)].map(([, tag]) => tag ?? "");
 
 const visit = (browser: string | undefined) => {
   const root = { lang: "", dataset: {} as Record<string, string> };
@@ -40,52 +48,88 @@ const visit = (browser: string | undefined) => {
 };
 
 describe("the home page", () => {
-  it.each(PAGES)("%s says everything in both languages, in pairs", (page) => {
-    const body = read(`${PLACE}/${page}`).split("<body>")[1] ?? "";
-    const said = [...body.matchAll(/<(\w+)[^>]*\slang="(es|en)"/g)].map(([, tag, language]) => `${tag} ${language}`);
-    expect(said.length).toBeGreaterThan(0);
-    expect(said.length % 2).toBe(0);
-    said.forEach((one, at) => {
-      const [tag, language] = one.split(" ");
-      const [firstTag] = (said[at - (at % 2)] ?? "").split(" ");
-      expect(language).toBe(at % 2 === 0 ? "es" : "en");
-      expect(tag).toBe(firstTag);
-    });
+  it.each(LANGUAGES)("in %s is a page of its own, written in that language", (language) => {
+    expect(HOME[language]).toContain(`<html lang="${language}">`);
+    expect(HOME[language].match(/<h1[\s>]/g)).toHaveLength(1);
+  });
+
+  it("is built the same in both languages, tag for tag", () => {
+    expect(tags(HOME.es).length).toBeGreaterThan(0);
+    expect(tags(HOME.en)).toEqual(tags(HOME.es));
   });
 
   it("does not contradict what Tisty says about Folio", () => {
-    expect(flat).toContain(
+    expect(flat(HOME.es)).toContain(
       "Folio te permite compartir documentos en privado con quien quieras, con un link y cifrados de forma segura. Se comparte desde Tisty.",
     );
-    expect(flat).toContain(
+    expect(flat(HOME.en)).toContain(
       "Folio lets you share documents privately with anyone, using an encrypted link. You share from Tisty.",
     );
   });
 
   it("says what the policy says about reports and orders", () => {
-    expect(flat).toContain("hasta 180 días");
-    expect(flat).toContain("up to 180 days");
-    expect(flat).toContain("docs/PRIVACIDAD.md");
-    expect(flat).toContain("docs/PRIVACY.md");
+    expect(flat(HOME.es)).toContain("hasta 180 días");
+    expect(flat(HOME.en)).toContain("up to 180 days");
+    expect(HOME.es).toContain("docs/PRIVACIDAD.md");
+    expect(HOME.en).toContain("docs/PRIVACY.md");
   });
 
   it.each(PAGES)("%s loads nothing from anyone else", (page) => {
     const loaded = [
-      ...read(`${PLACE}/${page}`).matchAll(/<(?:script|img)[^>]*\ssrc="([^"]+)"|<link[^>]*\shref="([^"]+)"/g),
-    ]
-      .map(([, source, linked]) => source ?? linked)
-      .filter((address) => address !== "https://tisty.cl/");
+      ...read(`${PLACE}/${page}`).matchAll(
+        /<(?:script|img)[^>]*\ssrc="([^"]+)"|<link(?![^>]*\srel="(?:canonical|alternate)")[^>]*\shref="([^"]+)"/g,
+      ),
+    ].map(([, source, linked]) => source ?? linked);
     expect(loaded.length).toBeGreaterThan(0);
     expect(loaded.every((address) => address?.startsWith("/"))).toBe(true);
   });
 
+  it.each(PAGES)("%s keeps everything between its header and its footer in its main content", (page) => {
+    const html = read(`${PLACE}/${page}`);
+    expect(html).toMatch(/<\/header>\s*<main[\s>]/);
+    expect(html).toMatch(/<\/main>\s*<footer[\s>]/);
+    expect(html.match(/<main[\s>]/g)).toHaveLength(1);
+  });
+
   it("is what tisty.cl shows at its root, without sending anyone away", () => {
     expect(REDIRECTS).toBe("/ /home 200\n");
-    expect(HTML).toContain('<link rel="canonical" href="https://tisty.cl/" />');
+    for (const language of LANGUAGES) {
+      expect(HOME[language]).toContain(`<link rel="canonical" href="${ADDRESS[language]}" />`);
+    }
   });
 
   it("is where the reader's name leads", () => {
     expect(read("src/page/index.html")).toContain('<a class="brand" href="/">');
+  });
+
+  it.each(LANGUAGES)("in %s can be found, and tells search engines where the other language lives", (language) => {
+    const html = HOME[language];
+    expect(html).not.toMatch(/<meta\s+name="robots"/);
+    expect(html).toContain('<link rel="alternate" hreflang="es" href="https://tisty.cl/" />');
+    expect(html).toContain('<link rel="alternate" hreflang="en" href="https://tisty.cl/en/" />');
+    expect(html).toContain('<link rel="alternate" hreflang="x-default" href="https://tisty.cl/en/" />');
+  });
+
+  it.each(LANGUAGES)("in %s is described in its own words when found or shared", (language) => {
+    const html = HOME[language];
+    expect(title(html)).toMatch(/^Folio by Tisty: .{20,}/);
+    expect(meta(html, "og:title")).toBe(title(html));
+    expect(meta(html, "description")?.length).toBeGreaterThan(80);
+    expect(meta(html, "og:description")).toBe(meta(html, "description"));
+    expect(meta(html, "og:url")).toBe(ADDRESS[language]);
+    expect(meta(html, "og:site_name")).toBe("Folio by Tisty");
+    expect(meta(html, "og:image")).toBe("https://tisty.cl/preview.png");
+    expect(meta(html, "og:image:alt")).toMatch(/^Folio by Tisty: /);
+    expect(meta(html, "twitter:card")).toBe("summary_large_image");
+  });
+
+  it.each(LANGUAGES)("in %s changes language with links, so the choice stays in the address", (language) => {
+    const html = HOME[language];
+    expect(html).toMatch(/<nav class="languages" aria-label="[^"]+">/);
+    expect(html).toMatch(/<a href="\/" hreflang="es" lang="es" aria-label="Español"/);
+    expect(html).toMatch(/<a href="\/en\/" hreflang="en" lang="en" aria-label="English"/);
+    expect(/<a href="([^"]+)"[^>]*aria-current="page"/.exec(html)?.[1]).toBe(new URL(ADDRESS[language]).pathname);
+    expect(html).not.toContain("<script");
   });
 
   it("is named by both privacy policies", () => {
@@ -110,12 +154,25 @@ describe("the home page", () => {
 });
 
 describe("the page of a link that is gone", () => {
+  it("says everything in both languages, in pairs", () => {
+    const body = MISSING.split("<body>")[1] ?? "";
+    const said = [...body.matchAll(/<(\w+)[^>]*\slang="(es|en)"/g)].map(([, tag, language]) => `${tag} ${language}`);
+    expect(said.length).toBeGreaterThan(0);
+    expect(said.length % 2).toBe(0);
+    said.forEach((one, at) => {
+      const [tag, language] = one.split(" ");
+      const [firstTag] = (said[at - (at % 2)] ?? "").split(" ");
+      expect(language).toBe(at % 2 === 0 ? "es" : "en");
+      expect(tag).toBe(firstTag);
+    });
+  });
+
   it("is tisty.cl's own, where the reader sends a missing link", () => {
     expect(read("src/page/ui/main.ts")).toContain('const NOT_FOUND = "/404";');
   });
 
   it("says what Tisty's site says when a shared link is gone", () => {
-    const words = MISSING.replace(/\s+/g, " ");
+    const words = flat(MISSING);
     expect(words).toContain("Esta nota se fue a descansar.");
     expect(words).toContain("This note has gone to rest.");
     expect(words).toContain("pídele a quien te lo envió un enlace nuevo");
@@ -138,7 +195,7 @@ describe("the page of a link that is gone", () => {
   });
 });
 
-describe("the language of the home page", () => {
+describe("the language of the page of a link that is gone", () => {
   it.each([
     ["es-CL", "es"],
     ["ES", "es"],

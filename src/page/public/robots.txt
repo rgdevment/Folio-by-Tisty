@@ -11,4 +11,9 @@ Allow: /
 Disallow: /api/
 
 User-agent: *
+Allow: /$
+Allow: /en/$
+Allow: /site.css$
+Allow: /icon.svg$
+Allow: /tisto.svg$
 Disallow: /

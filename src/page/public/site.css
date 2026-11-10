@@ -115,10 +115,11 @@ a {
   background: var(--surface);
 }
 
-html:not([data-shown]) .languages {
+html:not([data-shown]) .languages[role="group"] {
   display: none;
 }
 
+.languages a,
 .languages button {
   padding: 0.2rem 0.65rem;
   border: 0;
@@ -129,6 +130,7 @@ html:not([data-shown]) .languages {
   font: inherit;
   font-size: 0.8rem;
   font-weight: 500;
+  text-decoration: none;
 }
 
 html[data-shown="es"] body .languages [lang="en"],
@@ -136,9 +138,16 @@ html[data-shown="en"] body .languages [lang="es"] {
   display: inline;
 }
 
-.languages button[aria-pressed="true"] {
+.languages [aria-current="page"],
+.languages [aria-pressed="true"] {
   background: var(--fg);
   color: var(--on-fg);
+}
+
+.home {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 
 .hero {
