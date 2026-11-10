@@ -10,6 +10,7 @@ import type {
   Appealed,
   Created,
   Held,
+  HeldReviewed,
   KeptFiles,
   KeyAdmitted,
   NewDoc,
@@ -58,6 +59,7 @@ export interface Bindings {
 interface DocRow {
   owner: string;
   admin_hash: string;
+  reviewed: string | null;
   reviewed_seq: number | null;
   permit: string | null;
   owner_mark: string;
@@ -347,7 +349,7 @@ export class Cloud implements Store {
     return {
       owner: row.owner,
       adminHash: row.admin_hash,
-      reviewedSeq: row.reviewed_seq ?? 0,
+      reviewed: row.reviewed === null ? null : { said: row.reviewed, seq: row.reviewed_seq ?? 0 },
       permit: row.permit,
       ownerMark: row.owner_mark,
       anchor: row.anchor,
@@ -399,6 +401,17 @@ export class Cloud implements Store {
     return found !== null;
   }
 
+  async keepReviewed(id: string, latest: number, { said, seq }: HeldReviewed, at: number): Promise<boolean> {
+    const kept = await this.#db
+      .prepare(
+        `UPDATE docs SET reviewed = ?3, reviewed_at = ?4
+           WHERE id = ?1 AND latest = ?2 AND COALESCE(json_extract(reviewed, '$.seq'), 0) < ?5`,
+      )
+      .bind(id, latest, said, at, seq)
+      .run();
+    return kept.meta.changes > 0;
+  }
+
   async haveSigned(roots: string[]): Promise<boolean> {
     const asked = [...new Set(roots)];
     const found = await this.#db
@@ -445,7 +458,7 @@ export class Cloud implements Store {
   #row(id: string): Promise<DocRow | null> {
     return this.#db
       .prepare(
-        "SELECT owner, admin_hash, json_extract(reviewed, '$.seq') AS reviewed_seq, permit, owner_mark, anchor, latest, versions, files_bytes, blocked_at, paused_at, counts_from, blocked_by_operator FROM docs WHERE id = ?",
+        "SELECT owner, admin_hash, reviewed, json_extract(reviewed, '$.seq') AS reviewed_seq, permit, owner_mark, anchor, latest, versions, files_bytes, blocked_at, paused_at, counts_from, blocked_by_operator FROM docs WHERE id = ?",
       )
       .bind(id)
       .first<DocRow>();

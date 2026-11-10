@@ -292,6 +292,36 @@ describe("the owner's word on an anchor's reviews (contract 1.9.0)", () => {
     asked.mockRestore();
   });
 
+  it("comes with a retry of a version already kept, which keeps the word its first try lost", async () => {
+    const id = await shared();
+    const version = await owners(id, 2);
+    expect(await send(id, version, LATER)).toEqual({ stored: true, version: 2 });
+    const word = await reviewedBy(mario, { anchor: id, seq: 1 });
+    expect(await sendWith(id, version, LATER, word)).toEqual({ stored: true, version: 2 });
+    expect(JSON.parse((await heldWord(id))?.said ?? "null")).toEqual(word);
+  });
+
+  it("answers a retry that brings the word it already left as kept, and one below it as behind", async () => {
+    const id = await shared();
+    const version = await owners(id, 2);
+    const word = await reviewedBy(mario, { anchor: id, seq: 2 });
+    expect(await sendWith(id, version, LATER, word)).toEqual({ stored: true, version: 2 });
+    expect(await sendWith(id, version, LATER, word)).toEqual({ stored: true, version: 2 });
+    const lower = await reviewedBy(mario, { anchor: id, seq: 1 });
+    expect(await sendWith(id, version, LATER, lower)).toEqual({ refused: "behind" });
+    expect(await sendWith(id, version, LATER, word, "another token")).toEqual({ stored: true, version: 2 });
+    expect((await heldWord(id))?.seq).toBe(2);
+  });
+
+  it("never comes with a language, since only an anchor holds reviews", async () => {
+    const anchor = await shared();
+    const first = { ...(await started()), anchor };
+    const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });
+    const word = await reviewedBy(mario, { anchor: first.id, seq: 1 });
+    expect(await sendWith(first.id, bytes, NOW, word, first.adminToken, first)).toEqual({ refused: "reviewed" });
+    expect(await heldWord(first.id)).toBeNull();
+  });
+
   it("comes with a first version too", async () => {
     const first = await started();
     const bytes = await sealedEnvelope({ id: first.id, version: 1, owner: mario });

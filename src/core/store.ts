@@ -43,7 +43,6 @@ export interface Upload {
   reviewed?: HeldReviewed;
 }
 
-// The owner's word on an anchor's reviews, as it came, and its seq, which only grows.
 export interface HeldReviewed {
   said: string;
   seq: number;
@@ -63,7 +62,7 @@ export type Appealed = "accepted" | "review";
 export interface Held {
   owner: string;
   adminHash: string;
-  reviewedSeq: number;
+  reviewed: HeldReviewed | null;
   permit: string | null;
   ownerMark: string;
   anchor: string | null;
@@ -209,6 +208,7 @@ export interface Store {
   setPermit(id: string, permit: string | null): Promise<void>;
   revoke(revocations: Revocation[]): Promise<boolean>;
   isRevoked(root: string, machine: string, now: number): Promise<boolean>;
+  keepReviewed(id: string, latest: number, reviewed: HeldReviewed, at: number): Promise<boolean>;
   haveSigned(roots: string[]): Promise<boolean>;
   newRootsOf(roots: string[], day: number): Promise<string[]>;
   anyBlocked(roots: string[]): Promise<boolean>;

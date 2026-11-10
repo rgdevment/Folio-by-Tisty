@@ -126,7 +126,7 @@ const headOf = (said: string): Reviewed | null => {
 
 // Only with the owner's own version, under the admin link, and kept with it or not at all (contract, reviewed.written).
 const reviewedOf = async (
-  { id, now, reviewed, admin = "" }: Uploading,
+  { id, now, reviewed, admin = "", first }: Uploading,
   { signature }: ReadEnvelope,
   owner: string,
   held: Held | null,
@@ -136,15 +136,26 @@ const reviewedOf = async (
   if (!admin || (held && !sameText(await tokenHash(admin), held.adminHash))) return { refused: "not_yours" };
   if (signature.root !== owner) return { refused: "not_yours" };
   const head = headOf(reviewed);
-  if (!head || head.anchor !== id || head.root !== owner || !(await reviewedHolds(head))) {
+  const aLanguage = (held?.anchor ?? first?.anchor ?? null) !== null;
+  if (!head || aLanguage || head.anchor !== id || head.root !== owner || !(await reviewedHolds(head))) {
     return { refused: "reviewed" };
   }
-  if (head.seq <= (held?.reviewedSeq ?? 0)) return { refused: "behind" };
+  if (head.seq <= (held?.reviewed?.seq ?? 0)) return { refused: "behind" };
   // The version's own machine was weighed just before, so only another one costs a read.
   if (head.machine !== signature.machine && (await store.isRevoked(head.root, head.machine, now))) {
     return { refused: "revoked" };
   }
   return { said: JSON.stringify(head), seq: head.seq };
+};
+
+// A retry may bring the word its first try lost, or the one it already left (contract, reviewed.written).
+const reviewedAgain = async (uploading: Uploading, read: ReadEnvelope, held: Held, tools: UploadTools) => {
+  const head = uploading.reviewed === undefined ? null : headOf(uploading.reviewed);
+  if (uploading.reviewed === undefined || (head && held.reviewed?.said === JSON.stringify(head))) return null;
+  const reviewed = await reviewedOf(uploading, read, held.owner, held, tools);
+  if (!reviewed || "refused" in reviewed) return reviewed;
+  const kept = await tools.store.keepReviewed(uploading.id, held.latest, reviewed, uploading.now);
+  return kept ? null : ({ refused: "behind" } as Refused);
 };
 
 const sharesToday = (now: number): Refused => ({ refused: "shares_today", until: (dayOf(now) + 1) * DAY_MS });
@@ -326,7 +337,7 @@ const storeVersion = async (
   if (held?.latest === manifest.version && held.versions.at(-1)?.hash === hash) {
     // A retry may be all that is left of an upload whose record was lost after its version was kept.
     if (version !== null && !(await keys.admit(roots, accepted))) await keys.keep();
-    return { stored: true, version: manifest.version };
+    return (await reviewedAgain(uploading, read, held, tools)) ?? { stored: true, version: manifest.version };
   }
   const before = held?.versions.at(-1)?.contract;
   if (before !== undefined && contractBelow(manifest.contract, before)) return { refused: "outdated" };
