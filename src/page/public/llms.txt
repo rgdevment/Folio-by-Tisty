@@ -1,0 +1,13 @@
+# Folio by Tisty
+
+> Share a document from Tisty with anyone through an encrypted link. The key travels in the part of the link after the #, so the server never receives it, and whoever gets the link reads it in a browser with no account. Beta.
+
+- [Home](https://tisty.cl/): what Folio does, in English
+- [Portada](https://tisty.cl/es/): lo mismo, en español
+- [Tisty](https://www.tisty.app/): the desktop app for notes, documents and tasks that shares through Folio
+- [How to share a document](https://rgdevment.dev/guides/share-a-document-with-someone-without-tisty/)
+- [Privacy policy](https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/PRIVACY.md)
+- [Terms](https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/TERMS.md)
+- [Source code](https://github.com/rgdevment/Folio-by-Tisty), source available under FSL-1.1-ALv2
+
+Shared documents are encrypted before they leave the sender's computer, expire after up to 15 days without activity, and are kept out of search engines.

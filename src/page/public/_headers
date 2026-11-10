@@ -21,3 +21,7 @@
   ! Cache-Control
   Cache-Control: public, max-age=86400
   X-Robots-Tag: noindex
+
+/language-offer.js
+  ! Cache-Control
+  Cache-Control: public, max-age=3600

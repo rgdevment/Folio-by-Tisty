@@ -69,30 +69,16 @@ describe("the page's headers", () => {
     expect(marked("/es/")).toBe(false);
     expect(HEADERS).not.toContain("! X-Robots-Tag");
     expect(HTML).toContain('<meta name="robots" content="noindex" />');
-    expect(ROBOTS.split("\n\n").at(-1)).toBe(
-      "User-agent: *\nAllow: /$\nAllow: /es/$\nAllow: /en/$\nAllow: /site.css$\nAllow: /icon.svg$\nAllow: /tisto.svg$\nDisallow: /\n",
-    );
+    expect(ROBOTS).toBe("User-agent: *\nDisallow: /api/\n\nSitemap: https://tisty.cl/sitemap.xml\n");
   });
 });
 
 describe("a link pasted where it shows a preview", () => {
-  const PREVIEWERS = [
-    "Twitterbot",
-    "Slackbot",
-    "facebookexternalhit",
-    "LinkedInBot",
-    "Discordbot",
-    "WhatsApp",
-    "TelegramBot",
-  ];
   const meta = (property: string): string | undefined =>
     new RegExp(`<meta (?:property|name)="${property}" content="([^"]*)"`).exec(HTML)?.[1];
 
-  it("lets only the preview bots read the page, and none of them the API", () => {
-    const group = ROBOTS.split("\n\n").find((one) => one.includes("User-agent: Twitterbot")) ?? "";
-    for (const bot of PREVIEWERS) expect(group).toContain(`User-agent: ${bot}\n`);
-    expect(group).toContain("Allow: /\n");
-    expect(group).toContain("Disallow: /api/");
+  it("lets every crawler read the pages, so a document's noindex is seen and never just its address, and none of them the API", () => {
+    expect(ROBOTS.split("\n\n")[0]).toBe("User-agent: *\nDisallow: /api/");
   });
 
   it("shows a card that is the same for every document, in English, with a picture X takes", () => {

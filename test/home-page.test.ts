@@ -93,7 +93,7 @@ describe("the home page", () => {
   });
 
   it("is at tisty.cl's root in English, as on Tisty's site, and the old English address leads there", () => {
-    expect(REDIRECTS).toBe("/ /home 200\n/en/ / 301\n/en / 301\n");
+    expect(REDIRECTS).toBe("/ /home 200\n/en/ / 301\n/en / 301\n/es /es/ 301\n");
     for (const language of LANGUAGES) {
       expect(HOME[language]).toContain(`<link rel="canonical" href="${ADDRESS[language]}" />`);
     }
@@ -130,7 +130,17 @@ describe("the home page", () => {
     expect(html).toMatch(/<a href="\/es\/" hreflang="es" lang="es" aria-label="Español"/);
     expect(html).toMatch(/<a href="\/" hreflang="en" lang="en" aria-label="English"/);
     expect(/<a href="([^"]+)"[^>]*aria-current="page"/.exec(html)?.[1]).toBe(new URL(ADDRESS[language]).pathname);
-    expect([...html.matchAll(/<script[^>]*>/g)].map(([tag]) => tag)).toEqual(['<script src="/language-offer.js">']);
+    expect([...html.matchAll(/<script(?! type="application\/ld\+json")[^>]*>/g)].map(([tag]) => tag)).toEqual([
+      '<script src="/language-offer.js">',
+    ]);
+  });
+
+  it.each(LANGUAGES)("in %s tells search engines and assistants what Folio is and who runs it", (language) => {
+    const data = JSON.parse(/<script type="application\/ld\+json">([^<]+)<\/script>/.exec(HOME[language])?.[1] ?? "{}");
+    const app = data["@graph"]?.find((one: { "@type": string }) => one["@type"] === "WebApplication");
+    expect(app?.["@id"]).toBe("https://tisty.cl/#folio");
+    expect(app?.url).toBe(ADDRESS[language]);
+    expect(app?.provider?.["@id"]).toBe("https://rgdevment.dev/#person");
   });
 
   it("is named by both privacy policies", () => {
@@ -164,7 +174,7 @@ describe("the offer of the home in the other language", () => {
   it.each(LANGUAGES)("in %s leads to the other page, in the other language", (language) => {
     const other = language === "es" ? "en" : "es";
     expect(HOME[language]).toContain(
-      `<p class="offer" lang="${other}"><a href="${new URL(ADDRESS[other]).pathname}" hreflang="${other}">`,
+      `<p class="offer" lang="${other}" data-nosnippet><a href="${new URL(ADDRESS[other]).pathname}" hreflang="${other}">`,
     );
   });
 
