@@ -1,20 +1,4 @@
-# Link previews only: they read the page's generic card and never a document, which opens in the browser alone.
-User-agent: Twitterbot
-User-agent: Slackbot
-User-agent: Slackbot-LinkExpanding
-User-agent: facebookexternalhit
-User-agent: LinkedInBot
-User-agent: Discordbot
-User-agent: WhatsApp
-User-agent: TelegramBot
-Allow: /
+User-agent: *
 Disallow: /api/
 
-User-agent: *
-Allow: /$
-Allow: /es/$
-Allow: /en/$
-Allow: /site.css$
-Allow: /icon.svg$
-Allow: /tisto.svg$
-Disallow: /
+Sitemap: https://tisty.cl/sitemap.xml
