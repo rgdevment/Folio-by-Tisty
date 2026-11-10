@@ -1,4 +1,4 @@
-import type { Document, Revocation, Served, Verdict } from "@tisty/contracts";
+import type { Document, Review, Reviewed, Revocation, Served, Verdict } from "@tisty/contracts";
 import { type Bytes, fromBase64Url } from "../core/bytes";
 import { type Standing, standingOf, stillSpeaks } from "../core/look-alike";
 import { momentOf } from "../core/moment";
@@ -6,6 +6,7 @@ import { editorHolds, refuse } from "../rules/envelope";
 import { isChecked, type ShardLoader } from "./checked";
 import { MAKER } from "./maker";
 import { documentIn, openEnvelope } from "./open";
+import { keptBy, printOf } from "./reviews";
 import { fingerprintOf, verdictOf, worseOf } from "./verdict";
 
 export interface Arrived {
@@ -14,6 +15,8 @@ export interface Arrived {
   diesOn: number;
   version?: number;
   revocations?: Revocation[];
+  reviewed?: Reviewed;
+  reviewedAt?: number;
 }
 
 export interface Opened {
@@ -26,6 +29,9 @@ export interface Opened {
   ownerStanding: Standing;
   editors: readonly ShownEditor[];
   diesOn: number;
+  owner: string;
+  print: Bytes;
+  ownerKeeps: readonly Review[];
 }
 
 export interface ShownEditor {
@@ -70,18 +76,29 @@ export const editorsOf = async ({ id, editors = [] }: Document, served: Served):
   });
 };
 
+const servedOf = ({ arrivedAt, revocations = [], reviewed, reviewedAt }: Arrived): Served => ({
+  received: momentOf(arrivedAt),
+  revocations,
+  ...(reviewed ? { reviewed } : {}),
+  ...(reviewedAt ? { reviewed_received: momentOf(reviewedAt) } : {}),
+});
+
 export const openLink = async (id: string, linkKey: string, arrived: Arrived, load?: ShardLoader): Promise<Opened> => {
-  const open = await openEnvelope(arrived.bytes, { id, kind: "main" }, keyIn(linkKey));
+  const key = keyIn(linkKey);
+  const open = await openEnvelope(arrived.bytes, { id, kind: "main" }, key);
   const held = await documentIn(open);
-  const served = { received: momentOf(arrived.arrivedAt), revocations: arrived.revocations ?? [] };
+  const served = servedOf(arrived);
   const { signature, manifest } = open;
   const signer = await verdictOf(signature, served);
   const owner = manifest.owner;
+  const ownerRoot = owner?.root ?? signature.root;
   const ownerVerdict = owner ? await verdictOf(owner, served) : signer;
-  const [signerStanding, ownerStanding, editors] = await Promise.all([
+  const [signerStanding, ownerStanding, editors, ownerKeeps, print] = await Promise.all([
     standingFor(signature.root, signer, held.signed_as, load),
-    standingFor(owner?.root ?? signature.root, ownerVerdict, held.owner_name, load),
+    standingFor(ownerRoot, ownerVerdict, held.owner_name, load),
     editorsOf(held, served),
+    keptBy(id, ownerRoot, key, held.reviews ?? [], served),
+    printOf(open.opened),
   ]);
   // held.editors goes unshown until each entry has its own check under signing.editor: unchecked, one could name someone who never edited it.
   return {
@@ -94,5 +111,8 @@ export const openLink = async (id: string, linkKey: string, arrived: Arrived, lo
     ownerStanding,
     editors,
     diesOn: arrived.diesOn,
+    owner: ownerRoot,
+    print,
+    ownerKeeps,
   };
 };

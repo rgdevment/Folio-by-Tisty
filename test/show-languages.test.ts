@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { Document } from "@tisty/contracts";
+import type { Document, Review } from "@tisty/contracts";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Opened, openLink } from "../src/page/read";
@@ -40,8 +40,29 @@ const SPANISH: Document = {
   ],
 };
 
+const PRINT = new Uint8Array(32).fill(7);
+
+const keeps = (document: string, lang: string, print = PRINT): Review => ({
+  of: "of",
+  kept: true,
+  document,
+  lang,
+  title: "Promenades",
+  key: "REVIEWKEY",
+  print: Buffer.from(print).toString("base64url"),
+  seq: 1,
+  root: "owner",
+  machine: "machine",
+  since: "2026-11-10T00:00:00Z",
+  certificate: "",
+  signed: "",
+});
+
 const openedOf = (held: Document, fingerprint: string, ownerFingerprint: string | null = null): Opened => ({
   held,
+  owner: ownerFingerprint ?? fingerprint,
+  print: PRINT,
+  ownerKeeps: [],
   pictures: [],
   signerStanding: "plain",
   ownerStanding: "plain",
@@ -207,32 +228,75 @@ describe("a document in several languages", () => {
       "another owner who let the anchor's owner sign",
       () => openedOf(translation(FRENCH, "Promenades", "fr"), "owner", "stranger"),
     ],
-  ])(
-    "opens a language with %s, saying beside it and in the switch that its owner has not reviewed it",
-    async (_, opening) => {
-      opens[FRENCH] = opening();
+  ])("never shows a language of %s that the anchor's owner has not kept", async (_, opening) => {
+    opens[FRENCH] = opening();
+    await opened(["fr"]);
+    expect(place.document.title).toBe("Paseos · Folio");
+    expect(byId("missed-the-readers").hidden).toBe(false);
+    expect(byId("credit").hidden).toBe(true);
+    expect([...byId<HTMLSelectElement>("language").options].map((one) => one.text).join()).not.toContain("⚠");
+  });
+
+  it("says nothing of who translated a language its owner added", async () => {
+    await opened(["fr"]);
+    expect(place.document.title).toBe("Promenades · Folio");
+    expect(byId("credit").hidden).toBe(true);
+  });
+
+  describe("a language of another owner that the anchor's owner keeps", () => {
+    const creditOf = (lang: string, who: string): HTMLElement =>
+      byId("credit").querySelector(`[lang="${lang}"] [data-credit="${who}"]`) as HTMLElement;
+
+    beforeEach(() => {
+      opens[ANCHOR] = { ...openedOf({ ...SPANISH, signed_as: "Mario" }, "owner"), ownerKeeps: [keeps(FRENCH, "fr")] };
+      opens[FRENCH] = openedOf({ ...translation(FRENCH, "Promenades", "fr"), signed_as: "Ana" }, "stranger");
+    });
+
+    it("shows it as its owner read it, saying who translated it and who reviewed it", async () => {
       await opened(["fr"]);
       expect(place.document.title).toBe("Promenades · Folio");
-      expect(byId("unreviewed").hidden).toBe(false);
-      expect(byId("unreviewed").querySelector('[lang="es"]')?.textContent).toBe(
-        "Este idioma lo sumó alguien que edita, y su dueño todavía no lo revisa.",
-      );
-      expect(byId("unreviewed").querySelector('[lang="en"]')?.textContent).toBe(
-        "This language was added by someone who edits, and its owner has not reviewed it yet.",
-      );
-      const french = [...byId<HTMLSelectElement>("language").options].find((one) => one.value === "fr");
-      expect(french?.text).toMatch(/⚠$/);
+      expect(byId("credit").hidden).toBe(false);
+      expect(byId("credit").querySelector(':scope > [lang="es"]')?.firstChild?.textContent).toBe("Traducción de ");
+      expect(creditOf("es", "translator").querySelector("bdi")?.textContent).toBe("Ana");
+      expect(creditOf("en", "owner").querySelector("bdi")?.textContent).toBe("Mario");
+      expect(creditOf("es", "translator").dataset.standing).toBe("plain");
       await choose("es");
-      expect(byId("unreviewed").hidden).toBe(true);
-      await choose("fr");
-      expect(french?.text.match(/⚠/g)).toHaveLength(1);
-    },
-  );
+      expect(byId("credit").hidden).toBe(true);
+    });
 
-  it("says nothing of a language its owner added", async () => {
-    await opened(["fr"]);
-    expect(byId("unreviewed").hidden).toBe(true);
-    expect([...byId<HTMLSelectElement>("language").options].map((one) => one.text).join()).not.toContain("⚠");
+    it("reaches it by the key its owner signed, even once someone who edits takes it out of the map", async () => {
+      opens[ANCHOR] = { ...(opens[ANCHOR] as Opened), held: { ...SPANISH, languages: [] } };
+      await opened(["fr"]);
+      expect(place.document.title).toBe("Promenades · Folio");
+      expect(vi.mocked(openLink)).toHaveBeenLastCalledWith(FRENCH, "REVIEWKEY", expect.anything());
+    });
+
+    it("warns when the name of who translated it imitates the maker's", async () => {
+      opens[FRENCH] = { ...(opens[FRENCH] as Opened), signerStanding: "imitates" };
+      await opened(["fr"]);
+      expect(creditOf("es", "translator").dataset.standing).toBe("imitates");
+      expect(creditOf("es", "owner").dataset.standing).toBe("plain");
+    });
+
+    it.each([
+      ["changed since its owner read it", { print: new Uint8Array(32).fill(8) }],
+      ["in another lang than its owner read", { lang: "fr-CA" }],
+    ])("never shows it %s", async (_, change) => {
+      const changed = { ...translation(FRENCH, "Promenades", change.lang ?? "fr"), signed_as: "Ana" };
+      opens[FRENCH] = { ...openedOf(changed, "stranger"), print: change.print ?? PRINT };
+      await opened(["fr"]);
+      expect(place.document.title).toBe("Paseos · Folio");
+    });
+  });
+
+  it("does not offer a language that waits for its owner's review", async () => {
+    opens[ANCHOR] = openedOf(
+      { ...SPANISH, languages: [...(SPANISH.languages ?? []), { lang: "pt", document: "ptWords1", pending: true }] },
+      "owner",
+    );
+    await opened(["pt"]);
+    expect([...byId<HTMLSelectElement>("language").options].map((one) => one.value)).toEqual(["es", "en", "fr"]);
+    expect(askedFor()).toEqual([]);
   });
 
   it("takes a translation an editor signed for the same owner", async () => {
@@ -278,7 +342,7 @@ describe("a document in several languages", () => {
     opens[FRENCH] = openedOf(translation(FRENCH, "Promenades", "fr", null), "owner");
     await opened(["fr"]);
     expect(place.document.title).toBe("Promenades · Folio");
-    expect(byId("unreviewed").hidden).toBe(true);
+    expect(byId("credit").hidden).toBe(true);
   });
 
   it("goes to the reader's browser when the language kept for this link is no longer in the group", async () => {

@@ -1,4 +1,4 @@
-import type { Revocation } from "@tisty/contracts";
+import type { Reviewed, Revocation } from "@tisty/contracts";
 import type { Arrived } from "../read";
 import { said } from "./speak";
 
@@ -13,13 +13,17 @@ export interface NotArrived {
   bits?: number;
 }
 
-const revocationsIn = (said: string | null): Revocation[] => {
+const jsonIn = (said: string | null): unknown => {
   try {
-    const read: unknown = JSON.parse(said ?? "[]");
-    return Array.isArray(read) ? (read as Revocation[]) : [];
+    return JSON.parse(said ?? "null");
   } catch {
-    return [];
+    return null;
   }
+};
+
+const revocationsIn = (said: string | null): Revocation[] => {
+  const read = jsonIn(said);
+  return Array.isArray(read) ? (read as Revocation[]) : [];
 };
 
 export const asking = (path: string, proof?: string, caseToken?: string): Promise<Response> =>
@@ -38,12 +42,16 @@ const arrivedFrom = async (response: Response): Promise<Arrived | NotArrived> =>
   if (!(arrivedAt > 0 && diesOn > 0)) return { refused: "unreachable" };
   const revocations = revocationsIn(response.headers.get("Folio-Revocations"));
   const version = Number(response.headers.get("Folio-Version"));
+  const reviewed = jsonIn(response.headers.get("Folio-Reviewed"));
+  const reviewedAt = Number(response.headers.get("Folio-Reviewed-Arrived"));
   return {
     bytes: new Uint8Array(await response.arrayBuffer()),
     arrivedAt,
     diesOn,
     revocations,
     ...(version > 0 ? { version } : {}),
+    ...(reviewed !== null && typeof reviewed === "object" ? { reviewed: reviewed as Reviewed } : {}),
+    ...(reviewedAt > 0 ? { reviewedAt } : {}),
   };
 };
 

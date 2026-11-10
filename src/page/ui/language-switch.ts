@@ -25,12 +25,6 @@ const optionOf = (lang: string): HTMLOptionElement => {
   return option;
 };
 
-export const markUnreviewed = (lang: string): void => {
-  for (const option of element<HTMLSelectElement>("language").options) {
-    if (option.value === lang) option.text = `${nameOf(lang)} ⚠`;
-  }
-};
-
 export const offerLanguages = ({ langs, shown, missedTheReaders, choose }: LanguageSwitch): void => {
   const select = element<HTMLSelectElement>("language");
   const missed = element("missed-the-readers");

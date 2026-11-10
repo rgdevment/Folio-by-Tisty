@@ -127,7 +127,7 @@ const verified = async (key: Bytes, signature: Bytes, ...signed: Bytes[]): Promi
 
 const secondsOf = (moment: string): Bytes => bigEndian(Date.parse(moment) / 1000);
 
-const certified = ({
+export const certified = ({
   root,
   machine,
   certificate,
@@ -144,25 +144,23 @@ const certified = ({
   );
 };
 
-const sized = (said: string): Bytes[] => {
+export const sized = (said: string): Bytes[] => {
   const bytes = words(said);
   return [bigEndian(bytes.length), bytes];
 };
 
-const machineSigned = (
-  { root, machine, signed }: Pick<Signature, "root" | "machine" | "signed">,
+export const signedRow = (
+  { root, machine }: Pick<Signature, "root" | "machine">,
+  about: string,
+  ...rest: Bytes[]
+): Bytes[] => [words("tisty-share.signed.v1\0"), fromBase64Url(root), fromBase64Url(machine), ...sized(about), ...rest];
+
+export const machineSigned = (
+  who: Pick<Signature, "root" | "machine" | "signed">,
   about: string,
   ...rest: Bytes[]
 ): Promise<boolean> =>
-  verified(
-    fromBase64Url(machine),
-    fromBase64Url(signed),
-    words("tisty-share.signed.v1\0"),
-    fromBase64Url(root),
-    fromBase64Url(machine),
-    ...sized(about),
-    ...rest,
-  );
+  verified(fromBase64Url(who.machine), fromBase64Url(who.signed), ...signedRow(who, about, ...rest));
 
 const holdsSignature = async (signature: Signature, manifestBytes: Bytes, index: Bytes): Promise<void> => {
   const amiss = check("signature", signature);
