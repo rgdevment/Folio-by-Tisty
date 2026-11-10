@@ -29,6 +29,7 @@ const testEnv = env as unknown as {
 };
 const store = new Cloud(testEnv);
 const TODAY = dayOf(Date.now());
+const FLOOR = LEVEL_ONE.oldestContractTaken;
 const ID = "AbCdEfGh";
 const ANCHOR = "AAAAAAAA";
 const TOKEN = "the admin token";
@@ -749,7 +750,7 @@ afterEach(() => {
 });
 
 beforeEach(async () => {
-  LEVEL_ONE.oldestContractTaken = null;
+  LEVEL_ONE.oldestContractTaken = FLOOR;
   LEVEL_ONE.oldestContractServed = null;
   LEVEL_ONE.revocationsAnHour = 30;
   LEVEL_ONE.newSharesADay = 10;
