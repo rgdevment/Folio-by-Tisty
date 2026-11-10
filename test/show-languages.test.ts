@@ -281,11 +281,11 @@ describe("a document in several languages", () => {
     });
 
     it.each([
-      ["changed since its owner read it", { parts: [new Uint8Array([8])] }],
-      ["in another lang than its owner read", { lang: "fr-CA" }],
-    ])("never shows it %s", async (_, change) => {
-      const changed = { ...translation(FRENCH, "Promenades", change.lang ?? "fr"), signed_as: "Ana" };
-      opens[FRENCH] = { ...openedOf(changed, "stranger"), parts: change.parts ?? PARTS };
+      ["changed since its owner read it", { parts: [new Uint8Array([8])], lang: "fr" }],
+      ["in another lang than its owner read", { parts: PARTS, lang: "fr-CA" }],
+    ])("never shows it %s", async (_, { parts, lang }) => {
+      const changed = { ...translation(FRENCH, "Promenades", lang), signed_as: "Ana" };
+      opens[FRENCH] = { ...openedOf(changed, "stranger"), parts };
       await opened(["fr"]);
       expect(place.document.title).toBe("Paseos · Folio");
     });
