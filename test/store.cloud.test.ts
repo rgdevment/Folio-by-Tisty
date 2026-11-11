@@ -623,14 +623,11 @@ describe("expiring", () => {
 
   it("leaves what an upload left behind for the orphans, without listing R2", async () => {
     await store.create(newDoc("d1"), DAY);
-    await store.create(newDoc("live"), DAY + 2);
-    await store.upload(upload("live", 1), DAY + 2);
     await testEnv.ENVELOPES.put("d1/9.orphan", "left behind");
     await store.sweep(DAY + 2);
     expect(await row("d1")).toBeNull();
-    expect(await store.forgetOrphans(Date.now() + 2 * DAY_MS)).toEqual({ forgotten: 1, unknownBatches: 0 });
+    expect(await store.forgetOrphans(Date.now() + 31 * DAY_MS)).toEqual({ forgotten: 1, held: 0 });
     expect(await objects("d1")).toEqual([]);
-    expect(await objects("live")).toEqual(["live/1.h1"]);
   });
 
   it("forgets more objects than R2 deletes at once", async () => {
@@ -777,26 +774,52 @@ describe("orphans", () => {
     await store.create(newDoc("d1"), DAY);
     await store.upload(upload("d1", 1), DAY);
     await testEnv.ENVELOPES.put("lost/1.x", "no row");
-    const later = Date.now() + 2 * DAY_MS;
-    expect(await store.forgetOrphans(later)).toEqual({ forgotten: 1, unknownBatches: 0 });
+    const later = Date.now() + 31 * DAY_MS;
+    expect(await store.forgetOrphans(later)).toEqual({ forgotten: 1, held: 0 });
     expect(await objects("lost")).toEqual([]);
     expect(await objects("d1")).toEqual(["d1/1.h1"]);
   });
 
   it("leaves one that just arrived, which may be an upload on its way", async () => {
     await testEnv.ENVELOPES.put("lost/1.x", "no row yet");
-    expect(await store.forgetOrphans(Date.now())).toEqual({ forgotten: 0, unknownBatches: 0 });
+    expect(await store.forgetOrphans(Date.now())).toEqual({ forgotten: 0, held: 0 });
   });
 
-  it("leaves R2 whole when D1 knows none of a batch, as an emptied D1 or another one would, and says so", async () => {
+  it("waits out D1's Time Travel, so a row brought back still finds its envelope", async () => {
     await store.create(newDoc("d1"), DAY);
     await store.upload(upload("d1", 1), DAY);
-    await store.create(newDoc("d2"), DAY);
-    await store.upload(upload("d2", 1), DAY);
-    await testEnv.DB.prepare("DELETE FROM docs").run();
-    expect(await store.forgetOrphans(Date.now() + 2 * DAY_MS)).toEqual({ forgotten: 0, unknownBatches: 1 });
+    await testEnv.DB.prepare("DELETE FROM docs WHERE id = 'd1'").run();
+    expect(await store.forgetOrphans(Date.now() + 29 * DAY_MS)).toEqual({ forgotten: 0, held: 0 });
     expect(await objects("d1")).toEqual(["d1/1.h1"]);
-    expect(await objects("d2")).toEqual(["d2/1.h1"]);
+    expect(await store.forgetOrphans(Date.now() + 31 * DAY_MS)).toEqual({ forgotten: 1, held: 0 });
+  });
+
+  it("holds all of R2 when D1 knows less than half of it, as an emptied, half restored or other D1 would", async () => {
+    for (let n = 0; n < 12; n += 1) {
+      await store.create(newDoc(`d${n}`, { owner: `o${n}` }), DAY);
+      await store.upload(upload(`d${n}`, 1), DAY);
+    }
+    await testEnv.DB.prepare("DELETE FROM docs WHERE id <> 'd0'").run();
+    expect(await store.forgetOrphans(Date.now() + 31 * DAY_MS)).toEqual({ forgotten: 0, held: 11 });
+    expect((await testEnv.ENVELOPES.list()).objects).toHaveLength(12);
+  });
+
+  it("still forgets the few left behind when nothing else is stored", async () => {
+    for (let n = 0; n < 3; n += 1) await testEnv.ENVELOPES.put(`gone${n}/1.x`, "left behind");
+    expect(await store.forgetOrphans(Date.now() + 31 * DAY_MS)).toEqual({ forgotten: 3, held: 0 });
+  });
+
+  it("weighs every page R2 lists before forgetting any", async () => {
+    await store.create(newDoc("d1"), DAY);
+    const versions = Array.from({ length: 1005 }, (_, n) => ({ n, hash: "x", bytes: 1, at: 1 }));
+    await testEnv.DB.prepare("UPDATE docs SET latest = 1004, versions = ? WHERE id = 'd1'")
+      .bind(JSON.stringify(versions))
+      .run();
+    await Promise.all(versions.map(({ n }) => testEnv.ENVELOPES.put(`d1/${n}.x`, "x")));
+    await testEnv.ENVELOPES.put("zz/1.x", "past the first page");
+    expect(await store.forgetOrphans(Date.now() + 31 * DAY_MS)).toEqual({ forgotten: 1, held: 0 });
+    expect(await objects("zz")).toEqual([]);
+    expect(await testEnv.ENVELOPES.head("d1/1004.x")).not.toBeNull();
   });
 });
 

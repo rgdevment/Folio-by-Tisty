@@ -275,7 +275,7 @@ describe("the key of the evidence period", () => {
   it("is not an orphan, whatever its age", async () => {
     await store.evidenceKey(TODAY);
     await store.dayKey(TODAY);
-    expect(await store.forgetOrphans(Date.now() + 10 * 86_400_000)).toEqual({ forgotten: 0, unknownBatches: 0 });
+    expect(await store.forgetOrphans(Date.now() + 10 * 86_400_000)).toEqual({ forgotten: 0, held: 0 });
     const left = await testEnv.ENVELOPES.list();
     expect(left.objects).toHaveLength(2);
   });

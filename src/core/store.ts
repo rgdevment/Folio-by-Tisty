@@ -190,7 +190,7 @@ export interface Swept {
 
 export interface Orphans {
   forgotten: number;
-  unknownBatches: number;
+  held: number;
 }
 
 // What the rules need of wherever Folio runs, so the core never knows it is Cloudflare (decisions 16 and 108).
