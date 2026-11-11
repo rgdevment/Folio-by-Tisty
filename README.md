@@ -20,12 +20,13 @@ and your AI agent work from. Sooner or later somebody else needs part of it:
   last time.
 - **Another team** needs the runbook of the service they are about to touch.
 
-Pasted into a chat or an email, that context becomes a copy nobody signed,
-sitting in somebody else's database for good. Folio carries one copy instead:
-encrypted on your machine before it leaves, signed by you, and only for as long
-as you choose — so whoever picks it up, and the agent they work with, starts
-from what you know. Your memory stays on your disk; Folio only carries a copy,
-and it carries documents, not tasks.
+**The problem:** pasted into a chat or an email, that context becomes a copy
+nobody signed, sitting in somebody else's database for good.
+
+**With Folio:** one copy travels instead, encrypted on your machine before it
+leaves, signed by you, and only for as long as you choose — so whoever picks it
+up, and the agent they work with, starts from what you know. Your memory stays
+on your disk; Folio only carries a copy, and it carries documents, not tasks.
 
 > **It does not promise what the app promises.** The Tisty app has no server
 > and collects nothing. Folio does run a server: it keeps encrypted copies

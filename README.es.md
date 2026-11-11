@@ -21,12 +21,13 @@ persona necesita una parte:
   falló la última vez.
 - **Otro equipo** necesita el runbook del servicio que está por tocar.
 
-Pegado en un chat o en un correo, ese contexto se vuelve una copia que nadie
-firmó, guardada para siempre en la base de datos de otro. Folio lleva una sola
-copia: cifrada en tu equipo antes de salir, firmada por ti y solo por el tiempo
-que elijas, así quien la recibe, y el agente con el que trabaja, parte de lo que
-sabes. Tu memoria se queda en tu disco; Folio solo lleva una copia, y lleva
-documentos, no tareas.
+**El problema:** pegado en un chat o en un correo, ese contexto se vuelve una
+copia que nadie firmó, guardada para siempre en la base de datos de otro.
+
+**Con Folio:** viaja una sola copia, cifrada en tu equipo antes de salir,
+firmada por ti y solo por el tiempo que elijas, así quien la recibe, y el agente
+con el que trabaja, parte de lo que sabes. Tu memoria se queda en tu disco;
+Folio solo lleva una copia, y lleva documentos, no tareas.
 
 > **No promete lo que promete la app.** La app Tisty no tiene servidor y no
 > recolecta nada. Folio sí tiene un servidor: guarda copias cifradas
