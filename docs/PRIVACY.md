@@ -28,8 +28,8 @@ runs Folio as a non-profit. Contact: <rgdevment@tisty.app>.
 | The encrypted document and its attached files, with its latest version and those replaced in the last 3 days | To serve it to whoever has the link, and so a report can reach what someone replaced | Until the time without activity you choose, 15 days at most, or until you stop sharing it. If you pause it, it is not served and stays up to 30 days unless you resume it. If a report of deceit or a grave one holds it, the operator blocks it or an order holds it, it is not served once it expires, you stop sharing it or it is blocked, and it stays with its other languages for up to 180 days from the last report or the block, or for as long as an order or an authority asks. During a spending block or a failure, what was replaced can take longer to be deleted |
 | The manifest in the clear: how many parts, what each weighs, their kind and the version | To hold the limits without reading the content | As long as the document |
 | The manage link, kept as a digest (hash), and the public key of the edit link's token, which never reaches the server | To check who may change or delete it | As long as the document |
-| Your public key and its certificate, in what you share, with the exact time each version arrived | So readers know it is yours and since when | As long as the document |
-| If you edit what someone else shares: your public key, the key of the machine you sent your latest version from and the first version you signed | So readers know who edited it and get the keys you retired, so they no longer speak for you | As long as the document |
+| Your public key and its certificate, in what you share or edit, with the key of the machine that signed and the exact time each version arrived | So readers know who signed each version and since when | As long as the document |
+| If you edit what someone else shares: your public key, the key of the machine you sent your latest version from and the first version of yours Folio has on record | To send readers the keys you retired, so they no longer speak for you; to accept that you retire a machine even if you only edited; and so the operator sees how many documents a key edited | As long as the document |
 | If you review the languages someone else added to what you share, your word on them, signed with your key: only how many times you reviewed and a digest (hash) of the reviews, never which languages, with the exact time it arrived | So readers show only the languages you kept | As long as the document |
 | Your public key on its own, the day Folio first saw it, which version of the terms it accepted and in what hour the server heard it, and whether the operator blocked it, tied to no network and no document | So limits and reputation stay with it, and a new key starts from the lowest | For good, even after your documents are gone |
 | How many times it was read, counted once a day per visitor, and in which hours on a day with 5 or more | To show you the reads in Tisty | As long as the document |
@@ -64,16 +64,17 @@ record, stays there until then. The documents do not: they are deleted at once.
 
 It keeps data about five groups of people: those who share from Tisty, those
 who edit what someone else shared, those who open a link, those who report and
-those who write to the operator. All of it
-comes from you, from your Tisty or your browser, or from your connection, which
-is where Cloudflare takes the country and the data center from. A report brings
-what its reporter wrote about a document. Nothing comes from public sources.
+those who write to the operator. All of it comes from you, from your Tisty or
+your browser, or from your connection, which is where Cloudflare takes the
+country and the data center from. A report brings what its reporter wrote about
+a document. Nothing comes from public sources.
 
 - **Sharing, editing and serving what is shared** is what you ask for when you
   accept the [terms](TERMS.md).
-- **The limits, the network digests, the reports, the logs and the backups**
-  serve the legitimate interest of keeping the service safe, within its cost and
-  free of abuse. That interest never needs to know who you are.
+- **The limits, the network digests, the reports, what the operator sees of a
+  key, the logs and the backups** serve the legitimate interest of keeping the
+  service safe, within its cost and free of abuse. That interest never needs to
+  know who you are.
 - **What an authority asks for** is kept or handed over under a legal duty.
 - **The email you leave in a report** is the only thing that rests on your
   consent. You may take it back whenever you want by asking for it to be erased,
@@ -172,9 +173,10 @@ other copy it can read. Since there are no accounts, the most direct ways are:
 - **Your public key:** only you can show it is yours, so sign the request with
   it. It leaves the list of keys and starts over as a new one, with its
   reputation gone and no mark left. It stays for as long as these last: in the
-  documents you still share and the versions you signed, in a key you took back,
-  in what a report keeps for up to 180 days, in the operator's log for up to 180
-  days, and in the backups for 30 days. A key the operator blocked stays blocked.
+  documents you still share or edited and the versions you signed, in a key you
+  took back, in what a report keeps for up to 180 days, in the operator's log for
+  up to 180 days, and in the backups for 30 days. A key the operator blocked
+  stays blocked.
 
 If the operator does not answer in time or turns your request down, you may
 complain to Chile's Personal Data Protection Agency.
