@@ -1,12 +1,32 @@
-# Folio by Tisty
+# Folio by Tisty — Comparte lo que sabes con un link cifrado
 
 [English](README.md)
 
-Folio by Tisty convierte un documento de Tisty en un link que cualquiera puede
-leer: anónimo, cifrado de punta a punta, y que se va solo después de un tiempo.
-Es un **servicio**, aparte de la app Tisty, con su propio servidor, sus reglas y
-sus promesas. Sus links viven en tisty.cl, y su sitio es
-[www.tisty.app](https://www.tisty.app).
+Folio by Tisty es la forma de entregar lo que sabes. Convierte un documento
+Markdown de tu Tisty en un **link cifrado de punta a punta y firmado por ti**,
+que cualquiera abre en su navegador **sin cuenta**, y que se va solo después de
+los días sin uso que elijas. Es un **servicio**, aparte de la app Tisty, con su
+propio servidor, sus reglas y sus promesas. Sus links viven en tisty.cl, y su
+sitio es [www.tisty.app](https://www.tisty.app).
+
+## Para qué existe
+
+Tisty guarda tu memoria de trabajo en tu propio disco: las tareas y los
+documentos con los que trabajan tú y tu agente de IA. Tarde o temprano otra
+persona necesita una parte:
+
+- **Tu PO** necesita las decisiones detrás del checkout, cada una con su
+  porqué, no un resumen pegado en un chat.
+- **El QA que llega al proyecto** necesita los casos de regresión y lo que
+  falló la última vez.
+- **Otro equipo** necesita el runbook del servicio que está por tocar.
+
+Pegado en un chat o en un correo, ese contexto se vuelve una copia que nadie
+firmó, guardada para siempre en la base de datos de otro. Folio lleva una sola
+copia: cifrada en tu equipo antes de salir, firmada por ti y solo por el tiempo
+que elijas, así quien la recibe, y el agente con el que trabaja, parte de lo que
+sabes. Tu memoria se queda en tu disco; Folio solo lleva una copia, y lleva
+documentos, no tareas.
 
 > **No promete lo que promete la app.** La app Tisty no tiene servidor y no
 > recolecta nada. Folio sí tiene un servidor: guarda copias cifradas

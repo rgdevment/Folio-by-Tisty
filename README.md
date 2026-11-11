@@ -1,11 +1,31 @@
-# Folio by Tisty
+# Folio by Tisty — Share What You Know by an Encrypted Link
 
 [Español](README.es.md)
 
-Folio by Tisty turns a Tisty document into a link anyone can read: anonymous,
-end-to-end encrypted, and gone on its own after a while. It is a **service**,
-separate from the Tisty app, with its own server, rules and promises. Its links
-live at tisty.cl, and its site is [www.tisty.app](https://www.tisty.app).
+Folio by Tisty is how you hand over what you know. It turns a Markdown document
+from your Tisty into an **end-to-end encrypted link, signed by you**, that
+anyone opens in a browser with **no account** — and that is gone on its own
+after the days without use you choose. It is a **service**, separate from the
+Tisty app, with its own server, rules and promises. Its links live at tisty.cl,
+and its site is [www.tisty.app](https://www.tisty.app).
+
+## Why it exists
+
+Tisty keeps your working memory on your own disk: the tasks and documents you
+and your AI agent work from. Sooner or later somebody else needs part of it:
+
+- **Your PO** needs the decisions behind the checkout, each with its why, not a
+  summary pasted into a chat.
+- **The QA joining the project** needs the regression cases and what broke
+  last time.
+- **Another team** needs the runbook of the service they are about to touch.
+
+Pasted into a chat or an email, that context becomes a copy nobody signed,
+sitting in somebody else's database for good. Folio carries one copy instead:
+encrypted on your machine before it leaves, signed by you, and only for as long
+as you choose — so whoever picks it up, and the agent they work with, starts
+from what you know. Your memory stays on your disk; Folio only carries a copy,
+and it carries documents, not tasks.
 
 > **It does not promise what the app promises.** The Tisty app has no server
 > and collects nothing. Folio does run a server: it keeps encrypted copies
