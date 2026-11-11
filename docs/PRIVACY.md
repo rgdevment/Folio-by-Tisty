@@ -1,6 +1,6 @@
 # Folio by Tisty privacy policy
 
-**Version 7, in force since November 10, 2026.**
+**Version 8, in force since November 11, 2026.**
 
 ## The short version
 
@@ -29,6 +29,7 @@ runs Folio as a non-profit. Contact: <rgdevment@tisty.app>.
 | The manifest in the clear: how many parts, what each weighs, their kind and the version | To hold the limits without reading the content | As long as the document |
 | The manage link, kept as a digest (hash), and the public key of the edit link's token, which never reaches the server | To check who may change or delete it | As long as the document |
 | Your public key and its certificate, in what you share, with the exact time each version arrived | So readers know it is yours and since when | As long as the document |
+| If you edit what someone else shares: your public key, the key of the machine you sent your latest version from and the first version you signed | So readers know who edited it and get the keys you retired, so they no longer speak for you | As long as the document |
 | If you review the languages someone else added to what you share, your word on them, signed with your key: only how many times you reviewed and a digest (hash) of the reviews, never which languages, with the exact time it arrived | So readers show only the languages you kept | As long as the document |
 | Your public key on its own, the day Folio first saw it, which version of the terms it accepted and in what hour the server heard it, and whether the operator blocked it, tied to no network and no document | So limits and reputation stay with it, and a new key starts from the lowest | For good, even after your documents are gone |
 | How many times it was read, counted once a day per visitor, and in which hours on a day with 5 or more | To show you the reads in Tisty | As long as the document |
@@ -61,14 +62,15 @@ record, stays there until then. The documents do not: they are deleted at once.
 
 ## Whose, from where and on what basis
 
-It keeps data about four groups of people: those who share from Tisty, those
-who open a link, those who report and those who write to the operator. All of it
+It keeps data about five groups of people: those who share from Tisty, those
+who edit what someone else shared, those who open a link, those who report and
+those who write to the operator. All of it
 comes from you, from your Tisty or your browser, or from your connection, which
 is where Cloudflare takes the country and the data center from. A report brings
 what its reporter wrote about a document. Nothing comes from public sources.
 
-- **Sharing and serving what is shared** is what you ask for when you accept the
-  [terms](TERMS.md).
+- **Sharing, editing and serving what is shared** is what you ask for when you
+  accept the [terms](TERMS.md).
 - **The limits, the network digests, the reports, the logs and the backups**
   serve the legitimate interest of keeping the service safe, within its cost and
   free of abuse. That interest never needs to know who you are.
@@ -89,7 +91,8 @@ explain what Folio is. They are fixed files: they keep nothing about you, on the
 server or in your browser. Cloudflare also receives your IP and your requests
 when you visit them. On the page that reads a link, if you choose the light or
 dark mode, or a document's language, your browser remembers that choice, the
-language next to that link's identifier; it never leaves your device.
+language next to that link's identifier. It never leaves your device, and it
+stays until you clear the site's data in your browser.
 
 Three others take part, each with a policy of its own:
 
