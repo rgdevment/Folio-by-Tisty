@@ -69,8 +69,8 @@ const started = async (now = NOW): Promise<FirstUpload & { id: string }> => {
   return { id, start: mac, proof, adminToken: "the admin token", ttlDays: 3 };
 };
 
-const send = (id: string, bytes: Bytes, now = NOW, first?: FirstUpload) =>
-  uploadDoc({ id, now, ip: "203.0.113.9", bytes: async () => bytes, ...(first ? { first } : {}) }, tools);
+const send = (id: string, bytes: Bytes, now = NOW, first?: FirstUpload, over: UploadTools = tools) =>
+  uploadDoc({ id, now, ip: "203.0.113.9", bytes: async () => bytes, ...(first ? { first } : {}) }, over);
 
 const shared = async (over: { permit?: string } = {}) => {
   const first = await started();
@@ -423,23 +423,33 @@ describe("the owner's word on an anchor's reviews (contract 1.9.0)", () => {
 
 describe("a version under a lower contract than the one held (contract, never_lower)", () => {
   const STEP = 10 * MINUTE;
+  const takingOneEight = { ...tools, limits: { ...LIMITS, oldestContractTaken: "1.8.0" } };
 
   it("is refused as outdated, while the same contract is taken", async () => {
     const id = await shared();
     const lower = await sealedEnvelope({ id, version: 2, owner: mario, contract: "1.8.0" });
-    expect(await send(id, lower, LATER)).toEqual({ refused: "outdated" });
+    expect(await send(id, lower, LATER, undefined, takingOneEight)).toEqual({ refused: "outdated" });
     const same = await sealedEnvelope({ id, version: 2, owner: mario });
-    expect(await send(id, same, LATER)).toEqual({ stored: true, version: 2 });
+    expect(await send(id, same, LATER, undefined, takingOneEight)).toEqual({ stored: true, version: 2 });
   });
 
   it("lets a writer that knows more seal over what one that knew less wrote, and never back", async () => {
     const first = await started();
     const older = await sealedEnvelope({ id: first.id, version: 1, owner: mario, contract: "1.8.0" });
-    expect(await send(first.id, older, NOW, first)).toEqual({ stored: true, version: 1 });
+    expect(await send(first.id, older, NOW, first, takingOneEight)).toEqual({ stored: true, version: 1 });
     const newer = await sealedEnvelope({ id: first.id, version: 2, owner: mario });
-    expect(await send(first.id, newer, LATER)).toEqual({ stored: true, version: 2 });
+    expect(await send(first.id, newer, LATER, undefined, takingOneEight)).toEqual({ stored: true, version: 2 });
     const back = await sealedEnvelope({ id: first.id, version: 3, owner: mario, contract: "1.8.0" });
-    expect(await send(first.id, back, LATER + STEP)).toEqual({ refused: "outdated" });
+    expect(await send(first.id, back, LATER + STEP, undefined, takingOneEight)).toEqual({ refused: "outdated" });
+  });
+});
+
+describe("the oldest contract taken", () => {
+  it("is the one Tisty 1.46 seals under, so a version from an older Tisty is refused as outdated", async () => {
+    expect(LEVEL_ONE.oldestContractTaken).toBe("1.9.0");
+    const first = await started();
+    const older = await sealedEnvelope({ id: first.id, version: 1, owner: mario, contract: "1.8.0" });
+    expect(await send(first.id, older, NOW, first)).toEqual({ refused: "outdated" });
   });
 });
 
