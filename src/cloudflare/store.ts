@@ -36,7 +36,8 @@ import { addProvedTo, NEW_KEYS_NET, PROVED, PROVED_COLUMN, seenTable } from "./s
 
 // One row each by its key: the machine that signed the last version, its owner's, the start of owner_mark,
 // and the one that signed the owner's word on the reviews, which a reader weighs alone (contract, review.current).
-// Who edited may have signed on any machine: one of each root, earliest editor first, so later roots push none out.
+// Who edited may have signed on any machine. Earliest editor first, so later roots push none out, but 4 each before more.
+const EACH_EDITOR_BEFORE_MORE = 4;
 const revocationsOf = (version: string, editorsAtMost: string): string => `(
   SELECT json_group_array(json_object('root', root, 'machine', machine, 'at', at, 'signed', signed))
   FROM (
@@ -45,10 +46,11 @@ const revocationsOf = (version: string, editorsAtMost: string): string => `(
       OR (r.root = d.owner AND r.machine = substr(d.owner_mark, 1, instr(d.owner_mark, '.') - 1))
       OR (r.root = d.owner AND r.machine = json_extract(d.reviewed, '$.machine'))
     UNION
-    SELECT * FROM (
-      SELECT r.root, r.machine, r.at, r.signed FROM editors e JOIN revocations r ON r.root = e.root
+    SELECT root, machine, at, signed FROM (
+      SELECT r.root, r.machine, r.at, r.signed, ROW_NUMBER() OVER (PARTITION BY r.root ORDER BY r.at DESC) AS nth
+      FROM editors e JOIN revocations r ON r.root = e.root
       WHERE e.doc = d.id AND e.root <> d.owner
-      ORDER BY ROW_NUMBER() OVER (PARTITION BY r.root ORDER BY r.at DESC), e.first_version, r.root
+      ORDER BY nth > ${EACH_EDITOR_BEFORE_MORE}, e.first_version IS NULL, e.first_version, nth, r.root
       LIMIT ${editorsAtMost}
     )
   )
