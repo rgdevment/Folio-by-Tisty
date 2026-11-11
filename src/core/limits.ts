@@ -8,6 +8,7 @@ export interface Limits {
   newKeysBytesADay: number;
   newKeysNetBytesADay: number;
   revokedMachinesAtMost: number;
+  editorRevocationsServed: number;
   versionsKept: number;
   replacedKeptDays: number;
   versionsListedAtMost: number;
@@ -64,6 +65,7 @@ export const LEVEL_ONE: Limits = {
   newKeysBytesADay: 5_000_000_000,
   newKeysNetBytesADay: 50_000_000,
   revokedMachinesAtMost: 64,
+  editorRevocationsServed: 16,
   versionsKept: 1,
   replacedKeptDays: 3,
   versionsListedAtMost: 300,

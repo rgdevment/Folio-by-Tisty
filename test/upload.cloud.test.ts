@@ -6,6 +6,7 @@ import { Cloud } from "../src/cloudflare/store";
 import { administer } from "../src/core/admin";
 import type { Bytes } from "../src/core/bytes";
 import { DAY_MS, dayOf, LEVEL_ONE, type Limits } from "../src/core/limits";
+import { momentOf } from "../src/core/moment";
 import { latestVersion, readDoc, readFiles } from "../src/core/read";
 import { takeRevocations } from "../src/core/revocations";
 import { saltFor, solveProof, startNow, toBase64Url, tokenHash } from "../src/core/start";
@@ -18,9 +19,11 @@ import {
   uploadFiles,
 } from "../src/core/upload";
 import { keptVersions, listFreesAt, uploadAllowedAt } from "../src/core/versions";
+import { editorsOf } from "../src/page/read";
 import { readEnvelope } from "../src/rules/envelope";
 import {
   anotherMachine,
+  editorBy,
   filesHashOf,
   machineOf,
   newPerson,
@@ -1884,11 +1887,14 @@ describe("a machine its root took back", () => {
   const AT = "2026-11-01T10:00:00Z";
   const LATER_AT = "2026-11-02T10:00:00Z";
   const take = (said: unknown) => takeRevocations({ said, ip: "203.0.113.9", now: NOW }, tools);
-  const otherMachines = (person: Person, howMany: number) =>
+  const otherMachinesAt = (person: Person, ats: string[]) =>
     Promise.all(
-      Array.from({ length: howMany }, () =>
-        revocationBy({ ...person, machineBytes: crypto.getRandomValues(new Uint8Array(32)) }, AT),
-      ),
+      ats.map((at) => revocationBy({ ...person, machineBytes: crypto.getRandomValues(new Uint8Array(32)) }, at)),
+    );
+  const otherMachines = (person: Person, howMany: number) =>
+    otherMachinesAt(
+      person,
+      Array.from({ length: howMany }, () => AT),
     );
   const keptAt = async (person: Person) => {
     const kept = await testEnv.DB.prepare("SELECT at FROM revocations WHERE root = ? AND machine = ?")
@@ -1946,20 +1952,66 @@ describe("a machine its root took back", () => {
     expect(await row(first.id)).toBeNull();
   });
 
-  it("is told to a reader for the machine that signed and the owner's, and no other", async () => {
+  const readBy = async (id: string, now: number, over = tools) => {
+    const read = await readDoc({ id, ip: "203.0.113.9", now }, over);
+    if (!("served" in read)) throw new Error(read.refused);
+    await read.body.cancel();
+    return read;
+  };
+
+  it("is told to a reader for the machine that signed and the owner's, and no other of the owner's", async () => {
     const { pair, permit } = await newToken();
     const id = await shared({ permit });
     const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
     expect(await send(id, edited, LATER)).toEqual({ stored: true, version: 2 });
-    const others = [...(await otherMachines(mario, 20)), ...(await otherMachines(ana, 20))];
-    await store.revoke(others);
+    await store.revoke(await otherMachines(mario, 20));
     const asked = [await revocationBy(mario, AT), await revocationBy(ana, AT)];
     await store.revoke(asked);
-    const read = await readDoc({ id, ip: "203.0.113.9", now: LATER }, tools);
-    if (!("served" in read)) throw new Error(read.refused);
-    await read.body.cancel();
+    const read = await readBy(id, LATER);
     expect(read.revocations.map((one) => one.machine).sort()).toEqual(asked.map((one) => one.machine).sort());
     expect(read.revocations.find((one) => one.root === rootOf(ana))).toEqual(asked[1]);
+  });
+
+  it("is told to a reader for whoever edited it, so the page leaves out the entry that machine signed", async () => {
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+    expect(await send(id, edited, LATER)).toEqual({ stored: true, version: 2 });
+    const owners = await sealedEnvelope({ id, version: 3, owner: mario, permit });
+    expect(await send(id, owners, LATER + 5 * MINUTE)).toEqual({ stored: true, version: 3 });
+    const document = { id, editors: [await editorBy(ana, { in: id, name: "Ana" })], body: "", html: "" };
+    const shown = async () => {
+      const read = await readBy(id, LATER + 10 * MINUTE);
+      return editorsOf(document, { received: momentOf(read.version.at), revocations: read.revocations });
+    };
+    expect((await shown()).map((one) => one.name)).toEqual(["Ana"]);
+    await store.revoke([await revocationBy(ana, AT)]);
+    expect(await shown()).toEqual([]);
+  });
+
+  it("tells a reader of those who edited only up to its cap, one of each root first and its latest first", async () => {
+    const few = { ...LIMITS, editorRevocationsServed: 3 };
+    const tight = { ...tools, store: new Cloud(testEnv, few), limits: few };
+    const bea = await newPerson();
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    for (const [version, signer] of [ana, bea].entries()) {
+      const edited = await sealedEnvelope({ id, version: version + 2, owner: mario, signer, permit, token: pair });
+      expect(await send(id, edited, LATER + version * 5 * MINUTE)).toEqual({ stored: true, version: version + 2 });
+    }
+    const owners = await sealedEnvelope({ id, version: 4, owner: mario, permit });
+    expect(await send(id, owners, LATER + 10 * MINUTE)).toEqual({ stored: true, version: 4 });
+    const anas = ["2026-10-29T10:00:00Z", "2026-11-02T10:00:00Z", "2026-10-31T10:00:00Z", "2026-11-03T10:00:00Z"];
+    await store.revoke(await otherMachinesAt(ana, anas));
+    await store.revoke([...(await otherMachines(bea, 1)), ...(await otherMachines(mario, 5))]);
+    const read = await readBy(id, LATER + 15 * MINUTE, tight);
+    const told = (person: Person) => read.revocations.filter((one) => one.root === rootOf(person));
+    expect([told(ana).length, told(bea).length, told(mario).length]).toEqual([2, 1, 0]);
+    expect(
+      told(ana)
+        .map((one) => one.at)
+        .sort(),
+    ).toEqual(["2026-11-02T10:00:00Z", "2026-11-03T10:00:00Z"]);
   });
 
   it("is not kept for a root that signed nothing here", async () => {
