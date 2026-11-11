@@ -1,10 +1,10 @@
 # Folio by Tisty
 
-> Share a document from Tisty with anyone through an encrypted link. The key travels in the part of the link after the #, so the server never receives it, and whoever gets the link reads it in a browser with no account. Beta.
+> Hand over what you know: share a Markdown document from Tisty with anyone through an end-to-end encrypted link, signed by you — your PO, the QA joining a project, another team. The key travels in the part of the link after the #, so the server never receives it, and whoever gets the link reads it in a browser with no account. The document stays in the sender's Tisty; Folio carries an encrypted copy, documents only, not tasks. Beta.
 
 - [Home](https://tisty.cl/): what Folio does, in English
 - [Portada](https://tisty.cl/es/): lo mismo, en español
-- [Tisty](https://www.tisty.app/): the desktop app for notes, documents and tasks that shares through Folio
+- [Tisty](https://www.tisty.app/): local memory and context for you and your AI agent — the desktop app for notes, documents and tasks that shares through Folio
 - [How to share a document](https://rgdevment.dev/guides/share-a-document-with-someone-without-tisty/)
 - [Privacy policy](https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/PRIVACY.md)
 - [Terms](https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/TERMS.md)
