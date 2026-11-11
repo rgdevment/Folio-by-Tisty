@@ -84,8 +84,8 @@ export const LEVEL_ONE: Limits = {
   uploadsOfARootAnHour: 10,
   uploadWaitsMinutes: [5],
   uploadStreakResetMinutes: 30,
-  // Tisty 1.44.0 seals under 1.8.0, and an older one knows neither a token per language nor the anchor a language names.
-  oldestContractTaken: "1.8.0",
+  // Tisty 1.46.0 seals under 1.9.0, and an older one cannot sign the owner's word on the languages others add.
+  oldestContractTaken: "1.9.0",
   oldestContractServed: null,
   newReadersFree: 250,
   rowsPerOwnerADay: 5000,
