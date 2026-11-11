@@ -1887,11 +1887,14 @@ describe("a machine its root took back", () => {
   const AT = "2026-11-01T10:00:00Z";
   const LATER_AT = "2026-11-02T10:00:00Z";
   const take = (said: unknown) => takeRevocations({ said, ip: "203.0.113.9", now: NOW }, tools);
-  const otherMachines = (person: Person, howMany: number) =>
+  const otherMachinesAt = (person: Person, ats: string[]) =>
     Promise.all(
-      Array.from({ length: howMany }, () =>
-        revocationBy({ ...person, machineBytes: crypto.getRandomValues(new Uint8Array(32)) }, AT),
-      ),
+      ats.map((at) => revocationBy({ ...person, machineBytes: crypto.getRandomValues(new Uint8Array(32)) }, at)),
+    );
+  const otherMachines = (person: Person, howMany: number) =>
+    otherMachinesAt(
+      person,
+      Array.from({ length: howMany }, () => AT),
     );
   const keptAt = async (person: Person) => {
     const kept = await testEnv.DB.prepare("SELECT at FROM revocations WHERE root = ? AND machine = ?")
@@ -1986,7 +1989,7 @@ describe("a machine its root took back", () => {
     expect(await shown()).toEqual([]);
   });
 
-  it("tells a reader of those who edited only up to its cap, one of each root before a second of any", async () => {
+  it("tells a reader of those who edited only up to its cap, one of each root first and its latest first", async () => {
     const few = { ...LIMITS, editorRevocationsServed: 3 };
     const tight = { ...tools, store: new Cloud(testEnv, few), limits: few };
     const bea = await newPerson();
@@ -1998,11 +2001,17 @@ describe("a machine its root took back", () => {
     }
     const owners = await sealedEnvelope({ id, version: 4, owner: mario, permit });
     expect(await send(id, owners, LATER + 10 * MINUTE)).toEqual({ stored: true, version: 4 });
-    await store.revoke([...(await otherMachines(ana, 5)), ...(await otherMachines(bea, 1))]);
-    await store.revoke(await otherMachines(mario, 5));
+    const anas = ["2026-10-29T10:00:00Z", "2026-11-02T10:00:00Z", "2026-10-31T10:00:00Z", "2026-11-03T10:00:00Z"];
+    await store.revoke(await otherMachinesAt(ana, anas));
+    await store.revoke([...(await otherMachines(bea, 1)), ...(await otherMachines(mario, 5))]);
     const read = await readBy(id, LATER + 15 * MINUTE, tight);
-    const told = (person: Person) => read.revocations.filter((one) => one.root === rootOf(person)).length;
-    expect([told(ana), told(bea), told(mario)]).toEqual([2, 1, 0]);
+    const told = (person: Person) => read.revocations.filter((one) => one.root === rootOf(person));
+    expect([told(ana).length, told(bea).length, told(mario).length]).toEqual([2, 1, 0]);
+    expect(
+      told(ana)
+        .map((one) => one.at)
+        .sort(),
+    ).toEqual(["2026-11-02T10:00:00Z", "2026-11-03T10:00:00Z"]);
   });
 
   it("is not kept for a root that signed nothing here", async () => {
