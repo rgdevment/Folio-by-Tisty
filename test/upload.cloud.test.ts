@@ -2014,6 +2014,30 @@ describe("a machine its root took back", () => {
     ).toEqual(["2026-11-02T10:00:00Z", "2026-11-03T10:00:00Z"]);
   });
 
+  it("keeps who edited first within its cap, however the roots that came later sort", async () => {
+    const few = { ...LIMITS, editorRevocationsServed: 2 };
+    const tight = { ...tools, store: new Cloud(testEnv, few), limits: few };
+    const people = await Promise.all([newPerson(), newPerson(), newPerson()]);
+    const [first, ...later] = people.sort((one, other) => (rootOf(one) < rootOf(other) ? 1 : -1)) as [
+      Person,
+      Person,
+      Person,
+    ];
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    for (const [at, signer] of [first, ...later].entries()) {
+      const edited = await sealedEnvelope({ id, version: at + 2, owner: mario, signer, permit, token: pair });
+      expect(await send(id, edited, LATER + at * 5 * MINUTE)).toEqual({ stored: true, version: at + 2 });
+    }
+    const owners = await sealedEnvelope({ id, version: 5, owner: mario, permit });
+    expect(await send(id, owners, LATER + 15 * MINUTE)).toEqual({ stored: true, version: 5 });
+    const stolen = await revocationBy(first, AT);
+    await store.revoke([stolen, ...(await otherMachines(later[0], 1)), ...(await otherMachines(later[1], 1))]);
+    const read = await readBy(id, LATER + 20 * MINUTE, tight);
+    expect(read.revocations).toHaveLength(2);
+    expect(read.revocations).toContainEqual(stolen);
+  });
+
   it("is not kept for a root that signed nothing here", async () => {
     await shared();
     expect(await take([await revocationBy(ana, AT)])).toEqual({ refused: "bad_revocation" });
