@@ -1,6 +1,7 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import EDITORS_MIGRATION from "../migrations/0020_editors_first_version.sql?raw";
 import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
 import { administer } from "../src/core/admin";
@@ -1989,8 +1990,8 @@ describe("a machine its root took back", () => {
     expect(await shown()).toEqual([]);
   });
 
-  it("tells a reader of those who edited only up to its cap, one of each root first and its latest first", async () => {
-    const few = { ...LIMITS, editorRevocationsServed: 3 };
+  it("tells a reader of those who edited only up to its cap, 4 of each before more and the latest first", async () => {
+    const few = { ...LIMITS, editorRevocationsServed: 6 };
     const tight = { ...tools, store: new Cloud(testEnv, few), limits: few };
     const bea = await newPerson();
     const { pair, permit } = await newToken();
@@ -2001,17 +2002,101 @@ describe("a machine its root took back", () => {
     }
     const owners = await sealedEnvelope({ id, version: 4, owner: mario, permit });
     expect(await send(id, owners, LATER + 10 * MINUTE)).toEqual({ stored: true, version: 4 });
-    const anas = ["2026-10-29T10:00:00Z", "2026-11-02T10:00:00Z", "2026-10-31T10:00:00Z", "2026-11-03T10:00:00Z"];
+    const latest = ["2026-10-29T10:00:00Z", "2026-10-30T10:00:00Z", "2026-10-31T10:00:00Z", "2026-11-02T10:00:00Z"];
+    const anas = ["2026-10-28T10:00:00Z", "2026-11-03T10:00:00Z", ...latest];
     await store.revoke(await otherMachinesAt(ana, anas));
     await store.revoke([...(await otherMachines(bea, 1)), ...(await otherMachines(mario, 5))]);
     const read = await readBy(id, LATER + 15 * MINUTE, tight);
     const told = (person: Person) => read.revocations.filter((one) => one.root === rootOf(person));
-    expect([told(ana).length, told(bea).length, told(mario).length]).toEqual([2, 1, 0]);
+    expect([told(ana).length, told(bea).length, told(mario).length]).toEqual([5, 1, 0]);
     expect(
       told(ana)
         .map((one) => one.at)
         .sort(),
-    ).toEqual(["2026-11-02T10:00:00Z", "2026-11-03T10:00:00Z"]);
+    ).toEqual([...latest, "2026-11-03T10:00:00Z"]);
+  });
+
+  it("keeps who edited first within its cap, even a machine taken back before another, however later roots sort", async () => {
+    const few = { ...LIMITS, editorRevocationsServed: 2 };
+    const tight = { ...tools, store: new Cloud(testEnv, few), limits: few };
+    const people = await Promise.all([newPerson(), newPerson(), newPerson()]);
+    const [first, ...later] = people.sort((one, other) => (rootOf(one) < rootOf(other) ? 1 : -1)) as [
+      Person,
+      Person,
+      Person,
+    ];
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    for (const [order, signer] of [first, ...later].entries()) {
+      const edited = await sealedEnvelope({ id, version: order + 2, owner: mario, signer, permit, token: pair });
+      expect(await send(id, edited, LATER + order * 5 * MINUTE)).toEqual({ stored: true, version: order + 2 });
+    }
+    const owners = await sealedEnvelope({ id, version: 5, owner: mario, permit });
+    expect(await send(id, owners, LATER + 15 * MINUTE)).toEqual({ stored: true, version: 5 });
+    const stolen = await revocationBy(first, AT);
+    const sinceThen = await otherMachinesAt(first, [LATER_AT]);
+    await store.revoke([
+      stolen,
+      ...sinceThen,
+      ...(await otherMachines(later[0], 1)),
+      ...(await otherMachines(later[1], 1)),
+    ]);
+    const read = await readBy(id, LATER + 20 * MINUTE, tight);
+    expect(read.revocations.map((one) => one.root)).toEqual([rootOf(first), rootOf(first)]);
+    expect(read.revocations).toContainEqual(stolen);
+  });
+
+  it("puts last a root that older code noted without its first version, as after a rollback", async () => {
+    const few = { ...LIMITS, editorRevocationsServed: 1 };
+    const tight = { ...tools, store: new Cloud(testEnv, few), limits: few };
+    const people = await Promise.all([newPerson(), newPerson()]);
+    const [late, first] = people.sort((one, other) => (rootOf(one) < rootOf(other) ? -1 : 1)) as [Person, Person];
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: first, permit, token: pair });
+    expect(await send(id, edited, LATER)).toEqual({ stored: true, version: 2 });
+    await testEnv.DB.prepare("INSERT INTO editors (doc, root) VALUES (?, ?)").bind(id, rootOf(late)).run();
+    await store.revoke([...(await otherMachines(first, 1)), ...(await otherMachines(late, 1))]);
+    const read = await readBy(id, LATER + 5 * MINUTE, tight);
+    expect(read.revocations.map((one) => one.root)).toEqual([rootOf(first)]);
+  });
+
+  it("puts first among an editor's the machine they last sent a version from", async () => {
+    const few = { ...LIMITS, editorRevocationsServed: 1 };
+    const tight = { ...tools, store: new Cloud(testEnv, few), limits: few };
+    const desk = await anotherMachine(ana);
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    for (const [order, signer] of [ana, desk].entries()) {
+      const edited = await sealedEnvelope({ id, version: order + 2, owner: mario, signer, permit, token: pair });
+      expect(await send(id, edited, LATER + order * 5 * MINUTE)).toEqual({ stored: true, version: order + 2 });
+    }
+    const owners = await sealedEnvelope({ id, version: 4, owner: mario, permit });
+    expect(await send(id, owners, LATER + 10 * MINUTE)).toEqual({ stored: true, version: 4 });
+    const stolen = await revocationBy(desk, AT);
+    await store.revoke([stolen, await revocationBy(ana, LATER_AT), ...(await otherMachinesAt(ana, [LATER_AT]))]);
+    const read = await readBy(id, LATER + 15 * MINUTE, tight);
+    expect(read.revocations).toEqual([stolen]);
+  });
+
+  it("fills in the editors from before it with what their listed versions say, or 0", async () => {
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+    expect(await send(id, edited, LATER)).toEqual({ stored: true, version: 2 });
+    const bea = await newPerson();
+    await testEnv.DB.prepare("UPDATE editors SET first_version = NULL, machine = NULL").run();
+    await testEnv.DB.prepare("INSERT INTO editors (doc, root) VALUES (?, ?)").bind(id, rootOf(bea)).run();
+    await testEnv.DB.prepare(EDITORS_MIGRATION.slice(EDITORS_MIGRATION.indexOf("UPDATE editors"))).run();
+    const filled = await testEnv.DB.prepare(
+      "SELECT root, first_version, machine FROM editors WHERE doc = ? ORDER BY first_version",
+    )
+      .bind(id)
+      .all();
+    expect(filled.results).toEqual([
+      { root: rootOf(bea), first_version: 0, machine: null },
+      { root: rootOf(ana), first_version: 2, machine: machineOf(ana) },
+    ]);
   });
 
   it("is not kept for a root that signed nothing here", async () => {
