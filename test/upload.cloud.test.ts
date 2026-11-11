@@ -1,6 +1,7 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import EDITORS_MIGRATION from "../migrations/0020_editors_first_version.sql?raw";
 import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
 import { administer } from "../src/core/admin";
@@ -2026,9 +2027,9 @@ describe("a machine its root took back", () => {
     ];
     const { pair, permit } = await newToken();
     const id = await shared({ permit });
-    for (const [at, signer] of [first, ...later].entries()) {
-      const edited = await sealedEnvelope({ id, version: at + 2, owner: mario, signer, permit, token: pair });
-      expect(await send(id, edited, LATER + at * 5 * MINUTE)).toEqual({ stored: true, version: at + 2 });
+    for (const [order, signer] of [first, ...later].entries()) {
+      const edited = await sealedEnvelope({ id, version: order + 2, owner: mario, signer, permit, token: pair });
+      expect(await send(id, edited, LATER + order * 5 * MINUTE)).toEqual({ stored: true, version: order + 2 });
     }
     const owners = await sealedEnvelope({ id, version: 5, owner: mario, permit });
     expect(await send(id, owners, LATER + 15 * MINUTE)).toEqual({ stored: true, version: 5 });
@@ -2058,6 +2059,44 @@ describe("a machine its root took back", () => {
     await store.revoke([...(await otherMachines(first, 1)), ...(await otherMachines(late, 1))]);
     const read = await readBy(id, LATER + 5 * MINUTE, tight);
     expect(read.revocations.map((one) => one.root)).toEqual([rootOf(first)]);
+  });
+
+  it("puts first among an editor's the machine they last sent a version from", async () => {
+    const few = { ...LIMITS, editorRevocationsServed: 1 };
+    const tight = { ...tools, store: new Cloud(testEnv, few), limits: few };
+    const desk = await anotherMachine(ana);
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    for (const [order, signer] of [ana, desk].entries()) {
+      const edited = await sealedEnvelope({ id, version: order + 2, owner: mario, signer, permit, token: pair });
+      expect(await send(id, edited, LATER + order * 5 * MINUTE)).toEqual({ stored: true, version: order + 2 });
+    }
+    const owners = await sealedEnvelope({ id, version: 4, owner: mario, permit });
+    expect(await send(id, owners, LATER + 10 * MINUTE)).toEqual({ stored: true, version: 4 });
+    const stolen = await revocationBy(desk, AT);
+    await store.revoke([stolen, await revocationBy(ana, LATER_AT), ...(await otherMachinesAt(ana, [LATER_AT]))]);
+    const read = await readBy(id, LATER + 15 * MINUTE, tight);
+    expect(read.revocations).toEqual([stolen]);
+  });
+
+  it("fills in the editors from before it with what their listed versions say, or 0", async () => {
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+    expect(await send(id, edited, LATER)).toEqual({ stored: true, version: 2 });
+    const bea = await newPerson();
+    await testEnv.DB.prepare("UPDATE editors SET first_version = NULL, machine = NULL").run();
+    await testEnv.DB.prepare("INSERT INTO editors (doc, root) VALUES (?, ?)").bind(id, rootOf(bea)).run();
+    await testEnv.DB.prepare(EDITORS_MIGRATION.slice(EDITORS_MIGRATION.indexOf("UPDATE editors"))).run();
+    const filled = await testEnv.DB.prepare(
+      "SELECT root, first_version, machine FROM editors WHERE doc = ? ORDER BY first_version",
+    )
+      .bind(id)
+      .all();
+    expect(filled.results).toEqual([
+      { root: rootOf(bea), first_version: 0, machine: null },
+      { root: rootOf(ana), first_version: 2, machine: machineOf(ana) },
+    ]);
   });
 
   it("is not kept for a root that signed nothing here", async () => {

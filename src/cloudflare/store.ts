@@ -34,9 +34,7 @@ import { acceptAppeal, CLAIMED, mayCorrect } from "./moderation";
 import { HELD_BYTES, HOLDS_ROOM } from "./room";
 import { addProvedTo, NEW_KEYS_NET, PROVED, PROVED_COLUMN, seenTable } from "./seen";
 
-// One row each by its key: the machine that signed the last version, its owner's, the start of owner_mark,
-// and the one that signed the owner's word on the reviews, which a reader weighs alone (contract, review.current).
-// Who edited may have signed on any machine. Earliest editor first, so later roots push none out, but 4 each before more.
+// Who edited first goes first, so later roots push none out; 4 each, the one they sent from first, so none takes all.
 const EACH_EDITOR_BEFORE_MORE = 4;
 const revocationsOf = (version: string, editorsAtMost: string): string => `(
   SELECT json_group_array(json_object('root', root, 'machine', machine, 'at', at, 'signed', signed))
@@ -47,7 +45,8 @@ const revocationsOf = (version: string, editorsAtMost: string): string => `(
       OR (r.root = d.owner AND r.machine = json_extract(d.reviewed, '$.machine'))
     UNION
     SELECT root, machine, at, signed FROM (
-      SELECT r.root, r.machine, r.at, r.signed, ROW_NUMBER() OVER (PARTITION BY r.root ORDER BY r.at DESC) AS nth
+      SELECT r.root, r.machine, r.at, r.signed,
+        ROW_NUMBER() OVER (PARTITION BY r.root ORDER BY r.machine IS e.machine DESC, r.at DESC) AS nth
       FROM editors e JOIN revocations r ON r.root = e.root
       WHERE e.doc = d.id AND e.root <> d.owner
       ORDER BY nth > ${EACH_EDITOR_BEFORE_MORE}, e.first_version IS NULL, e.first_version, nth, r.root
@@ -328,10 +327,11 @@ export class Cloud implements Store {
         : [
             this.#db
               .prepare(
-                `INSERT OR IGNORE INTO editors (doc, root, first_version)
-                 SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM docs WHERE id = ?1 AND latest = ?3)`,
+                `INSERT INTO editors (doc, root, first_version, machine)
+                 SELECT ?1, ?2, ?3, ?4 WHERE EXISTS (SELECT 1 FROM docs WHERE id = ?1 AND latest = ?3)
+                 ON CONFLICT (doc, root) DO UPDATE SET machine = excluded.machine`,
               )
-              .bind(upload.id, upload.signer, upload.n),
+              .bind(upload.id, upload.signer, upload.n, upload.machine),
           ]),
       this.#db
         .prepare(

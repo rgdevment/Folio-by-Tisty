@@ -171,9 +171,11 @@ paths:
                 Whether the machine that signed it, its owner's, or the one that signed its owner's word on the reviews
                 was taken back, as JSON. Beside them, machines taken back by the roots of those who edited it, since any
                 of their machines may have signed their entry. Whoever edited first comes first, so roots that came later
-                push out no one already there, but only 4 of each root come before a fifth of any, the latest moment of
-                each first. Up to 16, at 236 bytes each, so the header stays under 4.5 KB, well below the 8 KB some
-                proxies cut at. A reader checks each one.
+                push out no one already there. Editors from before the server kept that order go by the versions of
+                theirs it still lists, and those with none left tie among themselves by root. Only 4 of each root come
+                before a fifth of any: first the machine it last sent a version from, then the latest moment. Up to 16,
+                at 236 bytes each, so the header stays under 4.5 KB, well below the 8 KB some proxies cut at. A reader
+                checks each one.
               required: true
               schema: { type: string }
             Folio-Reviewed:
