@@ -16,6 +16,7 @@ import type {
   NewDoc,
   News,
   OpenedCase,
+  Orphans,
   Owned,
   Reading,
   Report,
@@ -1493,17 +1494,27 @@ export class Cloud implements Store {
   }
 
   // After D1 goes back in time, what came later stays in R2 with no row, paying for storage where nothing lists it.
-  async forgetOrphans(now: number): Promise<number> {
+  async forgetOrphans(now: number): Promise<Orphans> {
     let forgotten = 0;
+    let unknownBatches = 0;
     let cursor: string | undefined;
     do {
       const page = await this.#envelopes.list({ cursor });
+      cursor = page.truncated ? page.cursor : undefined;
       const idOf = (key: string): string => key.split("/", 1)[0] ?? key;
-      const ids = [...new Set(page.objects.map((one) => idOf(one.key)))];
+      const old = now - DAY_MS;
+      const aged = page.objects.filter((one) => !one.key.startsWith(KEY_OBJECTS) && one.uploaded.getTime() < old);
+      const ids = [...new Set(aged.map((one) => idOf(one.key)))];
+      if (ids.length === 0) continue;
       const held = await this.#db
         .prepare("SELECT id, versions FROM docs WHERE id IN (SELECT value FROM json_each(?))")
         .bind(JSON.stringify(ids))
         .all<{ id: string; versions: string }>();
+      // A D1 that knows none of a batch is empty or not this bucket's, and believing it would empty R2.
+      if (held.results.length === 0) {
+        unknownBatches += 1;
+        continue;
+      }
       const known = new Set(held.results.map((one) => one.id));
       // What a document's versions still name; anything else under it is what a failed delete left.
       const named = new Set(
@@ -1512,17 +1523,10 @@ export class Cloud implements Store {
           return [...listed.map((one) => objectKey(id, one)), ...filesKeysOf(id, listed)];
         }),
       );
-      const old = now - DAY_MS;
-      const orphans = page.objects.filter(
-        (one) =>
-          !one.key.startsWith(KEY_OBJECTS) &&
-          one.uploaded.getTime() < old &&
-          (!known.has(idOf(one.key)) || !named.has(one.key)),
-      );
+      const orphans = aged.filter((one) => !known.has(idOf(one.key)) || !named.has(one.key));
       if (orphans.length > 0) await this.#envelopes.delete(orphans.map((one) => one.key));
       forgotten += orphans.length;
-      cursor = page.truncated ? page.cursor : undefined;
     } while (cursor);
-    return forgotten;
+    return { forgotten, unknownBatches };
   }
 }

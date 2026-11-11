@@ -623,11 +623,14 @@ describe("expiring", () => {
 
   it("leaves what an upload left behind for the orphans, without listing R2", async () => {
     await store.create(newDoc("d1"), DAY);
+    await store.create(newDoc("live"), DAY + 2);
+    await store.upload(upload("live", 1), DAY + 2);
     await testEnv.ENVELOPES.put("d1/9.orphan", "left behind");
     await store.sweep(DAY + 2);
     expect(await row("d1")).toBeNull();
-    expect(await store.forgetOrphans(Date.now() + 2 * DAY_MS)).toBe(1);
+    expect(await store.forgetOrphans(Date.now() + 2 * DAY_MS)).toEqual({ forgotten: 1, unknownBatches: 0 });
     expect(await objects("d1")).toEqual([]);
+    expect(await objects("live")).toEqual(["live/1.h1"]);
   });
 
   it("forgets more objects than R2 deletes at once", async () => {
@@ -775,14 +778,25 @@ describe("orphans", () => {
     await store.upload(upload("d1", 1), DAY);
     await testEnv.ENVELOPES.put("lost/1.x", "no row");
     const later = Date.now() + 2 * DAY_MS;
-    expect(await store.forgetOrphans(later)).toBe(1);
+    expect(await store.forgetOrphans(later)).toEqual({ forgotten: 1, unknownBatches: 0 });
     expect(await objects("lost")).toEqual([]);
     expect(await objects("d1")).toEqual(["d1/1.h1"]);
   });
 
   it("leaves one that just arrived, which may be an upload on its way", async () => {
     await testEnv.ENVELOPES.put("lost/1.x", "no row yet");
-    expect(await store.forgetOrphans(Date.now())).toBe(0);
+    expect(await store.forgetOrphans(Date.now())).toEqual({ forgotten: 0, unknownBatches: 0 });
+  });
+
+  it("leaves R2 whole when D1 knows none of a batch, as an emptied D1 or another one would, and says so", async () => {
+    await store.create(newDoc("d1"), DAY);
+    await store.upload(upload("d1", 1), DAY);
+    await store.create(newDoc("d2"), DAY);
+    await store.upload(upload("d2", 1), DAY);
+    await testEnv.DB.prepare("DELETE FROM docs").run();
+    expect(await store.forgetOrphans(Date.now() + 2 * DAY_MS)).toEqual({ forgotten: 0, unknownBatches: 1 });
+    expect(await objects("d1")).toEqual(["d1/1.h1"]);
+    expect(await objects("d2")).toEqual(["d2/1.h1"]);
   });
 });
 

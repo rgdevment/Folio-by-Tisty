@@ -91,7 +91,8 @@ export default {
       return;
     }
     if (controller.cron === WEEKLY) {
-      console.log(JSON.stringify({ orphans: await store.forgetOrphans(controller.scheduledTime) }));
+      const orphans = await store.forgetOrphans(controller.scheduledTime);
+      (orphans.unknownBatches > 0 ? console.error : console.log)(JSON.stringify({ orphans }));
       return;
     }
     const swept = await store.sweep(dayOf(controller.scheduledTime), hourOf(controller.scheduledTime));
