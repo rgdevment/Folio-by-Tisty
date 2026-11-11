@@ -6,6 +6,7 @@ import { Cloud } from "../src/cloudflare/store";
 import { administer } from "../src/core/admin";
 import type { Bytes } from "../src/core/bytes";
 import { DAY_MS, dayOf, LEVEL_ONE, type Limits } from "../src/core/limits";
+import { momentOf } from "../src/core/moment";
 import { latestVersion, readDoc, readFiles } from "../src/core/read";
 import { takeRevocations } from "../src/core/revocations";
 import { saltFor, solveProof, startNow, toBase64Url, tokenHash } from "../src/core/start";
@@ -18,9 +19,11 @@ import {
   uploadFiles,
 } from "../src/core/upload";
 import { keptVersions, listFreesAt, uploadAllowedAt } from "../src/core/versions";
+import { editorsOf } from "../src/page/read";
 import { readEnvelope } from "../src/rules/envelope";
 import {
   anotherMachine,
+  editorBy,
   filesHashOf,
   machineOf,
   newPerson,
@@ -1946,20 +1949,60 @@ describe("a machine its root took back", () => {
     expect(await row(first.id)).toBeNull();
   });
 
-  it("is told to a reader for the machine that signed and the owner's, and no other", async () => {
+  const readBy = async (id: string, now: number, over = tools) => {
+    const read = await readDoc({ id, ip: "203.0.113.9", now }, over);
+    if (!("served" in read)) throw new Error(read.refused);
+    await read.body.cancel();
+    return read;
+  };
+
+  it("is told to a reader for the machine that signed and the owner's, and no other of the owner's", async () => {
     const { pair, permit } = await newToken();
     const id = await shared({ permit });
     const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
     expect(await send(id, edited, LATER)).toEqual({ stored: true, version: 2 });
-    const others = [...(await otherMachines(mario, 20)), ...(await otherMachines(ana, 20))];
-    await store.revoke(others);
+    await store.revoke(await otherMachines(mario, 20));
     const asked = [await revocationBy(mario, AT), await revocationBy(ana, AT)];
     await store.revoke(asked);
-    const read = await readDoc({ id, ip: "203.0.113.9", now: LATER }, tools);
-    if (!("served" in read)) throw new Error(read.refused);
-    await read.body.cancel();
+    const read = await readBy(id, LATER);
     expect(read.revocations.map((one) => one.machine).sort()).toEqual(asked.map((one) => one.machine).sort());
     expect(read.revocations.find((one) => one.root === rootOf(ana))).toEqual(asked[1]);
+  });
+
+  it("is told to a reader for whoever edited it, so the page leaves out the entry that machine signed", async () => {
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    const edited = await sealedEnvelope({ id, version: 2, owner: mario, signer: ana, permit, token: pair });
+    expect(await send(id, edited, LATER)).toEqual({ stored: true, version: 2 });
+    const owners = await sealedEnvelope({ id, version: 3, owner: mario, permit });
+    expect(await send(id, owners, LATER + 5 * MINUTE)).toEqual({ stored: true, version: 3 });
+    const document = { id, editors: [await editorBy(ana, { in: id, name: "Ana" })], body: "", html: "" };
+    const shown = async () => {
+      const read = await readBy(id, LATER + 10 * MINUTE);
+      return editorsOf(document, { received: momentOf(read.version.at), revocations: read.revocations });
+    };
+    expect((await shown()).map((one) => one.name)).toEqual(["Ana"]);
+    await store.revoke([await revocationBy(ana, AT)]);
+    expect(await shown()).toEqual([]);
+  });
+
+  it("tells a reader of those who edited only up to its cap, one of each root before a second of any", async () => {
+    const few = { ...LIMITS, editorRevocationsServed: 3 };
+    const tight = { ...tools, store: new Cloud(testEnv, few), limits: few };
+    const bea = await newPerson();
+    const { pair, permit } = await newToken();
+    const id = await shared({ permit });
+    for (const [version, signer] of [ana, bea].entries()) {
+      const edited = await sealedEnvelope({ id, version: version + 2, owner: mario, signer, permit, token: pair });
+      expect(await send(id, edited, LATER + version * 5 * MINUTE)).toEqual({ stored: true, version: version + 2 });
+    }
+    const owners = await sealedEnvelope({ id, version: 4, owner: mario, permit });
+    expect(await send(id, owners, LATER + 10 * MINUTE)).toEqual({ stored: true, version: 4 });
+    await store.revoke([...(await otherMachines(ana, 5)), ...(await otherMachines(bea, 1))]);
+    await store.revoke(await otherMachines(mario, 5));
+    const read = await readBy(id, LATER + 15 * MINUTE, tight);
+    const told = (person: Person) => read.revocations.filter((one) => one.root === rootOf(person)).length;
+    expect([told(ana), told(bea), told(mario)]).toEqual([2, 1, 0]);
   });
 
   it("is not kept for a root that signed nothing here", async () => {

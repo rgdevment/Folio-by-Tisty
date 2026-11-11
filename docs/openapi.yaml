@@ -169,7 +169,9 @@ paths:
             Folio-Revocations:
               description: |
                 Whether the machine that signed it, its owner's, or the one that signed its owner's word on the reviews
-                was taken back, as JSON. A reader checks each one.
+                was taken back, as JSON. Beside them, up to 16 machines taken back by the roots of those who edited it,
+                since any of their machines may have signed their entry: one of each root before a second of any, the
+                latest moment of each first. A reader checks each one.
               required: true
               schema: { type: string }
             Folio-Reviewed:

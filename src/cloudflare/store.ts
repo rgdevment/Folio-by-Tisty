@@ -36,14 +36,23 @@ import { addProvedTo, NEW_KEYS_NET, PROVED, PROVED_COLUMN, seenTable } from "./s
 
 // Three rows by their key at most: the machine that signed the last version, its owner's, the start of owner_mark,
 // and the one that signed the owner's word on the reviews, which a reader weighs alone (contract, review.current).
-const revocationsOf = (version: string): string => `(
-  SELECT json_group_array(json_object('root', r.root, 'machine', r.machine, 'at', r.at, 'signed', r.signed))
-  FROM revocations r
-  WHERE (r.root = json_extract(${version}, '$.signer') AND r.machine = json_extract(${version}, '$.machine'))
-    OR (r.root = d.owner AND r.machine = substr(d.owner_mark, 1, instr(d.owner_mark, '.') - 1))
-    OR (r.root = d.owner AND r.machine = json_extract(d.reviewed, '$.machine'))
+// Who edited it may have signed their entry on any machine; one of each root first, so many from one push no other out.
+const revocationsOf = (version: string, editorsAtMost: string): string => `(
+  SELECT json_group_array(json_object('root', root, 'machine', machine, 'at', at, 'signed', signed))
+  FROM (
+    SELECT r.root, r.machine, r.at, r.signed FROM revocations r
+    WHERE (r.root = json_extract(${version}, '$.signer') AND r.machine = json_extract(${version}, '$.machine'))
+      OR (r.root = d.owner AND r.machine = substr(d.owner_mark, 1, instr(d.owner_mark, '.') - 1))
+      OR (r.root = d.owner AND r.machine = json_extract(d.reviewed, '$.machine'))
+    UNION
+    SELECT * FROM (
+      SELECT r.root, r.machine, r.at, r.signed FROM editors e JOIN revocations r ON r.root = e.root
+      WHERE e.doc = d.id AND e.root <> d.owner
+      ORDER BY ROW_NUMBER() OVER (PARTITION BY r.root ORDER BY r.at DESC), r.root
+      LIMIT ${editorsAtMost}
+    )
+  )
 )`;
-const REVOCATIONS_OF_THE_LAST_VERSION = revocationsOf("json_extract(d.versions, '$[#-1]')");
 
 const revocationsIn = (said: string): Revocation[] =>
   (JSON.parse(said) as (Omit<Revocation, "at"> & { at: number })[]).map((one) => ({
@@ -673,14 +682,14 @@ export class Cloud implements Store {
       .prepare(
         `SELECT d.owner, d.latest, json_extract(d.versions, '$[#-1]') AS last_version, d.dies_on, d.paused_at, d.blocked_at, d.fix_by,
            d.reviewed, json_extract(d.reviewed, '$.seq') AS reviewed_seq, d.reviewed_at,
-           ${REVOCATIONS_OF_THE_LAST_VERSION} AS revocations,
+           ${revocationsOf("json_extract(d.versions, '$[#-1]')", "?3")} AS revocations,
            CASE WHEN d.latest = ${CLAIMED} OR (d.paused_at IS NOT NULL AND d.dies_on < ?2) THEN 0
              ELSE EXISTS (SELECT 1 FROM holds h WHERE h.held = d.id) OR CASE WHEN a.id IS NULL THEN d.dies_on >= ?2
                ELSE a.latest <> ${CLAIMED} AND a.blocked_at IS NULL AND a.paused_at IS NULL
                  AND (a.dies_on >= ?2 OR EXISTS (SELECT 1 FROM holds h WHERE h.held = a.id)) END END AS alive
          FROM docs d LEFT JOIN docs a ON a.id = d.anchor WHERE d.id = ?1`,
       )
-      .bind(id, today)
+      .bind(id, today, this.#limits.editorRevocationsServed)
       .first<{
         owner: string;
         latest: number;
@@ -721,12 +730,12 @@ export class Cloud implements Store {
     }>([
       this.#db
         .prepare(
-          `SELECT v.value AS version, d.dies_on, c.sealed_records, ${revocationsOf("v.value")} AS revocations
+          `SELECT v.value AS version, d.dies_on, c.sealed_records, ${revocationsOf("v.value", "?4")} AS revocations
            FROM cases c JOIN docs d ON d.id = c.doc
              JOIN json_each(d.versions) v ON json_extract(v.value, '$.n') = c.version
            WHERE c.token_hash = ?1 AND c.doc = ?2 AND c.until >= ?3`,
         )
-        .bind(hash, id, today),
+        .bind(hash, id, today, this.#limits.editorRevocationsServed),
       this.#db
         .prepare(
           `INSERT OR IGNORE INTO openings (doc, at, reason, kind)
