@@ -396,7 +396,7 @@ describe("how long a replaced version stays when no upload follows", () => {
       const swept = await failing.sweep(DAY + 8, (DAY + 8) * 24);
       expect(swept.failed).toBe(1);
       expect((await versionsOf("R2Fails01")).map((one) => one.n)).toEqual([2]);
-      await store.forgetOrphans(Date.now() + 2 * DAY_MS);
+      await store.forgetOrphans(Date.now() + 31 * DAY_MS);
       expect(await object("R2Fails01", 1), "a replaced version stayed in R2 for good").toBeNull();
       expect(await object("R2Fails01", 2)).not.toBeNull();
     });

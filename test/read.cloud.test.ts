@@ -270,7 +270,7 @@ describe("the key of the day", () => {
 
   it("does not go with the orphans", async () => {
     await store.dayKey(TODAY);
-    await store.forgetOrphans(Date.now() + 2 * DAY_MS);
+    await store.forgetOrphans(Date.now() + 31 * DAY_MS);
     expect(await testEnv.ENVELOPES.head("~day-key")).not.toBeNull();
   });
 });

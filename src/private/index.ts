@@ -91,7 +91,17 @@ export default {
       return;
     }
     if (controller.cron === WEEKLY) {
-      console.log(JSON.stringify({ orphans: await store.forgetOrphans(controller.scheduledTime) }));
+      const orphans = await store.forgetOrphans(controller.scheduledTime);
+      if (orphans.held === 0) {
+        console.log(JSON.stringify({ orphans }));
+        return;
+      }
+      console.error(JSON.stringify({ orphans }));
+      await sendMail(
+        env,
+        "Folio: R2 sin limpiar",
+        `La limpieza semanal dejó ${orphans.held} objetos de R2 sin borrar: D1 no conoce más de la mitad de lo que hay. Revisa si D1 está vacía, a medio restaurar o es otra base.`,
+      );
       return;
     }
     const swept = await store.sweep(dayOf(controller.scheduledTime), hourOf(controller.scheduledTime));

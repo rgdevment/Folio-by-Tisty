@@ -188,6 +188,11 @@ export interface Swept {
   failed: number;
 }
 
+export interface Orphans {
+  forgotten: number;
+  held: number;
+}
+
 // What the rules need of wherever Folio runs, so the core never knows it is Cloudflare (decisions 16 and 108).
 export interface KeyAdmitted {
   said: "known" | "new" | "full" | "blocked";
@@ -237,7 +242,7 @@ export interface Store {
   resume(id: string, today: number): Promise<void>;
   stop(id: string, today: number): Promise<void>;
   sweep(today: number): Promise<Swept>;
-  forgetOrphans(now: number): Promise<number>;
+  forgetOrphans(now: number): Promise<Orphans>;
   stage(): Promise<Stage>;
   spentAt(): Promise<number | null>;
   digested(): Promise<{ hour: number; alerted: Stage }>;

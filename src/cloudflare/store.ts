@@ -16,6 +16,7 @@ import type {
   NewDoc,
   News,
   OpenedCase,
+  Orphans,
   Owned,
   Reading,
   Report,
@@ -91,6 +92,10 @@ const KEY_BYTES = 32;
 
 // What R2 takes in one delete.
 const KEYS_AT_ONCE = 1000;
+
+// D1's Time Travel can bring a row back for 30 days, so what D1 no longer names waits as long before it goes.
+const ORPHANS_WAIT_MS = 30 * DAY_MS;
+const ORPHANS_ALWAYS_FORGOTTEN = 10;
 
 // A report that weighs: not cleared by an appeal, and not from who reported falsely before (decision 41).
 const COUNTED_REPORT = "r.cleared = 0 AND r.over_cap = 0 AND r.net NOT IN (SELECT net FROM false_reporters)";
@@ -1380,9 +1385,7 @@ export class Cloud implements Store {
       const listed = JSON.parse(versions) as Version[];
       return [...listed.map((one) => objectKey(id, one)), ...filesKeysOf(id, listed)];
     });
-    for (let from = 0; from < keys.length; from += KEYS_AT_ONCE) {
-      await this.#envelopes.delete(keys.slice(from, from + KEYS_AT_ONCE));
-    }
+    await this.#deleteObjects(keys);
     const ids = JSON.stringify(claimed.results.map((one) => one.id));
     const [, deleted] = await this.#db.batch([
       this.#db
@@ -1493,18 +1496,22 @@ export class Cloud implements Store {
   }
 
   // After D1 goes back in time, what came later stays in R2 with no row, paying for storage where nothing lists it.
-  async forgetOrphans(now: number): Promise<number> {
-    let forgotten = 0;
+  async forgetOrphans(now: number): Promise<Orphans> {
+    const old = now - ORPHANS_WAIT_MS;
+    const idOf = (key: string): string => key.split("/", 1)[0] ?? key;
+    const orphans: string[] = [];
+    let aged = 0;
     let cursor: string | undefined;
     do {
       const page = await this.#envelopes.list({ cursor });
-      const idOf = (key: string): string => key.split("/", 1)[0] ?? key;
-      const ids = [...new Set(page.objects.map((one) => idOf(one.key)))];
+      cursor = page.truncated ? page.cursor : undefined;
+      const waited = page.objects.filter((one) => !one.key.startsWith(KEY_OBJECTS) && one.uploaded.getTime() < old);
+      aged += waited.length;
+      if (waited.length === 0) continue;
       const held = await this.#db
         .prepare("SELECT id, versions FROM docs WHERE id IN (SELECT value FROM json_each(?))")
-        .bind(JSON.stringify(ids))
+        .bind(JSON.stringify([...new Set(waited.map((one) => idOf(one.key)))]))
         .all<{ id: string; versions: string }>();
-      const known = new Set(held.results.map((one) => one.id));
       // What a document's versions still name; anything else under it is what a failed delete left.
       const named = new Set(
         held.results.flatMap(({ id, versions }) => {
@@ -1512,17 +1519,19 @@ export class Cloud implements Store {
           return [...listed.map((one) => objectKey(id, one)), ...filesKeysOf(id, listed)];
         }),
       );
-      const old = now - DAY_MS;
-      const orphans = page.objects.filter(
-        (one) =>
-          !one.key.startsWith(KEY_OBJECTS) &&
-          one.uploaded.getTime() < old &&
-          (!known.has(idOf(one.key)) || !named.has(one.key)),
-      );
-      if (orphans.length > 0) await this.#envelopes.delete(orphans.map((one) => one.key));
-      forgotten += orphans.length;
-      cursor = page.truncated ? page.cursor : undefined;
+      orphans.push(...waited.filter((one) => !named.has(one.key)).map((one) => one.key));
     } while (cursor);
-    return forgotten;
+    // Most of R2 unknown to D1 says D1 is empty, half restored or another one, not that so much was left behind.
+    if (orphans.length > ORPHANS_ALWAYS_FORGOTTEN && orphans.length * 2 > aged) {
+      return { forgotten: 0, held: orphans.length };
+    }
+    await this.#deleteObjects(orphans);
+    return { forgotten: orphans.length, held: 0 };
+  }
+
+  async #deleteObjects(keys: string[]): Promise<void> {
+    for (let from = 0; from < keys.length; from += KEYS_AT_ONCE) {
+      await this.#envelopes.delete(keys.slice(from, from + KEYS_AT_ONCE));
+    }
   }
 }
