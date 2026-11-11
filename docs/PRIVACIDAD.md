@@ -1,6 +1,6 @@
 # Privacidad de Folio by Tisty
 
-**Versión 7, vigente desde el 10 de noviembre de 2026.**
+**Versión 8, vigente desde el 11 de noviembre de 2026.**
 
 ## En corto
 
@@ -27,7 +27,8 @@ opera Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
 | El documento cifrado y sus adjuntos, con su última versión y las reemplazadas en los últimos 3 días | Servirlo a quien tiene el link, y que una denuncia alcance lo que alguien reemplazó | Hasta el plazo sin actividad que elijas, de 15 días como mucho, o hasta que dejes de compartirlo. Si lo pausas, no se sirve y queda hasta 30 días, salvo que lo reanudes. Si una denuncia de engaño o grave lo retiene, el operador lo bloquea o una orden lo retiene, no se sirve una vez que caduca, dejas de compartirlo o se bloquea, y queda junto con sus otros idiomas hasta 180 días desde la última denuncia o el bloqueo, o lo que pida una orden o una autoridad. Durante un corte por gasto o una falla, lo reemplazado puede tardar más en borrarse |
 | El manifiesto en claro: cuántas partes tiene, cuánto pesa cada una, de qué tipo son y su versión | Aplicar los topes sin leer el contenido | Lo mismo que el documento |
 | El link de administrar, guardado como resumen (hash), y la llave pública del token del link de editar, que nunca llega al servidor | Comprobar quién puede cambiar o borrar | Lo mismo que el documento |
-| Tu llave pública y su certificado, en lo que compartes, con la hora exacta en que llegó cada versión | Que quien lee sepa que es tuyo y desde cuándo | Lo mismo que el documento |
+| Tu llave pública y su certificado, en lo que compartes o editas, con la llave de la máquina que firmó y la hora exacta en que llegó cada versión | Que quien lee sepa quién firmó cada versión y desde cuándo | Lo mismo que el documento |
+| Si editas lo que otra persona comparte: tu llave pública, la de la máquina desde la que mandaste tu última versión y la primera versión tuya que Folio tiene registrada | Mandar a quien lee las llaves que retiraste, para que ya no hablen por ti; aceptar que retires una máquina aunque solo hayas editado; y que el operador vea cuántos documentos editó una llave | Lo mismo que el documento |
 | Si revisas los idiomas que otra persona sumó a lo tuyo, tu palabra sobre ellos, firmada con tu llave: solo cuántas veces revisaste y un resumen (hash) de las revisiones, nunca qué idiomas, con la hora exacta en que llegó | Que quien lee muestre solo los idiomas que mantuviste | Lo mismo que el documento |
 | Tu llave pública sola, el día en que Folio la vio por primera vez, qué versión de los términos aceptó y en qué hora lo supo el servidor, y si el operador la bloqueó, sin relación con ninguna red ni documento | Que los topes y la reputación sigan con ella, y que una llave nueva parta con los más bajos | Para siempre, aunque tus documentos ya no estén |
 | Cuántas veces se leyó, contando una vez por día y por visitante, y en qué horas en un día con 5 o más | Mostrarte las lecturas en Tisty | Lo mismo que el documento |
@@ -60,17 +61,19 @@ borran de inmediato.
 
 ## De quién, de dónde y con qué base
 
-Guarda datos de cuatro grupos de personas: quienes comparten desde Tisty,
-quienes abren un link, quienes denuncian y quienes le escriben al operador. Todo
-llega de ti, desde tu Tisty o tu navegador, o de tu conexión, que es de donde
-Cloudflare saca el país y el centro de datos. Una denuncia trae lo que quien
-denuncia escribió sobre un documento. Nada viene de fuentes de acceso público.
+Guarda datos de cinco grupos de personas: quienes comparten desde Tisty,
+quienes editan lo que otra persona compartió, quienes abren un link, quienes
+denuncian y quienes le escriben al operador. Todo llega de ti, desde tu Tisty o
+tu navegador, o de tu conexión, que es de donde Cloudflare saca el país y el
+centro de datos. Una denuncia trae lo que quien denuncia escribió sobre un
+documento. Nada viene de fuentes de acceso público.
 
-- **Compartir y servir lo compartido** es lo que pides al aceptar los
+- **Compartir, editar y servir lo compartido** es lo que pides al aceptar los
   [términos](TERMINOS.md).
-- **Los topes, los resúmenes de red, las denuncias, los registros y los
-  respaldos** responden al interés legítimo de que el servicio siga seguro,
-  dentro de su costo y sin abusos. Ese interés nunca necesita saber quién eres.
+- **Los topes, los resúmenes de red, las denuncias, lo que el operador ve de
+  una llave, los registros y los respaldos** responden al interés legítimo de
+  que el servicio siga seguro, dentro de su costo y sin abusos. Ese interés
+  nunca necesita saber quién eres.
 - **Lo que pide una autoridad** se guarda o se entrega por obligación legal.
 - **El correo que dejas en una denuncia** es lo único que depende de tu
   consentimiento. Puedes retirarlo cuando quieras pidiendo que se borre, y eso
@@ -88,7 +91,8 @@ explican qué es Folio. Son archivos fijos: no guardan nada de ti, ni en el
 servidor ni en tu navegador. Cloudflare también recibe tu IP y tus peticiones al
 visitarlas. En la página que lee un link, si eliges el modo claro u oscuro, o el
 idioma de un documento, tu navegador recuerda esa elección, el idioma junto al
-identificador de ese link; no sale de tu equipo.
+identificador de ese link. No sale de tu equipo, y queda hasta que borres los
+datos del sitio en tu navegador.
 
 También participan otros tres, cada uno con su propia política:
 
@@ -171,10 +175,11 @@ que pueda leer. Como no hay cuentas, lo más directo es:
 - **Tu llave pública:** solo tú puedes demostrar que es tuya, así que firma la
   petición con ella. Sale de la lista de llaves y parte de nuevo como una
   nueva, sin su reputación y sin ninguna marca. Sigue mientras duren estos
-  lugares: en los documentos que sigues compartiendo y las versiones que firmaste,
-  en una llave que retiraste, en lo que guarda una denuncia hasta por 180 días,
-  en el registro del operador hasta por 180 días y en los respaldos por 30 días.
-  Una llave que el operador bloqueó sigue bloqueada.
+  lugares: en los documentos que sigues compartiendo o que editaste y las
+  versiones que firmaste, en una llave que retiraste, en lo que guarda una
+  denuncia hasta por 180 días, en el registro del operador hasta por 180 días y
+  en los respaldos por 30 días. Una llave que el operador bloqueó sigue
+  bloqueada.
 
 Si el operador no responde a tiempo o rechaza tu petición, puedes reclamar ante
 la Agencia de Protección de Datos Personales.
