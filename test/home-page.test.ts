@@ -11,7 +11,7 @@ const ADDRESS: Record<Language, string> = { es: "https://tisty.cl/es/", en: "htt
 const PAGES = ["home.html", "es/index.html", "404.html"];
 const REDIRECTS = read(`${PLACE}/_redirects`);
 const LANGUAGE = read(`${PLACE}/language.js`);
-const OFFER = read(`${PLACE}/language-offer.js`);
+const CHOOSER = read(`${PLACE}/home-language.js`);
 const MISSING = read(`${PLACE}/404.html`);
 const flat = (html: string): string => html.replace(/\s+/g, " ");
 const meta = (html: string, property: string): string | undefined =>
@@ -131,7 +131,7 @@ describe("the home page", () => {
     expect(html).toMatch(/<a href="\/" hreflang="en" lang="en" aria-label="English"/);
     expect(/<a href="([^"]+)"[^>]*aria-current="page"/.exec(html)?.[1]).toBe(new URL(ADDRESS[language]).pathname);
     expect([...html.matchAll(/<script(?! type="application\/ld\+json")[^>]*>/g)].map(([tag]) => tag)).toEqual([
-      '<script src="/language-offer.js">',
+      '<script src="/home-language.js">',
     ]);
   });
 
@@ -164,38 +164,73 @@ describe("the home page", () => {
   });
 });
 
-describe("the offer of the home in the other language", () => {
-  const offered = (page: string, browser: string | undefined): string => {
+describe("the home in the browser's language", () => {
+  const SITE = "https://tisty.cl";
+  const arrive = (page: Language, browser: string | undefined, referrer = "", address = "") => {
     const root = { lang: page, dataset: {} as Record<string, string> };
-    runInNewContext(OFFER, { document: { documentElement: root }, navigator: { language: browser } });
-    return root.dataset.offer ?? "nothing";
+    const sent: string[] = [];
+    const [search = "", hash = ""] = address.split(/(?=#)/);
+    const location = { origin: SITE, search, hash, replace: (to: string) => sent.push(to) };
+    runInNewContext(CHOOSER, {
+      document: { documentElement: root, referrer },
+      navigator: { language: browser },
+      location,
+    });
+    return { sent, offer: root.dataset.offer ?? "nothing" };
   };
 
-  it.each(LANGUAGES)("in %s leads to the other page, in the other language", (language) => {
-    const other = language === "es" ? "en" : "es";
-    expect(HOME[language]).toContain(
-      `<p class="offer" lang="${other}" data-nosnippet><a href="${new URL(ADDRESS[other]).pathname}" hreflang="${other}">`,
-    );
+  it.each(["es-CL", "ES", "es"])("sends a browser in %s from the root to the page in Spanish", (browser) => {
+    expect(arrive("en", browser)).toEqual({ sent: ["/es/"], offer: "nothing" });
+  });
+
+  it("keeps the query and the section a visitor came for", () => {
+    expect(arrive("en", "es-CL", "", "?from=tisty#facts").sent).toEqual(["/es/?from=tisty#facts"]);
+  });
+
+  it("leaves a browser in Spanish that chose English on this site, and still offers Spanish", () => {
+    expect(arrive("en", "es-CL", `${SITE}/`)).toEqual({ sent: [], offer: "es" });
+  });
+
+  it("sends a browser in Spanish that came from another site", () => {
+    expect(arrive("en", "es-CL", "https://tisty.cl.example.com/").sent).toEqual(["/es/"]);
   });
 
   it.each([
+    ["en", "en-GB", "nothing"],
+    ["en", "pt-BR", "nothing"],
+    ["en", undefined, "nothing"],
     ["es", "en-US", "en"],
     ["es", "pt-BR", "en"],
     ["es", undefined, "en"],
     ["es", "es-CL", "nothing"],
-    ["es", "ES", "nothing"],
-    ["en", "es-CL", "es"],
-    ["en", "en-GB", "nothing"],
-    ["en", "pt-BR", "nothing"],
-  ])("on the page in %s, for a browser in %s, offers %s", (page, browser, offer) => {
-    expect(offered(page, browser)).toBe(offer);
+  ] as const)("on the page in %s, for a browser in %s, stays and offers %s", (page, browser, offer) => {
+    expect(arrive(page, browser)).toEqual({ sent: [], offer });
   });
 
-  it("stays hidden until the browser asks for it, and keeps nothing in the browser", () => {
+  it.each(LANGUAGES)("in %s offers the other page, in the other language", (language) => {
+    const other = language === "es" ? "en" : "es";
+    expect(HOME[language]).toMatch(
+      new RegExp(
+        `<p class="offer" lang="${other}" data-nosnippet><a href="${new URL(ADDRESS[other]).pathname}" hreflang="${other}"[ >]`,
+      ),
+    );
+  });
+
+  it.each(LANGUAGES)(
+    "in %s sends this site as referrer from every link to English, and only from those",
+    (language) => {
+      const toEnglish = [...HOME[language].matchAll(/<a href="\/"[^>]*>/g)].map(([tag]) => tag);
+      expect(toEnglish.length).toBeGreaterThan(0);
+      expect(toEnglish.every((tag) => tag.includes('referrerpolicy="origin"'))).toBe(true);
+      expect(HOME[language].match(/referrerpolicy=/g)).toHaveLength(toEnglish.length);
+    },
+  );
+
+  it("keeps the offer hidden until the browser asks for it, and keeps nothing in the browser", () => {
     const site = read(`${PLACE}/site.css`);
     expect(site).toMatch(/\.offer \{\s+display: none;/);
     expect(site).toMatch(/html\[data-offer\] \.offer \{\s+display: block;/);
-    expect(OFFER).not.toMatch(/Storage|cookie/);
+    expect(CHOOSER).not.toMatch(/Storage|cookie/);
   });
 });
 
