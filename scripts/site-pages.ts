@@ -117,11 +117,26 @@ const withHeadingIds = (html: string): string => {
 const withScrollingTables = (html: string): string =>
   html.replaceAll("<table>", '<div class="table"><table>').replaceAll("</table>", "</table></div>");
 
+const CONTENTS_TITLE: Record<Language, string> = { en: "On this page", es: "En esta página" };
+
+const contentsOf = (article: string, language: Language): string => {
+  const sections = [...article.matchAll(/<h2 id="([^"]+)">([\s\S]*?)<\/h2>/g)].map(
+    ([, id, inner = ""]) => `<li><a href="#${id}">${inner.replace(/<[^>]+>/g, "")}</a></li>`,
+  );
+  return `<nav class="contents" aria-labelledby="contents-title">
+        <p id="contents-title">${CONTENTS_TITLE[language]}</p>
+        <ol>
+          ${sections.join("\n          ")}
+        </ol>
+      </nav>`;
+};
+
 export const policyPage = (policy: Policy, markdown: string, home: string): string => {
   const title = escaped(/^# (.+)$/m.exec(markdown)?.[1] ?? policy.source);
   const es = policyOf(policy.kind, "es");
   const en = policyOf(policy.kind, "en");
   const rendered = micromark(markdown, { extensions: [gfmTable()], htmlExtensions: [gfmTableHtml()] });
+  const article = withScrollingTables(withHeadingIds(withSiteLinks(rendered)));
   return `<!doctype html>
 <html lang="${policy.language}">
   <head>
@@ -143,7 +158,10 @@ export const policyPage = (policy: Policy, markdown: string, home: string): stri
     ${headerOf(policy, home)}
 
     <main class="policy">
-${withScrollingTables(withHeadingIds(withSiteLinks(rendered)))}
+      ${contentsOf(article, policy.language)}
+      <article>
+${article}
+      </article>
     </main>
 
     ${footerOf(policy, home)}
