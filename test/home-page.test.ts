@@ -72,8 +72,8 @@ describe("the home page", () => {
   it("says what the policy says about reports and orders", () => {
     expect(flat(HOME.es)).toContain("hasta 180 días");
     expect(flat(HOME.en)).toContain("up to 180 days");
-    expect(HOME.es).toContain("docs/PRIVACIDAD.md");
-    expect(HOME.en).toContain("docs/PRIVACY.md");
+    expect(HOME.es).toContain('href="/es/privacidad/"');
+    expect(HOME.en).toContain('href="/privacy/"');
   });
 
   it.each(PAGES)("%s loads nothing from anyone else", (page) => {

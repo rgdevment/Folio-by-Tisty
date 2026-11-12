@@ -47,7 +47,7 @@ served_once() {
         grep -qi '^speculation-rules:' "$headers" && prefetches=1
         ;;
       home.html) compare "$file" as_browser "$address/" ;;
-      es/index.html) compare "$file" as_browser "$address/es/" ;;
+      */index.html) compare "$file" as_browser "$address/${file%index.html}" ;;
       404.html) compare "$file" as_browser "$address/404" ;;
       widget-frame.html) compare "$file" as_browser "$address/widget-frame" ;;
       *) compare "$file" curl -s --max-time 10 "$address/$file" ;;

@@ -25,7 +25,7 @@ curl() {
   case $file in
     AAAAAAAA) file=index.html ;;
     "") file=home.html ;;
-    es/) file=es/index.html ;;
+    */) file=\${file}index.html ;;
     404) file=404.html ;;
     widget-frame) file=widget-frame.html ;;
   esac
@@ -100,6 +100,13 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     expect(listed).toContain("home.html");
     expect(listed).toContain("es/index.html");
     expect(listed).toContain("404.html");
+  });
+
+  it("attests a page in its own folder, and compares it with what its address serves", () => {
+    mkdirSync(join(site, "es/terminos"));
+    writeFileSync(join(site, "es/terminos/index.html"), "<p>terms in Spanish</p>\n");
+    expect(run(`sums "${site}"`).stdout).toContain("es/terminos/index.html");
+    expect(run(`served "${site}" ${ADDRESS}`).status).toBe(0);
   });
 
   it("sees a script Cloudflare adds only for a browser, also on the frame's page", () => {
