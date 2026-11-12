@@ -25,3 +25,19 @@
 /language-offer.js
   ! Cache-Control
   Cache-Control: public, max-age=3600
+
+/icon.svg
+  ! Cache-Control
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
+
+/tisto.svg
+  ! Cache-Control
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
+
+/favicon.ico
+  ! Cache-Control
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
+
+/preview.png
+  ! Cache-Control
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800

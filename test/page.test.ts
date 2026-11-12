@@ -49,6 +49,15 @@ describe("the page's headers", () => {
     expect(assets).not.toContain("no-transform");
   });
 
+  it("keep the home's images for a month, apart from the page's own revalidation", () => {
+    const rules = HEADERS.split("\n\n");
+    for (const path of ["/icon.svg", "/tisto.svg", "/favicon.ico", "/preview.png"]) {
+      const rule = rules.find((one) => one.startsWith(`${path}\n`)) ?? "";
+      expect(rule).toContain("! Cache-Control");
+      expect(rule).toContain("Cache-Control: public, max-age=2592000, stale-while-revalidate=604800");
+    }
+  });
+
   it("keep every one-segment page, a shared document among them, out of search, and never mark the home, whatever order Cloudflare runs the rules in", () => {
     const marking = HEADERS.split("\n\n")
       .filter((one) => one.includes("\n  X-Robots-Tag: noindex"))
