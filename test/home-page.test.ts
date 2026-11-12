@@ -12,6 +12,7 @@ const PAGES = ["home.html", "es/index.html", "404.html"];
 const REDIRECTS = read(`${PLACE}/_redirects`);
 const LANGUAGE = read(`${PLACE}/language.js`);
 const CHOOSER = read(`${PLACE}/home-language.js`);
+const SITUATIONS = read(`${PLACE}/home-situations.js`);
 const MISSING = read(`${PLACE}/404.html`);
 const flat = (html: string): string => html.replace(/\s+/g, " ");
 const meta = (html: string, property: string): string | undefined =>
@@ -137,6 +138,7 @@ describe("the home page", () => {
     expect(/<a href="([^"]+)"[^>]*aria-current="page"/.exec(html)?.[1]).toBe(new URL(ADDRESS[language]).pathname);
     expect([...html.matchAll(/<script(?! type="application\/ld\+json")[^>]*>/g)].map(([tag]) => tag)).toEqual([
       '<script src="/home-language.js">',
+      '<script src="/home-situations.js" defer>',
     ]);
   });
 
@@ -236,6 +238,74 @@ describe("the home in the browser's language", () => {
     expect(site).toMatch(/\.offer \{\s+display: none;/);
     expect(site).toMatch(/html\[data-offer\] \.offer \{\s+display: block;/);
     expect(CHOOSER).not.toMatch(/Storage|cookie/);
+  });
+});
+
+describe("the situations the home tells", () => {
+  const hiddenAt = (html: string): boolean[] =>
+    [
+      ...(/<span class="situations">([\s\S]*?)<\/span>\s+Folio/.exec(html)?.[1] ?? "").matchAll(
+        /<span( aria-hidden="true")?>/g,
+      ),
+    ].map(([, hidden]) => hidden !== undefined);
+
+  const watch = ({ reduced = false, hidden = false, hovered = false } = {}) => {
+    const situations = [0, 1, 2].map((at) => {
+      const said = new Set(at === 0 ? [] : ["aria-hidden"]);
+      return {
+        said,
+        setAttribute: (name: string) => said.add(name),
+        removeAttribute: (name: string) => said.delete(name),
+      };
+    });
+    let tick: (() => void) | undefined;
+    let stopped = false;
+    runInNewContext(SITUATIONS, {
+      document: { querySelector: () => ({ children: situations, matches: () => hovered }), hidden },
+      matchMedia: () => ({ matches: reduced }),
+      setInterval: (listener: () => void) => {
+        tick = listener;
+      },
+      clearInterval: () => {
+        stopped = true;
+      },
+    });
+    const shown = () => situations.findIndex((one) => !one.said.has("aria-hidden"));
+    return { tick: () => tick?.(), shown, stopped: () => stopped, moves: () => tick !== undefined };
+  };
+
+  it("are as many in both languages, and only the first is shown before any script runs", () => {
+    const es = hiddenAt(HOME.es);
+    expect(es.length).toBeGreaterThan(1);
+    expect(es).toEqual([false, ...Array(es.length - 1).fill(true)]);
+    expect(hiddenAt(HOME.en)).toEqual(es);
+  });
+
+  it("show each one once and end on the first", () => {
+    const home = watch();
+    const seen = [1, 2, 3].map(() => {
+      expect(home.stopped()).toBe(false);
+      home.tick();
+      return home.shown();
+    });
+    expect(seen).toEqual([1, 2, 0]);
+    expect(home.stopped()).toBe(true);
+  });
+
+  it.each([{ hovered: true }, { hidden: true }])("wait while %o", (state) => {
+    const home = watch(state);
+    home.tick();
+    expect(home.shown()).toBe(0);
+  });
+
+  it("stay on the first when the system asks for less motion", () => {
+    expect(watch({ reduced: true }).moves()).toBe(false);
+  });
+
+  it("share one place, so the page does not jump when one changes", () => {
+    const site = read(`${PLACE}/site.css`);
+    expect(site).toMatch(/\.situations > \* \{\s+grid-area: 1 \/ 1;/);
+    expect(site).toMatch(/\.situations > \[aria-hidden="true"\] \{\s+visibility: hidden;/);
   });
 });
 
