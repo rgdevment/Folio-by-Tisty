@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { Document, Page } from "@tisty/contracts";
+import { CONTRACTS, type Document, type Page } from "@tisty/contracts";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { domPurifyCleaner } from "../src/page/ui/clean";
@@ -1003,6 +1003,160 @@ describe("what a note says it is", () => {
   ])("%s reads %s", (kind, said) => {
     draw(holding(`<blockquote class="callout" data-callout="${kind}"><p>x</p></blockquote>`));
     expect(root.querySelector("blockquote")?.getAttribute("data-said")).toBe(said);
+  });
+});
+
+describe("an idea stuck on the sheet", () => {
+  const idea = (head: string): HTMLElement => {
+    draw(holding(`<blockquote class="callout" data-callout="idea"${head}><p>Pintar la reja</p></blockquote>`));
+    return root.querySelector("blockquote") as HTMLElement;
+  };
+  const shape = (note: HTMLElement) => [
+    note.dataset.hold,
+    note.dataset.pin,
+    ...["--tilt", "--angle", "--along"].map((one) => note.style.getPropertyValue(one)),
+  ];
+
+  it("keeps its hue and side, and says its date and time in the reader's words", () => {
+    const note = idea(' data-when="2026-11-12 09:40" data-hue="yellow" data-side="right"');
+    expect([note.dataset.hue, note.dataset.side, note.dataset.said]).toEqual(["yellow", "right", "12 nov · 09:40"]);
+    expect(note.textContent).toBe("Pintar la reja");
+  });
+
+  it.each([
+    [' data-when="2026-11-12 09:40"', ["pin", "0", "-0.5deg", "15deg", "55%"]],
+    [' data-when="2026-11-12 09:40" data-hue="blue" data-side="left"', ["pin", "0", "-0.5deg", "15deg", "55%"]],
+    [' data-when="2026-11-12"', ["tape", "2", "1.25deg", "-10deg", "28%"]],
+  ])("leans and is held as Tisty draws%s", (head, drawn) => {
+    expect(shape(idea(head))).toEqual(drawn);
+  });
+
+  it("says only its date when it has no time", () => {
+    expect(idea(' data-when="2026-11-12"').dataset.said).toBe("12 nov");
+  });
+
+  it("says the word of its kind without a head line, leaning by its words", () => {
+    const note = idea("");
+    expect(note.dataset.said).toBe("Idea");
+    expect(shape(note)).toEqual(["corner-right", "1", "1.25deg", "11deg", "43%"]);
+  });
+
+  it.each(["ayer", "2026-13-45 09:40", "2026-02-30", "2026-00-10", "2026-11-12 24:00", "2026-11-12 09:60"])(
+    "says the word of its kind when %s is not a date",
+    (when) => {
+      expect(idea(` data-when="${when}"`).dataset.said).toBe("Idea");
+    },
+  );
+
+  it.each([
+    [' data-when="2026-11-12 09:40"', "Nov 12 · 09:40"],
+    [' data-when="2026-11-12"', "Nov 12"],
+    ["", "Idea"],
+  ])("says%s in English to a reader of English", (head, said) => {
+    draw({
+      ...holding(`<blockquote class="callout" data-callout="idea"${head}><p>Paint the gate</p></blockquote>`),
+      lang: "en",
+    });
+    expect(root.querySelector("blockquote")?.getAttribute("data-said")).toBe(said);
+  });
+
+  it("reads a year under a hundred as written", () => {
+    expect(idea(' data-when="0099-01-02"').dataset.said).toBe("2 ene");
+  });
+});
+
+describe("what goes below a floated idea", () => {
+  it("marks a picture alone in its paragraph, and not one among words", () => {
+    draw(
+      holding(
+        '<p><img alt="sola"></p><p><a href="#rio"><img alt="enlazada"></a></p><p><img alt="con salto"><br></p><p>Mira <img alt="entre"> aquí</p><p><img alt="a"><img alt="b"></p><p><a href="#rio"><img alt="c"></a> y más</p>',
+      ),
+    );
+    expect([...root.querySelectorAll("p")].map((one) => one.hasAttribute("data-alone"))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+});
+
+describe("the sheet around a floated idea", () => {
+  const sheet = readFileSync("src/page/ui/sheet.css", "utf8");
+  const declared = (html: string, property: string): string => {
+    const { window } = new JSDOM(`<style>${sheet}</style><article class="sheet">${html}</article>`);
+    const target = window.document.querySelector(".sheet > *") as Element;
+    const matching = (rule: CSSStyleRule): boolean => {
+      try {
+        return target.matches(rule.selectorText);
+      } catch {
+        return false;
+      }
+    };
+    return (
+      [...(window.document.styleSheets[0]?.cssRules ?? [])]
+        .filter((rule): rule is CSSStyleRule => rule instanceof window.CSSStyleRule)
+        .filter(matching)
+        .map((rule) => rule.style.getPropertyValue(property))
+        .filter(Boolean)
+        .at(-1) ?? ""
+    );
+  };
+
+  it("keeps a note whole on paper", () => {
+    expect(declared('<blockquote class="callout" data-callout="idea"><p>a</p></blockquote>', "break-inside")).toBe(
+      "avoid",
+    );
+  });
+
+  it.each([
+    ["a list", "<ul><li>a</li></ul>"],
+    ["a numbered list", "<ol><li>a</li></ol>"],
+    ["a quote", "<blockquote><p>a</p></blockquote>"],
+    ["a callout", '<blockquote class="callout" data-callout="tip"><p>a</p></blockquote>'],
+  ])("keeps %s beside the note, never under it", (_says, html) => {
+    expect(declared(html, "display")).toBe("flow-root");
+  });
+
+  it.each([
+    ["a picture alone", "<p data-alone><img></p>", "both"],
+    ["a paragraph", "<p>a</p>", ""],
+  ])("sends %s below the note only when it stands alone", (_says, html, clear) => {
+    expect(declared(html, "clear")).toBe(clear);
+  });
+});
+
+describe("the colours of an idea", () => {
+  const sheet = readFileSync("src/page/ui/sheet.css", "utf8");
+  const { hues } = (CONTRACTS.style as unknown as { values: { callouts: { idea: { hues: string[] } } } }).values
+    .callouts.idea;
+  const ruled = (hue: string): CSSStyleDeclaration[] => {
+    const { window } = new JSDOM(`<style>${sheet}</style>`);
+    const note = window.document.createElement("blockquote");
+    note.className = "callout";
+    note.dataset.callout = "idea";
+    note.dataset.hue = hue;
+    return [...(window.document.styleSheets[0]?.cssRules ?? [])]
+      .filter((rule): rule is CSSStyleRule => rule instanceof window.CSSStyleRule)
+      .filter((rule) => rule.selectorText.startsWith("blockquote") && note.matches(rule.selectorText))
+      .map((rule) => rule.style);
+  };
+  const last = (hue: string, property: string): string =>
+    ruled(hue)
+      .map((style) => style.getPropertyValue(property))
+      .filter(Boolean)
+      .at(-1) ?? "";
+
+  it.each(hues)("fills %s with its own colour", (hue) => {
+    expect(last(hue, "--idea-fill")).toBe(`var(--tisty-idea-${hue})`);
+    expect(last(hue, "background")).toBe("var(--idea-fill)");
+  });
+
+  it("leaves a hue no sticky note wears plain, the colour of the sheet", () => {
+    expect(last("red", "--idea-fill")).toBe("");
+    expect(last("red", "background")).toBe("var(--tisty-sheet)");
   });
 });
 

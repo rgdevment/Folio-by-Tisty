@@ -176,6 +176,7 @@ const es = {
     important: "Importante",
     warning: "Aviso",
     caution: "Cuidado",
+    idea: "Idea",
   } as Record<string, string>,
 
   original: "Original",
@@ -353,6 +354,7 @@ const en: Words = {
     important: "Important",
     warning: "Warning",
     caution: "Caution",
+    idea: "Idea",
   },
 
   original: "Original",
