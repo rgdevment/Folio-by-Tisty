@@ -126,6 +126,17 @@ describe("the policy pages of tisty.cl", () => {
     expect(html).toContain('<h2 id="notas-1">');
   });
 
+  it.each(POLICIES)("$path lists its sections beside the text, in order, each leading to its own", (policy) => {
+    const html = pageOf(policy);
+    const contents = /<nav class="contents"[\s\S]*?<\/nav>/.exec(html)?.[0] ?? "";
+    const article = /<article>([\s\S]*?)<\/article>/.exec(html)?.[1] ?? "";
+    const headings = [...article.matchAll(/<h2 id="([^"]+)">/g)].map(([, id]) => `#${id}`);
+    expect(headings.length).toBeGreaterThan(3);
+    expect(linksIn(contents)).toEqual(headings);
+    expect(contents).toContain(policy.language === "es" ? "En esta página" : "On this page");
+    expect(html).toMatch(/<main class="policy">\s*<nav class="contents"[\s\S]*<\/nav>\s*<article>/);
+  });
+
   it.each(POLICIES)("$path keeps each table a table, inside a box that scrolls on a narrow screen", (policy) => {
     const html = pageOf(policy);
     const tables = html.match(/<table>/g)?.length ?? 0;
