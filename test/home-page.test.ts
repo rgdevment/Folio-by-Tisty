@@ -100,9 +100,15 @@ describe("the home page", () => {
     }
   });
 
-  it.each(LANGUAGES)("in %s leads its code link to Tisty's site, in that language", (language) => {
-    const site = language === "es" ? "https://www.tisty.app/es/" : "https://www.tisty.app/";
-    expect(HOME[language]).toContain(`<a href="${site}">${language === "es" ? "Código" : "Code"}</a>`);
+  it.each(LANGUAGES)("in %s leads its code link to Tisty's source code", (language) => {
+    expect(HOME[language]).toContain(
+      `<a href="https://github.com/rgdevment/Tisty">${language === "es" ? "Código" : "Code"}</a>`,
+    );
+  });
+
+  it("leads the missing page's code links to Tisty's source code, in both languages", () => {
+    expect(MISSING).toContain('<a href="https://github.com/rgdevment/Tisty" lang="es">Código</a>');
+    expect(MISSING).toContain('<a href="https://github.com/rgdevment/Tisty" lang="en">Code</a>');
   });
 
   it("is where the reader's name leads", () => {
