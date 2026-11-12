@@ -99,6 +99,11 @@ describe("the home page", () => {
     }
   });
 
+  it.each(LANGUAGES)("in %s leads its code link to Tisty's site, in that language", (language) => {
+    const site = language === "es" ? "https://www.tisty.app/es/" : "https://www.tisty.app/";
+    expect(HOME[language]).toContain(`<a href="${site}">${language === "es" ? "Código" : "Code"}</a>`);
+  });
+
   it("is where the reader's name leads", () => {
     expect(read("src/page/index.html")).toContain('<a class="brand" href="/">');
   });
