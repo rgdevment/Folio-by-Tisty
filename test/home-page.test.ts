@@ -176,7 +176,7 @@ describe("the home in the browser's language", () => {
   const arrive = (page: Language, browser: string | undefined, referrer = "", address = "") => {
     const root = { lang: page, dataset: {} as Record<string, string> };
     const sent: string[] = [];
-    const [search = "", hash = ""] = address.split(/(?=#)/);
+    const { search, hash } = new URL(address, SITE);
     const location = { origin: SITE, search, hash, replace: (to: string) => sent.push(to) };
     runInNewContext(CHOOSER, {
       document: { documentElement: root, referrer },
@@ -190,8 +190,12 @@ describe("the home in the browser's language", () => {
     expect(arrive("en", browser)).toEqual({ sent: ["/es/"], offer: "nothing" });
   });
 
-  it("keeps the query and the section a visitor came for", () => {
-    expect(arrive("en", "es-CL", "", "?from=tisty#facts").sent).toEqual(["/es/?from=tisty#facts"]);
+  it.each([
+    ["?from=tisty#facts", "/es/?from=tisty#facts"],
+    ["#facts", "/es/#facts"],
+    ["?from=tisty", "/es/?from=tisty"],
+  ])("keeps the query and the section a visitor came for, at %s", (address, to) => {
+    expect(arrive("en", "es-CL", "", address).sent).toEqual([to]);
   });
 
   it("leaves a browser in Spanish that chose English on this site, and still offers Spanish", () => {
@@ -223,15 +227,10 @@ describe("the home in the browser's language", () => {
     );
   });
 
-  it.each(LANGUAGES)(
-    "in %s sends this site as referrer from every link to English, and only from those",
-    (language) => {
-      const toEnglish = [...HOME[language].matchAll(/<a href="\/"[^>]*>/g)].map(([tag]) => tag);
-      expect(toEnglish.length).toBeGreaterThan(0);
-      expect(toEnglish.every((tag) => tag.includes('referrerpolicy="origin"'))).toBe(true);
-      expect(HOME[language].match(/referrerpolicy=/g)).toHaveLength(toEnglish.length);
-    },
-  );
+  it.each(LANGUAGES)("in %s tells only this site where every link of the page was followed from", (language) => {
+    expect(HOME[language]).toContain('<meta name="referrer" content="same-origin" />');
+    expect(HOME[language]).not.toContain("referrerpolicy=");
+  });
 
   it("keeps the offer hidden until the browser asks for it, and keeps nothing in the browser", () => {
     const site = read(`${PLACE}/site.css`);
@@ -249,7 +248,7 @@ describe("the situations the home tells", () => {
       ),
     ].map(([, hidden]) => hidden !== undefined);
 
-  const watch = ({ reduced = false, hidden = false, hovered = false } = {}) => {
+  const watch = ({ reduced = false, hidden = false, hovered = false, touch = false } = {}) => {
     const situations = [0, 1, 2].map((at) => {
       const said = new Set(at === 0 ? [] : ["aria-hidden"]);
       return {
@@ -262,7 +261,7 @@ describe("the situations the home tells", () => {
     let stopped = false;
     runInNewContext(SITUATIONS, {
       document: { querySelector: () => ({ children: situations, matches: () => hovered }), hidden },
-      matchMedia: () => ({ matches: reduced }),
+      matchMedia: (query: string) => ({ matches: query.includes("reduced-motion") ? reduced : !touch }),
       setInterval: (listener: () => void) => {
         tick = listener;
       },
@@ -296,6 +295,12 @@ describe("the situations the home tells", () => {
     const home = watch(state);
     home.tick();
     expect(home.shown()).toBe(0);
+  });
+
+  it("go on after a tap on a touch screen, which leaves :hover behind", () => {
+    const home = watch({ hovered: true, touch: true });
+    home.tick();
+    expect(home.shown()).toBe(1);
   });
 
   it("stay on the first when the system asks for less motion", () => {

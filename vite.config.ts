@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { CONTRACTS } from "@tisty/contracts";
 import { defineConfig, type Plugin } from "vite";
-import { POLICIES, policyPage } from "./scripts/policy-pages";
+import { HOME_FILES, POLICIES, policyPage, sitemap } from "./scripts/site-pages";
 
 const TOKENS = "virtual:tisty-tokens.css";
 const RESOLVED_TOKENS = `\0${TOKENS}`;
@@ -59,22 +59,27 @@ const domains = (): Plugin => ({
 });
 
 // Rendered from docs/ at every build, so the site cannot say other words than the policies in the repository.
-const policies = (): Plugin => ({
-  name: "folio-policies",
+const sitePages = (): Plugin => ({
+  name: "folio-site-pages",
   generateBundle() {
     for (const policy of POLICIES) {
       this.emitFile({
         type: "asset",
         fileName: `${policy.path.slice(1)}index.html`,
-        source: policyPage(policy, readFileSync(`docs/${policy.source}`, "utf8")),
+        source: policyPage(
+          policy,
+          readFileSync(`docs/${policy.source}`, "utf8"),
+          readFileSync(HOME_FILES[policy.language], "utf8"),
+        ),
       });
     }
+    this.emitFile({ type: "asset", fileName: "sitemap.xml", source: sitemap() });
   },
 });
 
 export default defineConfig({
   root: "src/page",
-  plugins: [tokens(), licenses(), domains(), policies()],
+  plugins: [tokens(), licenses(), domains(), sitePages()],
   define: { __FOLIO_SHARDS__: JSON.stringify(shardNames().map((name) => name.slice(0, 2))) },
   build: {
     outDir: "../../dist/page",

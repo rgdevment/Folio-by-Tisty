@@ -270,9 +270,12 @@ h1 {
   color: var(--fg);
 }
 
-.policy table {
-  display: block;
+.policy .table {
   overflow-x: auto;
+}
+
+.policy table {
+  width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
 }
