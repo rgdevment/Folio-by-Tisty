@@ -18,6 +18,11 @@ interface Sample {
 
 const SAMPLES = VECTORS.editors as Sample[];
 const IN_A_DOCUMENT = VECTORS.editors_in_a_document as { id: string; editors: Editor[]; kept: Editor[] };
+const WEIGHED = VECTORS.editors_weighed as {
+  id: string;
+  editors: Editor[];
+  cases: { says: string; served: Served; kept: Editor[] }[];
+};
 const entry = (says: string): Editor => (SAMPLES.find((one) => one.says === says) as Sample).entry;
 const MARIO = entry("the owner, who signed its first version");
 const ANA = entry("someone who edited it through its link");
@@ -52,6 +57,14 @@ describe("whom the page names as having edited it", () => {
     const shown = await editorsOf(documentWith(IN_A_DOCUMENT.editors, IN_A_DOCUMENT.id), {});
     expect(shown.map((one) => one.name)).toEqual(IN_A_DOCUMENT.kept.map((one) => one.name));
   });
+
+  it.each(WEIGHED.cases.map((one) => [one.says, one] as const))(
+    "%s, weighed as the contract says",
+    async (_, { served, kept }) => {
+      const shown = await editorsOf(documentWith(WEIGHED.editors, WEIGHED.id), served);
+      expect(shown.map((one) => one.name)).toEqual(kept.map((one) => one.name));
+    },
+  );
 
   it("nobody when no entry holds", async () => {
     expect(await shownIn(SAMPLES.filter((one) => !one.holds).map((one) => one.entry))).toEqual([]);
