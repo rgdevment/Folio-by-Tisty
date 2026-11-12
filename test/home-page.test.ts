@@ -11,7 +11,8 @@ const ADDRESS: Record<Language, string> = { es: "https://tisty.cl/es/", en: "htt
 const PAGES = ["home.html", "es/index.html", "404.html"];
 const REDIRECTS = read(`${PLACE}/_redirects`);
 const LANGUAGE = read(`${PLACE}/language.js`);
-const OFFER = read(`${PLACE}/language-offer.js`);
+const CHOOSER = read(`${PLACE}/home-language.js`);
+const SITUATIONS = read(`${PLACE}/home-situations.js`);
 const MISSING = read(`${PLACE}/404.html`);
 const flat = (html: string): string => html.replace(/\s+/g, " ");
 const meta = (html: string, property: string): string | undefined =>
@@ -71,8 +72,8 @@ describe("the home page", () => {
   it("says what the policy says about reports and orders", () => {
     expect(flat(HOME.es)).toContain("hasta 180 días");
     expect(flat(HOME.en)).toContain("up to 180 days");
-    expect(HOME.es).toContain("docs/PRIVACIDAD.md");
-    expect(HOME.en).toContain("docs/PRIVACY.md");
+    expect(HOME.es).toContain('href="/es/privacidad/"');
+    expect(HOME.en).toContain('href="/privacy/"');
   });
 
   it.each(PAGES)("%s loads nothing from anyone else", (page) => {
@@ -97,6 +98,11 @@ describe("the home page", () => {
     for (const language of LANGUAGES) {
       expect(HOME[language]).toContain(`<link rel="canonical" href="${ADDRESS[language]}" />`);
     }
+  });
+
+  it.each(LANGUAGES)("in %s leads its code link to Tisty's site, in that language", (language) => {
+    const site = language === "es" ? "https://www.tisty.app/es/" : "https://www.tisty.app/";
+    expect(HOME[language]).toContain(`<a href="${site}">${language === "es" ? "Código" : "Code"}</a>`);
   });
 
   it("is where the reader's name leads", () => {
@@ -131,7 +137,8 @@ describe("the home page", () => {
     expect(html).toMatch(/<a href="\/" hreflang="en" lang="en" aria-label="English"/);
     expect(/<a href="([^"]+)"[^>]*aria-current="page"/.exec(html)?.[1]).toBe(new URL(ADDRESS[language]).pathname);
     expect([...html.matchAll(/<script(?! type="application\/ld\+json")[^>]*>/g)].map(([tag]) => tag)).toEqual([
-      '<script src="/language-offer.js">',
+      '<script src="/home-language.js">',
+      '<script src="/home-situations.js" defer>',
     ]);
   });
 
@@ -164,38 +171,146 @@ describe("the home page", () => {
   });
 });
 
-describe("the offer of the home in the other language", () => {
-  const offered = (page: string, browser: string | undefined): string => {
+describe("the home in the browser's language", () => {
+  const SITE = "https://tisty.cl";
+  const arrive = (page: Language, browser: string | undefined, referrer = "", address = "") => {
     const root = { lang: page, dataset: {} as Record<string, string> };
-    runInNewContext(OFFER, { document: { documentElement: root }, navigator: { language: browser } });
-    return root.dataset.offer ?? "nothing";
+    const sent: string[] = [];
+    const { search, hash } = new URL(address, SITE);
+    const location = { origin: SITE, search, hash, replace: (to: string) => sent.push(to) };
+    runInNewContext(CHOOSER, {
+      document: { documentElement: root, referrer },
+      navigator: { language: browser },
+      location,
+    });
+    return { sent, offer: root.dataset.offer ?? "nothing" };
   };
 
-  it.each(LANGUAGES)("in %s leads to the other page, in the other language", (language) => {
-    const other = language === "es" ? "en" : "es";
-    expect(HOME[language]).toContain(
-      `<p class="offer" lang="${other}" data-nosnippet><a href="${new URL(ADDRESS[other]).pathname}" hreflang="${other}">`,
-    );
+  it.each(["es-CL", "ES", "es"])("sends a browser in %s from the root to the page in Spanish", (browser) => {
+    expect(arrive("en", browser)).toEqual({ sent: ["/es/"], offer: "nothing" });
   });
 
   it.each([
+    ["?from=tisty#facts", "/es/?from=tisty#facts"],
+    ["#facts", "/es/#facts"],
+    ["?from=tisty", "/es/?from=tisty"],
+  ])("keeps the query and the section a visitor came for, at %s", (address, to) => {
+    expect(arrive("en", "es-CL", "", address).sent).toEqual([to]);
+  });
+
+  it("leaves a browser in Spanish that chose English on this site, and still offers Spanish", () => {
+    expect(arrive("en", "es-CL", `${SITE}/`)).toEqual({ sent: [], offer: "es" });
+  });
+
+  it("sends a browser in Spanish that came from another site", () => {
+    expect(arrive("en", "es-CL", "https://tisty.cl.example.com/").sent).toEqual(["/es/"]);
+  });
+
+  it.each([
+    ["en", "en-GB", "nothing"],
+    ["en", "pt-BR", "nothing"],
+    ["en", undefined, "nothing"],
     ["es", "en-US", "en"],
     ["es", "pt-BR", "en"],
     ["es", undefined, "en"],
     ["es", "es-CL", "nothing"],
-    ["es", "ES", "nothing"],
-    ["en", "es-CL", "es"],
-    ["en", "en-GB", "nothing"],
-    ["en", "pt-BR", "nothing"],
-  ])("on the page in %s, for a browser in %s, offers %s", (page, browser, offer) => {
-    expect(offered(page, browser)).toBe(offer);
+  ] as const)("on the page in %s, for a browser in %s, stays and offers %s", (page, browser, offer) => {
+    expect(arrive(page, browser)).toEqual({ sent: [], offer });
   });
 
-  it("stays hidden until the browser asks for it, and keeps nothing in the browser", () => {
+  it.each(LANGUAGES)("in %s offers the other page, in the other language", (language) => {
+    const other = language === "es" ? "en" : "es";
+    expect(HOME[language]).toMatch(
+      new RegExp(
+        `<p class="offer" lang="${other}" data-nosnippet><a href="${new URL(ADDRESS[other]).pathname}" hreflang="${other}"[ >]`,
+      ),
+    );
+  });
+
+  it.each(LANGUAGES)("in %s tells only this site where every link of the page was followed from", (language) => {
+    expect(HOME[language]).toContain('<meta name="referrer" content="same-origin" />');
+    expect(HOME[language]).not.toContain("referrerpolicy=");
+  });
+
+  it("keeps the offer hidden until the browser asks for it, and keeps nothing in the browser", () => {
     const site = read(`${PLACE}/site.css`);
     expect(site).toMatch(/\.offer \{\s+display: none;/);
     expect(site).toMatch(/html\[data-offer\] \.offer \{\s+display: block;/);
-    expect(OFFER).not.toMatch(/Storage|cookie/);
+    expect(CHOOSER).not.toMatch(/Storage|cookie/);
+  });
+});
+
+describe("the situations the home tells", () => {
+  const hiddenAt = (html: string): boolean[] =>
+    [
+      ...(/<span class="situations">([\s\S]*?)<\/span>\s+Folio/.exec(html)?.[1] ?? "").matchAll(
+        /<span( aria-hidden="true")?>/g,
+      ),
+    ].map(([, hidden]) => hidden !== undefined);
+
+  const watch = ({ reduced = false, hidden = false, hovered = false, touch = false } = {}) => {
+    const situations = [0, 1, 2].map((at) => {
+      const said = new Set(at === 0 ? [] : ["aria-hidden"]);
+      return {
+        said,
+        setAttribute: (name: string) => said.add(name),
+        removeAttribute: (name: string) => said.delete(name),
+      };
+    });
+    let tick: (() => void) | undefined;
+    let stopped = false;
+    runInNewContext(SITUATIONS, {
+      document: { querySelector: () => ({ children: situations, matches: () => hovered }), hidden },
+      matchMedia: (query: string) => ({ matches: query.includes("reduced-motion") ? reduced : !touch }),
+      setInterval: (listener: () => void) => {
+        tick = listener;
+      },
+      clearInterval: () => {
+        stopped = true;
+      },
+    });
+    const shown = () => situations.findIndex((one) => !one.said.has("aria-hidden"));
+    return { tick: () => tick?.(), shown, stopped: () => stopped, moves: () => tick !== undefined };
+  };
+
+  it("are as many in both languages, and only the first is shown before any script runs", () => {
+    const es = hiddenAt(HOME.es);
+    expect(es.length).toBeGreaterThan(1);
+    expect(es).toEqual([false, ...Array(es.length - 1).fill(true)]);
+    expect(hiddenAt(HOME.en)).toEqual(es);
+  });
+
+  it("show each one once and end on the first", () => {
+    const home = watch();
+    const seen = [1, 2, 3].map(() => {
+      expect(home.stopped()).toBe(false);
+      home.tick();
+      return home.shown();
+    });
+    expect(seen).toEqual([1, 2, 0]);
+    expect(home.stopped()).toBe(true);
+  });
+
+  it.each([{ hovered: true }, { hidden: true }])("wait while %o", (state) => {
+    const home = watch(state);
+    home.tick();
+    expect(home.shown()).toBe(0);
+  });
+
+  it("go on after a tap on a touch screen, which leaves :hover behind", () => {
+    const home = watch({ hovered: true, touch: true });
+    home.tick();
+    expect(home.shown()).toBe(1);
+  });
+
+  it("stay on the first when the system asks for less motion", () => {
+    expect(watch({ reduced: true }).moves()).toBe(false);
+  });
+
+  it("share one place, so the page does not jump when one changes", () => {
+    const site = read(`${PLACE}/site.css`);
+    expect(site).toMatch(/\.situations > \* \{\s+grid-area: 1 \/ 1;/);
+    expect(site).toMatch(/\.situations > \[aria-hidden="true"\] \{\s+visibility: hidden;/);
   });
 });
 

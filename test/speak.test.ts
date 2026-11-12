@@ -72,12 +72,12 @@ describe("the page's words", () => {
 
   it("send terms, privacy and security to the version in the language spoken", () => {
     speak("es");
-    expect(linkSaying("Términos")?.href).toContain("/docs/TERMINOS.md");
-    expect(linkSaying("Privacidad")?.href).toContain("/docs/PRIVACIDAD.md");
+    expect(linkSaying("Términos")?.href).toContain("/es/terminos/");
+    expect(linkSaying("Privacidad")?.href).toContain("/es/privacidad/");
     expect(linkSaying("Seguridad")?.href).toContain("/docs/SEGURIDAD.md");
     speak("en");
-    expect(linkSaying("Terms")?.href).toContain("/docs/TERMS.md");
-    expect(linkSaying("Privacy")?.href).toContain("/docs/PRIVACY.md");
+    expect(linkSaying("Terms")?.href).toContain("/terms/");
+    expect(linkSaying("Privacy")?.href).toContain("/privacy/");
     expect(linkSaying("Security")?.href).toContain("/docs/SECURITY.md");
   });
 

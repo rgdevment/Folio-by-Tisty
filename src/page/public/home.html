@@ -10,6 +10,7 @@
     />
     <meta name="theme-color" content="#faf8f4" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0e0d0b" media="(prefers-color-scheme: dark)" />
+    <meta name="referrer" content="same-origin" />
     <link rel="canonical" href="https://tisty.cl/" />
     <link rel="alternate" hreflang="es" href="https://tisty.cl/es/" />
     <link rel="alternate" hreflang="en" href="https://tisty.cl/" />
@@ -33,7 +34,8 @@
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="stylesheet" href="/site.css" />
-    <script src="/language-offer.js"></script>
+    <script src="/home-language.js"></script>
+    <script src="/home-situations.js" defer></script>
     <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://tisty.cl/#website","name":"Folio by Tisty","url":"https://tisty.cl/","inLanguage":["en","es"],"publisher":{"@id":"https://rgdevment.dev/#person"}},{"@type":"WebApplication","@id":"https://tisty.cl/#folio","name":"Folio by Tisty","url":"https://tisty.cl/","description":"Hand over what you know: share a Markdown document from Tisty by an end-to-end encrypted link, signed by you, that anyone reads with no account.","inLanguage":"en","applicationCategory":"UtilitiesApplication","operatingSystem":"Any web browser","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"provider":{"@id":"https://rgdevment.dev/#person"},"isRelatedTo":{"@id":"https://www.tisty.app/#app"}}]}</script>
   </head>
   <body>
@@ -59,9 +61,31 @@
           </p>
           <h1>Hand over what you know. Only people with the link can read it.</h1>
           <p class="lead">
-            Your PO, the QA joining the project, another team: give them the document they need, not a summary
-            pasted into a chat. Folio lets you share documents privately with anyone, using an encrypted link. You
-            share from Tisty.
+            <span class="situations">
+              <span>
+                Your PO, the QA joining the project, another team: give them the document they need, not a summary
+                pasted into a chat.
+              </span>
+              <span aria-hidden="true">
+                Whoever joins the team on Monday: give them the guide to get started, not an email thread from a
+                year ago.
+              </span>
+              <span aria-hidden="true">
+                Whoever is on call tonight: give them the whole runbook, not your number so they can wake you up.
+              </span>
+              <span aria-hidden="true">
+                You are off on holiday and someone picks up your work: give them the full handover, not twenty
+                scattered messages.
+              </span>
+              <span aria-hidden="true">
+                Your client asks how the project is going: give them the report as it stands today, not a PDF
+                growing old in their inbox.
+              </span>
+              <span aria-hidden="true">
+                Your team in another country: give them the document in their language too, not only in yours.
+              </span>
+            </span>
+            Folio lets you share documents privately with anyone, using an encrypted link. You share from Tisty.
           </p>
           <p class="action">
             <a class="button" href="https://www.tisty.app/">Get Tisty</a>
@@ -112,15 +136,15 @@
       <p class="caveat">
         There are exceptions: after a serious report or an order, a document stops being served and may be kept up to
         180 days or what the order asks, and whoever reports it can get the link to the operator. The details are in the
-        <a href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/PRIVACY.md">privacy policy</a>.
+        <a href="/privacy/">privacy policy</a>.
       </p>
     </main>
 
     <footer class="bottom">
       <a href="https://www.tisty.app/">Tisty</a>
-      <a href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/PRIVACY.md">Privacy</a>
-      <a href="https://github.com/rgdevment/Folio-by-Tisty/blob/main/docs/TERMS.md">Terms</a>
-      <a href="https://github.com/rgdevment/Folio-by-Tisty">Code</a>
+      <a href="/privacy/">Privacy</a>
+      <a href="/terms/">Terms</a>
+      <a href="https://www.tisty.app/">Code</a>
     </footer>
   </body>
 </html>

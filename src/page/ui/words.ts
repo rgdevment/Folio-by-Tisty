@@ -65,9 +65,9 @@ const es = {
   site: "https://www.tisty.app/es/",
   install: "https://www.tisty.app/es/#install",
   terms: "Términos",
-  termsAt: `${GITHUB_DOCS}/TERMINOS.md`,
+  termsAt: "/es/terminos/",
   privacy: "Privacidad",
-  privacyAt: `${GITHUB_DOCS}/PRIVACIDAD.md`,
+  privacyAt: "/es/privacidad/",
   security: "Seguridad",
   securityAt: `${GITHUB_DOCS}/SEGURIDAD.md`,
 
@@ -244,9 +244,9 @@ const en: Words = {
   site: "https://www.tisty.app/",
   install: "https://www.tisty.app/#install",
   terms: "Terms",
-  termsAt: `${GITHUB_DOCS}/TERMS.md`,
+  termsAt: "/terms/",
   privacy: "Privacy",
-  privacyAt: `${GITHUB_DOCS}/PRIVACY.md`,
+  privacyAt: "/privacy/",
   security: "Security",
   securityAt: `${GITHUB_DOCS}/SECURITY.md`,
 
