@@ -6,14 +6,41 @@ import { HOME_FILES, POLICIES, policyPage, sitemap } from "./scripts/site-pages"
 const TOKENS = "virtual:tisty-tokens.css";
 const RESOLVED_TOKENS = `\0${TOKENS}`;
 
+type Theme = "light" | "dark";
+type Themed<T> = Record<Theme, T>;
+
+interface Idea {
+  fill: Themed<Record<string, string>>;
+  ink: Themed<string>;
+  pins: Themed<string[]>;
+  tape: Themed<string>;
+}
+
 interface StyleValues {
-  colors: { light: Record<string, string>; dark: Record<string, string> };
+  colors: Themed<Record<string, string>>;
+  callouts: { idea: Idea };
 }
 
 const variables = ({ light, dark }: StyleValues["colors"]): string =>
   Object.entries(light)
-    .map(([name, value]) => `--tisty-${name}:light-dark(${value},${dark[name]});`)
+    .map(([name, value]) => {
+      const night = dark[name];
+      if (night === undefined) throw new Error(`the style contract gives --tisty-${name} no dark colour`);
+      return `--tisty-${name}:light-dark(${value},${night});`;
+    })
     .join("");
+
+const ideaColors = ({ fill, ink, pins, tape }: Idea, theme: Theme): Record<string, string> => ({
+  ...Object.fromEntries(Object.entries(fill[theme]).map(([hue, value]) => [`idea-${hue}`, value])),
+  ...Object.fromEntries(pins[theme].map((value, at) => [`idea-pin-${at}`, value])),
+  "idea-ink": ink[theme],
+  "idea-tape": tape[theme],
+});
+
+const colorsOf = ({ colors, callouts }: StyleValues): StyleValues["colors"] => ({
+  light: { ...colors.light, ...ideaColors(callouts.idea, "light") },
+  dark: { ...colors.dark, ...ideaColors(callouts.idea, "dark") },
+});
 
 // The colors come from the contract when building, so they change with it and no copy of them is kept here.
 const tokens = (): Plugin => ({
@@ -21,8 +48,7 @@ const tokens = (): Plugin => ({
   resolveId: (id) => (id === TOKENS ? RESOLVED_TOKENS : null),
   load(id) {
     if (id !== RESOLVED_TOKENS) return null;
-    const { colors } = (CONTRACTS.style as { values: StyleValues }).values;
-    return `:root{${variables(colors)}}`;
+    return `:root{${variables(colorsOf((CONTRACTS.style as { values: StyleValues }).values))}}`;
   },
 });
 

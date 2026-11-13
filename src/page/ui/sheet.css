@@ -4,6 +4,7 @@
 }
 
 .sheet {
+  display: flow-root;
   padding: 36px 40px;
   background: var(--tisty-sheet);
   border-radius: 10px;
@@ -188,11 +189,11 @@ blockquote.callout::before {
   text-transform: uppercase;
 }
 
-blockquote.callout > :first-child {
+blockquote > :first-child {
   margin-top: 0;
 }
 
-blockquote.callout > :last-child {
+blockquote > :last-child {
   margin-bottom: 0;
 }
 
@@ -210,6 +211,186 @@ blockquote[data-callout="warning"] {
 
 blockquote[data-callout="caution"] {
   --said: var(--tisty-hue-red);
+}
+
+blockquote[data-callout="idea"] {
+  --said: var(--tisty-soft);
+  --pin: var(--tisty-idea-pin-0);
+  position: relative;
+  box-sizing: border-box;
+  width: fit-content;
+  min-width: 150px;
+  max-width: 256px;
+  margin: 14px 0;
+  padding: 24px 14px 18px;
+  background: var(--tisty-sheet);
+  border: 1px dashed var(--tisty-line);
+  border-radius: 6px;
+  box-shadow:
+    0 4px 14px var(--tisty-cast),
+    0 1px 3px var(--tisty-cast);
+  font-family: "Ink Free", "Segoe Print", Noteworthy, "Bradley Hand", "Marker Felt", cursive;
+  font-size: 16px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  transform: rotate(var(--tilt, -1.2deg));
+  break-inside: avoid;
+}
+
+blockquote[data-callout="idea"]::before {
+  margin-bottom: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.7;
+}
+
+blockquote[data-callout="idea"][data-pin="1"] {
+  --pin: var(--tisty-idea-pin-1);
+}
+
+blockquote[data-callout="idea"][data-pin="2"] {
+  --pin: var(--tisty-idea-pin-2);
+}
+
+blockquote[data-callout="idea"][data-pin="3"] {
+  --pin: var(--tisty-idea-pin-3);
+}
+
+blockquote[data-callout="idea"][data-hold]::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+blockquote[data-callout="idea"][data-hold="pin"]::after {
+  top: -7px;
+  left: var(--along);
+  width: 16px;
+  height: 16px;
+  translate: -50% 0;
+  background: radial-gradient(
+    circle at 35% 30%,
+    color-mix(in srgb, var(--pin), white 45%),
+    var(--pin) 45%,
+    color-mix(in srgb, var(--pin), black 45%)
+  );
+  border-radius: 50%;
+  box-shadow: 2px 3px 3px rgb(0 0 0 / 0.35);
+}
+
+blockquote[data-callout="idea"]:is([data-hold="tape"], [data-hold^="corner"])::after {
+  top: -9px;
+  left: var(--along);
+  width: 64px;
+  height: 18px;
+  translate: -50% 0;
+  rotate: var(--angle);
+  background: var(--tisty-idea-tape);
+  border: 1px solid var(--tisty-line);
+}
+
+blockquote[data-callout="idea"][data-hold="corner-left"]::after {
+  top: 2px;
+  left: -14px;
+  translate: none;
+  rotate: calc(-40deg + var(--angle) / 3);
+}
+
+blockquote[data-callout="idea"][data-hold="corner-right"]::after {
+  top: 2px;
+  right: -14px;
+  left: auto;
+  translate: none;
+  rotate: calc(40deg + var(--angle) / 3);
+}
+
+blockquote[data-callout="idea"]:is(
+  [data-hue="pink"],
+  [data-hue="coral"],
+  [data-hue="orange"],
+  [data-hue="yellow"],
+  [data-hue="lime"],
+  [data-hue="green"],
+  [data-hue="teal"],
+  [data-hue="cyan"],
+  [data-hue="blue"],
+  [data-hue="lavender"],
+  [data-hue="violet"],
+  [data-hue="magenta"]
+) {
+  --said: var(--tisty-idea-ink);
+  background: var(--idea-fill);
+  border-color: transparent;
+  color: var(--tisty-idea-ink);
+}
+
+blockquote[data-callout="idea"][data-hue="pink"] {
+  --idea-fill: var(--tisty-idea-pink);
+}
+
+blockquote[data-callout="idea"][data-hue="coral"] {
+  --idea-fill: var(--tisty-idea-coral);
+}
+
+blockquote[data-callout="idea"][data-hue="orange"] {
+  --idea-fill: var(--tisty-idea-orange);
+}
+
+blockquote[data-callout="idea"][data-hue="yellow"] {
+  --idea-fill: var(--tisty-idea-yellow);
+}
+
+blockquote[data-callout="idea"][data-hue="lime"] {
+  --idea-fill: var(--tisty-idea-lime);
+}
+
+blockquote[data-callout="idea"][data-hue="green"] {
+  --idea-fill: var(--tisty-idea-green);
+}
+
+blockquote[data-callout="idea"][data-hue="teal"] {
+  --idea-fill: var(--tisty-idea-teal);
+}
+
+blockquote[data-callout="idea"][data-hue="cyan"] {
+  --idea-fill: var(--tisty-idea-cyan);
+}
+
+blockquote[data-callout="idea"][data-hue="blue"] {
+  --idea-fill: var(--tisty-idea-blue);
+}
+
+blockquote[data-callout="idea"][data-hue="lavender"] {
+  --idea-fill: var(--tisty-idea-lavender);
+}
+
+blockquote[data-callout="idea"][data-hue="violet"] {
+  --idea-fill: var(--tisty-idea-violet);
+}
+
+blockquote[data-callout="idea"][data-hue="magenta"] {
+  --idea-fill: var(--tisty-idea-magenta);
+}
+
+blockquote[data-callout="idea"][data-side="right"] {
+  float: right;
+  margin: 4px 0 12px 20px;
+}
+
+blockquote[data-callout="idea"][data-side="left"] {
+  float: left;
+  margin: 4px 20px 12px 0;
+}
+
+:is(.sheet, .printed-page) > :is(hr, div.table, figure, pre, details, div.math, p[data-alone]) {
+  clear: both;
+}
+
+/* Their markers, checks, borders and tints would run under a floated note. */
+:is(.sheet, .printed-page) > :is(ul, ol, blockquote) {
+  display: flow-root;
 }
 
 mark {
@@ -490,7 +671,7 @@ svg[data-theme="dark"],
   }
 
   .printed-page {
-    display: block;
+    display: flow-root;
   }
 
   .printed-page.before {

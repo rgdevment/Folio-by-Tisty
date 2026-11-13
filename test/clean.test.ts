@@ -1,4 +1,4 @@
-import { CONTRACTS } from "@tisty/contracts";
+import { CONTRACTS, checkHtml } from "@tisty/contracts";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 import { SAMPLE } from "../src/page/sample";
@@ -11,7 +11,9 @@ interface HtmlCase {
   holds: boolean;
 }
 
-const CASES = (CONTRACTS.document as unknown as { html_cases: HtmlCase[] }).html_cases;
+const CASES = [CONTRACTS.document, CONTRACTS.text].flatMap(
+  (one) => (one as unknown as { html_cases?: HtmlCase[] }).html_cases ?? [],
+);
 
 const { window } = new JSDOM("<!doctype html><body></body>");
 const place = window as unknown as Window & typeof globalThis;
@@ -57,6 +59,10 @@ describe("the cleaner, against the contract's own HTML", () => {
 
   it.each(holding.map((one) => [one.says, one.html]))("changes nothing of what holds: %s", (_says, html) => {
     expect(shapeOf(cleaner.clean(html as string))).toEqual(shapeOf(parsed(html as string)));
+  });
+
+  it.each(holding.map((one) => [one.says, one.html]))("lets the check through what holds: %s", (_says, html) => {
+    expect(checkHtml(html as string)).toEqual([]);
   });
 
   it.each(refused.map((one) => [one.says, one.html]))("leaves nothing harmful of what fails: %s", (_says, html) => {

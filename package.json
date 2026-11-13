@@ -12,7 +12,7 @@
     "@cloudflare/vitest-plugin": "1.5.1",
     "@cloudflare/workers-types": "5.20261103.1",
     "@seriousme/openapi-schema-validator": "^2.11.0",
-    "@tisty/contracts": "https://github.com/rgdevment/Tisty/releases/download/contracts-v1.9.1/tisty-contracts-1.9.1.tgz",
+    "@tisty/contracts": "https://github.com/rgdevment/Tisty/releases/download/contracts-v1.11.0/tisty-contracts-1.11.0.tgz",
     "@types/node": "^26.6.6",
     "dompurify": "3.4.17",
     "js-yaml": "^5.5.0",
