@@ -165,7 +165,7 @@ const reportsFromOf = (request: Request): number => {
   return Number.isSafeInteger(from) && from > 0 ? from : 0;
 };
 
-// The reader's own route, under its own Access application: only the service's totals, and nothing else for it.
+// Its own Access application covers this path, so the service token never reaches the operator's.
 const totals = async (request: Request, token: string | null, api: AdminApi): Promise<Response> => {
   const { dashboard, now } = api;
   if (request.method !== "GET" || !(await isReader(token, api.reader, api.certs, now))) {
