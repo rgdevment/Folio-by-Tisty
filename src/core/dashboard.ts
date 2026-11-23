@@ -25,6 +25,8 @@ export interface ServiceDay {
   day: number;
   readers: number;
   uploads: number;
+  newDocs: number;
+  newKeys: number;
 }
 
 export interface Totals {
@@ -49,7 +51,13 @@ export const totalsOf = (day: number, overview: Overview, days: ServiceDay[]): T
   keys: { total: overview.keys.total, newToday: overview.keys.newToday },
   uploads: { today: overview.uploads.today, newDocs: overview.uploads.newDocs },
   stored: { gb: overview.stored.gb, heldBytes: overview.stored.heldBytes },
-  days: days.map((one) => ({ day: one.day, readers: one.readers, uploads: one.uploads })),
+  days: days.map((one) => ({
+    day: one.day,
+    readers: one.readers,
+    uploads: one.uploads,
+    newDocs: one.newDocs,
+    newKeys: one.newKeys,
+  })),
 });
 
 export interface Logged {

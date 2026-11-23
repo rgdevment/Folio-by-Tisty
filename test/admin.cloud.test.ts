@@ -873,7 +873,7 @@ describe("the reader's totals", () => {
     expect(sortedKeys(totals.uploads)).toEqual(["newDocs", "today"]);
     expect(sortedKeys(totals.stored)).toEqual(["gb", "heldBytes"]);
     expect(totals.days).toHaveLength(30);
-    for (const day of totals.days) expect(sortedKeys(day)).toEqual(["day", "readers", "uploads"]);
+    for (const day of totals.days) expect(sortedKeys(day)).toEqual(["day", "newDocs", "newKeys", "readers", "uploads"]);
 
     const overview = (await (await asked("/api/overview")).json()) as Record<string, Record<string, unknown>>;
     expect(overview.operator).toBe("mario@…");
