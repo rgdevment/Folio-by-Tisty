@@ -1,6 +1,6 @@
 # Privacidad de Folio by Tisty
 
-**Versión 9, vigente desde el 22 de noviembre de 2026.**
+**Versión 9, vigente desde el 23 de noviembre de 2026.**
 
 ## En corto
 
