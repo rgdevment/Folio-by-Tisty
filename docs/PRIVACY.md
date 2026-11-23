@@ -1,6 +1,6 @@
 # Folio by Tisty privacy policy
 
-**Version 9, in force since November 22, 2026.**
+**Version 9, in force since November 23, 2026.**
 
 ## The short version
 
