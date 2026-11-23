@@ -52,7 +52,10 @@ be met with legal threats.
 - **The operator's panel stands apart.** It is another Worker, at panel.tisty.cl,
   with no access to where documents are stored or to their keys, so it cannot open
   anything. It sits behind Cloudflare Access, checks its token again, and refuses
-  everyone if anything is missing. Every action is logged.
+  everyone if anything is missing. Every action is logged. One machine of the
+  operator also gets in, with an Access service token and under its own
+  application: it only reads the service's totals at `/api/totals`, nothing of a
+  document, a key or a network, and everything else is refused to it.
 
 ## What it does not protect
 

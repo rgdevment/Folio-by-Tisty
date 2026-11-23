@@ -1,14 +1,15 @@
 # Privacidad de Folio by Tisty
 
-**Versión 8, vigente desde el 11 de noviembre de 2026.**
+**Versión 9, vigente desde el 22 de noviembre de 2026.**
 
 ## En corto
 
 Folio guarda lo mínimo para funcionar, y casi todo va cifrado con una
 llave que nunca recibe. No hay cuentas, ni cookies, ni analítica, ni anuncios,
 ni nada de terceros en la página. Lo que guarda caduca solo, salvo la parte
-pública de tu llave y las llaves que retiraste; el operador borra sus correos a
-mano. Esta política cuenta exactamente qué guarda, por qué y por cuánto tiempo.
+pública de tu llave, las llaves que retiraste y los totales diarios del
+servicio, que no dicen nada de nadie; el operador borra sus correos a mano.
+Esta política cuenta exactamente qué guarda, por qué y por cuánto tiempo.
 
 Quién responde por estos datos: Mario Hidalgo G., persona natural en Chile, que
 opera Folio sin fines de lucro. Contacto: <rgdevment@tisty.app>.
@@ -52,6 +53,13 @@ límites de Folio, y lo que firma puede mostrarse como «verificado».
 veces a la misma persona el mismo día se usa un resumen temporal, que anota si
 trajo prueba de trabajo y se descarta al terminar el día. Su llave cambia cada
 día y solo se guarda ese día, fuera de la base de datos y de los respaldos.
+
+**Sobre los totales del servicio:** Folio cuenta cada día, para todo el
+servicio, cuántos documentos hay abiertos, nuevos y con más de un idioma,
+cuántos lectores, llaves nuevas y subidas hubo y cuánto espacio se usa. El
+operador los copia a diario a un equipo suyo en Chile, con un token que solo
+puede leer esos totales. No dicen nada de ningún documento, llave, red ni
+persona, y se guardan sin plazo.
 
 **Sobre lo que se borra:** la base de datos conserva su propia copia hasta por
 30 días en Cloudflare, para recuperarse de una falla. Lo que se borra de ella,

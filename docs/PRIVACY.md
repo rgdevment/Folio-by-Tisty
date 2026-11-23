@@ -1,14 +1,15 @@
 # Folio by Tisty privacy policy
 
-**Version 8, in force since November 11, 2026.**
+**Version 9, in force since November 22, 2026.**
 
 ## The short version
 
 Folio keeps the least it needs to work, and nearly all of it is encrypted
 with a key it never receives. No accounts, no cookies, no analytics, no ads,
 and nothing from third parties on the page. What it keeps expires on its own,
-except your key's public part and the keys you took back; the operator deletes
-their mail by hand. This policy says exactly what it keeps, why, and for how
+except your key's public part, the keys you took back and the service's daily
+totals, which say nothing about anyone; the operator deletes their mail by
+hand. This policy says exactly what it keeps, why, and for how
 long.
 
 Who answers for this data: Mario Hidalgo G., a natural person in Chile, who
@@ -54,6 +55,13 @@ same person twice on one day, a short-lived digest is used, which notes whether
 it came with a proof of work and is thrown away when the day ends. Its key
 changes every day and is kept only for that day, outside the database and the
 backups.
+
+**About the service's totals:** each day Folio counts, for the whole service,
+how many documents are open, new and in more than one language, how many
+readers, new keys and uploads there were, and how much space is used. The
+operator copies them every day to a machine of their own in Chile, with a token
+that can read only those totals. They say nothing about any document, key,
+network or person, and they are kept with no end date.
 
 **About what is deleted:** the database keeps its own copy for up to 30 days at
 Cloudflare, to recover from a failure. Whatever is deleted from it, such as the
