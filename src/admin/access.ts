@@ -6,6 +6,12 @@ export interface AccessSettings {
   email: string;
 }
 
+export interface ReaderSettings {
+  team: string;
+  audience: string;
+  clientId: string;
+}
+
 export type Certs = (fresh?: boolean) => Promise<JsonWebKey[]>;
 
 interface Header {
@@ -19,6 +25,8 @@ interface Claims {
   exp?: number;
   nbf?: number;
   email?: string;
+  sub?: string;
+  common_name?: string;
 }
 
 const CERTS_KEPT_SECONDS = 600;
@@ -56,6 +64,30 @@ const signatureHolds = async (token: string, header: Header, certs: Certs): Prom
   );
 };
 
+const signedFor = async (
+  token: string | null,
+  team: string,
+  audience: string,
+  certs: Certs,
+  now: number,
+  whose: (claims: Claims) => boolean,
+): Promise<boolean> => {
+  if (!token || !team || !audience) return false;
+  try {
+    const [head, body] = token.split(".");
+    const header = jsonOf<Header>(head ?? "");
+    const claims = jsonOf<Claims>(body ?? "");
+    const seconds = now / 1000;
+    const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+    if (claims.iss !== issuerOf(team) || !audiences.includes(audience) || !whose(claims)) return false;
+    if (typeof claims.exp !== "number" || claims.exp <= seconds) return false;
+    if (typeof claims.nbf === "number" && claims.nbf > seconds) return false;
+    return await signatureHolds(token, header, certs);
+  } catch {
+    return false;
+  }
+};
+
 // Access stands in front, and this holds even if the route or the rule in Cloudflare is ever wrong.
 export const isOperator = async (
   token: string | null,
@@ -63,18 +95,24 @@ export const isOperator = async (
   certs: Certs,
   now: number,
 ): Promise<boolean> => {
-  if (!token || !team || !audience || !email) return false;
-  try {
-    const [head, body] = token.split(".");
-    const header = jsonOf<Header>(head ?? "");
-    const claims = jsonOf<Claims>(body ?? "");
-    const seconds = now / 1000;
-    const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-    if (claims.iss !== issuerOf(team) || !audiences.includes(audience) || claims.email !== email) return false;
-    if (typeof claims.exp !== "number" || claims.exp <= seconds) return false;
-    if (typeof claims.nbf === "number" && claims.nbf > seconds) return false;
-    return await signatureHolds(token, header, certs);
-  } catch {
-    return false;
-  }
+  if (!email) return false;
+  return signedFor(token, team, audience, certs, now, (claims) => claims.email === email);
+};
+
+// A service token says its Client ID as common_name, with an empty sub and no address.
+export const isReader = async (
+  token: string | null,
+  { team, audience, clientId }: ReaderSettings,
+  certs: Certs,
+  now: number,
+): Promise<boolean> => {
+  if (!clientId) return false;
+  return signedFor(
+    token,
+    team,
+    audience,
+    certs,
+    now,
+    (claims) => claims.common_name === clientId && claims.sub === "" && claims.email === undefined,
+  );
 };

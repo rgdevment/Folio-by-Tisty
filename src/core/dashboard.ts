@@ -25,7 +25,40 @@ export interface ServiceDay {
   day: number;
   readers: number;
   uploads: number;
+  newDocs: number;
+  newKeys: number;
 }
+
+export interface Totals {
+  day: number;
+  docs: { open: number; newToday: number; withLanguages: number };
+  readers: { today: number; yesterday: number | null };
+  keys: { total: number; newToday: number };
+  uploads: { today: number; newDocs: number };
+  stored: { gb: number | null; heldBytes: number };
+  days: ServiceDay[];
+}
+
+// Named field by field, so nothing the operator's overview gains later reaches the reader.
+export const totalsOf = (day: number, overview: Overview, days: ServiceDay[]): Totals => ({
+  day,
+  docs: {
+    open: overview.docs.open,
+    newToday: overview.docs.newToday,
+    withLanguages: overview.docs.withLanguages,
+  },
+  readers: { today: overview.readers.today, yesterday: overview.readers.yesterday },
+  keys: { total: overview.keys.total, newToday: overview.keys.newToday },
+  uploads: { today: overview.uploads.today, newDocs: overview.uploads.newDocs },
+  stored: { gb: overview.stored.gb, heldBytes: overview.stored.heldBytes },
+  days: days.map((one) => ({
+    day: one.day,
+    readers: one.readers,
+    uploads: one.uploads,
+    newDocs: one.newDocs,
+    newKeys: one.newKeys,
+  })),
+});
 
 export interface Logged {
   at: number;

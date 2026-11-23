@@ -120,19 +120,32 @@ export class CloudDashboard implements Dashboard {
   async days(now: number): Promise<ServiceDay[]> {
     const today = dayOf(now);
     const first = today - DAYS_CHARTED + 1;
-    const [past, uploads] = await this.#db.batch([
-      this.#db.prepare("SELECT day, readers, uploads FROM service_day WHERE day >= ?1 AND day < ?2").bind(first, today),
-      this.#db.prepare("SELECT COALESCE(SUM(uploads), 0) AS n FROM net_day WHERE day = ?").bind(today),
+    const [past, sums] = await this.#db.batch([
+      this.#db
+        .prepare(
+          `SELECT day, readers, uploads, new_docs AS newDocs, new_keys AS newKeys
+           FROM service_day WHERE day >= ?1 AND day < ?2`,
+        )
+        .bind(first, today),
+      this.#db
+        .prepare(
+          `SELECT COALESCE(SUM(uploads), 0) AS uploads, COALESCE(SUM(docs), 0) AS docs, COALESCE(SUM(keys), 0) AS keys
+           FROM net_day WHERE day = ?`,
+        )
+        .bind(today),
     ]);
     const byDay = new Map(((past?.results ?? []) as unknown as ServiceDay[]).map((one) => [one.day, one]));
+    const counted = firstOf<{ uploads: number; docs: number; keys: number }>(sums);
     byDay.set(today, {
       day: today,
       readers: await this.#readersOn(today),
-      uploads: firstOf<{ n: number }>(uploads)?.n ?? 0,
+      uploads: counted?.uploads ?? 0,
+      newDocs: counted?.docs ?? 0,
+      newKeys: counted?.keys ?? 0,
     });
     return Array.from({ length: DAYS_CHARTED }, (_, at) => {
       const day = first + at;
-      return byDay.get(day) ?? { day, readers: 0, uploads: 0 };
+      return byDay.get(day) ?? { day, readers: 0, uploads: 0, newDocs: 0, newKeys: 0 };
     });
   }
 

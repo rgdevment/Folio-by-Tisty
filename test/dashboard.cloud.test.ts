@@ -1,7 +1,7 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { type AccessSettings, type Certs, issuerOf } from "../src/admin/access";
+import { type AccessSettings, type Certs, issuerOf, type ReaderSettings } from "../src/admin/access";
 import { answer } from "../src/admin/api";
 import { CloudDashboard } from "../src/cloudflare/dashboard";
 import { CloudModeration } from "../src/cloudflare/moderation";
@@ -24,6 +24,7 @@ const store = new Cloud(testEnv, LIMITS);
 const dashboard = new CloudDashboard(testEnv.DB, LIMITS);
 const ROOT = "R".repeat(43);
 const ACCESS: AccessSettings = { team: "rina", audience: "the-panel", email: "mario@example.test" };
+const READER: ReaderSettings = { team: "rina", audience: "the-reader", clientId: "machine.access" };
 
 const shared = async (id: string, owner = ROOT, { net = "up", day = TODAY, body = "sealed", versions = 1 } = {}) => {
   await store.create({ id, owner, adminHash: "a", ttlDays: 3, net }, day);
@@ -191,19 +192,25 @@ describe("a day of readers, added up", () => {
     expect(await store.dayKey(TODAY + 1)).not.toBe(yesterday);
   });
 
-  it("charts each day's readers and uploads, counting today as it goes", async () => {
+  it("charts each day's readers, uploads, new documents and new keys, counting today as it goes", async () => {
     await shared("Dddddddd", ROOT, { day: TODAY - 1, versions: 2 });
     await read("Dddddddd", "r1", { day: TODAY - 1 });
+    const newKeys = (day: number, keys: number) =>
+      testEnv.DB.prepare("INSERT INTO net_day (day, net, docs, bytes, keys) VALUES (?, 'n9', 0, 0, ?)")
+        .bind(day, keys)
+        .run();
+    await newKeys(TODAY - 1, 3);
     await store.sweep(TODAY);
     await store.sweep(TODAY);
     await shared("Eeeeeeee");
     await read("Eeeeeeee", "r1");
     await read("Eeeeeeee", "r2");
+    await newKeys(TODAY, 2);
     const days = await dashboard.days(NOW);
     expect(days).toHaveLength(30);
-    expect(days.at(-2)).toEqual({ day: TODAY - 1, readers: 1, uploads: 2 });
-    expect(days.at(-1)).toEqual({ day: TODAY, readers: 2, uploads: 1 });
-    expect(days[0]).toEqual({ day: TODAY - 29, readers: 0, uploads: 0 });
+    expect(days.at(-2)).toEqual({ day: TODAY - 1, readers: 1, uploads: 2, newDocs: 1, newKeys: 3 });
+    expect(days.at(-1)).toEqual({ day: TODAY, readers: 2, uploads: 1, newDocs: 1, newKeys: 2 });
+    expect(days[0]).toEqual({ day: TODAY - 29, readers: 0, uploads: 0, newDocs: 0, newKeys: 0 });
   });
 });
 
@@ -542,6 +549,7 @@ describe("the panel's answers", () => {
         dashboard,
         about: { sharingOpen: true, termsVersion: "14", limitsSerial: 25 },
         access: ACCESS,
+        reader: READER,
         certs,
         now: NOW,
       },

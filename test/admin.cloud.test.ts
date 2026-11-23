@@ -1,11 +1,12 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { type AccessSettings, type Certs, isOperator, issuerOf } from "../src/admin/access";
+import { type AccessSettings, type Certs, isOperator, issuerOf, type ReaderSettings } from "../src/admin/access";
 import { answer } from "../src/admin/api";
 import { CloudDashboard } from "../src/cloudflare/dashboard";
 import { CloudModeration } from "../src/cloudflare/moderation";
 import { Cloud } from "../src/cloudflare/store";
+import type { Totals } from "../src/core/dashboard";
 import { dayOf } from "../src/core/limits";
 import { toBase64Url } from "../src/core/start";
 import type { Held } from "../src/core/store";
@@ -21,6 +22,7 @@ const TODAY = dayOf(NOW);
 const HOUR = Math.floor(NOW / 3_600_000);
 const ID = "AbCdEfGh";
 const ACCESS: AccessSettings = { team: "rina", audience: "the-panel", email: "mario@example.test" };
+const READER: ReaderSettings = { team: "rina", audience: "the-reader", clientId: "machine.access" };
 const store = new Cloud(testEnv);
 const moderation = new CloudModeration(testEnv.DB);
 const dashboard = new CloudDashboard(testEnv.DB);
@@ -52,6 +54,7 @@ const asked = async (path: string, init: RequestInit = {}, token?: string) => {
     dashboard,
     about: ABOUT,
     access: ACCESS,
+    reader: READER,
     certs,
     now: NOW,
   });
@@ -201,6 +204,7 @@ describe("who may enter", () => {
       dashboard,
       about: ABOUT,
       access: ACCESS,
+      reader: READER,
       certs,
       now: NOW,
     });
@@ -211,7 +215,7 @@ describe("who may enter", () => {
         headers: { "Folio-Operator": "1" },
         body: JSON.stringify({ note: "x" }),
       }),
-      { moderation, dashboard, about: ABOUT, access: ACCESS, certs, now: NOW },
+      { moderation, dashboard, about: ABOUT, access: ACCESS, reader: READER, certs, now: NOW },
     );
     expect(acted.status).toBe(403);
     expect((await row())?.blocked_at).toBeNull();
@@ -834,5 +838,117 @@ describe("what it can do", () => {
     expect(await logged()).toEqual([]);
     expect(await moderation.block(ID, "x", NOW)).toBe("done");
     expect(await logged()).toEqual([{ action: "block", note: "x" }]);
+  });
+});
+
+describe("the reader's totals", () => {
+  const MACHINE = { aud: [READER.audience], email: undefined, sub: "", common_name: READER.clientId };
+  const machine = (over: Record<string, unknown> = {}) => tokenBy(keys.privateKey, { ...MACHINE, ...over });
+  const read = async (path: string, init: RequestInit = {}, token?: string, reader = READER) => {
+    const headers = new Headers(init.headers);
+    headers.set("Cf-Access-Jwt-Assertion", token ?? (await machine()));
+    return answer(new Request(`https://panel.test${path}`, { ...init, headers }), {
+      moderation,
+      dashboard,
+      about: ABOUT,
+      access: ACCESS,
+      reader,
+      certs,
+      now: NOW,
+    });
+  };
+  const sortedKeys = (said: object) => Object.keys(said).sort();
+
+  it("gives the service token the service's totals, the same the operator sees, and no other key", async () => {
+    await share();
+    const response = await read("/api/totals");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const totals = (await response.json()) as Totals;
+    expect(sortedKeys(totals)).toEqual(["day", "days", "docs", "keys", "readers", "stored", "uploads"]);
+    expect(totals.day).toBe(TODAY);
+    expect(sortedKeys(totals.docs)).toEqual(["newToday", "open", "withLanguages"]);
+    expect(sortedKeys(totals.readers)).toEqual(["today", "yesterday"]);
+    expect(sortedKeys(totals.keys)).toEqual(["newToday", "total"]);
+    expect(sortedKeys(totals.uploads)).toEqual(["newDocs", "today"]);
+    expect(sortedKeys(totals.stored)).toEqual(["gb", "heldBytes"]);
+    expect(totals.days).toHaveLength(30);
+    for (const day of totals.days) expect(sortedKeys(day)).toEqual(["day", "newDocs", "newKeys", "readers", "uploads"]);
+
+    const overview = (await (await asked("/api/overview")).json()) as Record<string, Record<string, unknown>>;
+    expect(overview.operator).toBe("mario@…");
+    expect(totals.docs).toEqual(overview.docs);
+    expect(totals.readers).toEqual(overview.readers);
+    expect(totals.uploads).toEqual(overview.uploads);
+    expect(totals.keys).toEqual({ total: overview.keys?.total, newToday: overview.keys?.newToday });
+    expect(totals.stored).toEqual({ gb: overview.stored?.gb, heldBytes: overview.stored?.heldBytes });
+    expect(totals.docs).toMatchObject({ open: 1, newToday: 1 });
+    expect(totals.days).toEqual(await (await asked("/api/days")).json());
+    expect(JSON.stringify(totals)).not.toMatch(/AbCdEfGh|mario|o1|m1/);
+  });
+
+  it.each([
+    "/api/overview",
+    "/api/days",
+    "/api/queue",
+    "/api/log",
+    "/api/nets",
+    "/api/top",
+    `/api/owners?docs=${ID}`,
+    "/api/find?q=AbCdEfGh",
+    `/api/keys/${"A".repeat(43)}`,
+    `/api/keys/${"A".repeat(43)}/records`,
+    `/api/docs/${ID}/purge_owner`,
+    "/api/totals/",
+    "/API/totals",
+    "/api/totals/more",
+  ])("refuses the service token at %s", async (path) => {
+    await share();
+    const response = await read(path);
+    expect(response.status).toBe(403);
+    expect(response.headers.get("Content-Security-Policy")).toBe("default-src 'none'; frame-ancestors 'none'");
+  });
+
+  it("refuses the service token every write, with the operator's header too, and logs nothing", async () => {
+    await share();
+    for (const path of [`/api/docs/${ID}/block`, `/api/keys/${"A".repeat(43)}/block`, "/api/totals"]) {
+      const response = await read(path, {
+        method: "POST",
+        headers: { "Folio-Operator": "1" },
+        body: JSON.stringify({ note: "x" }),
+      });
+      expect(response.status).toBe(403);
+    }
+    expect((await read("/api/totals", { method: "HEAD" })).status).toBe(403);
+    expect((await row())?.blocked_at).toBeNull();
+    expect(await logged()).toEqual([]);
+  });
+
+  it.each([
+    ["the operator's token", { aud: [ACCESS.audience], email: ACCESS.email, sub: "mario", common_name: undefined }],
+    ["a service token of the operator's application", { aud: [ACCESS.audience] }],
+    ["another service token", { common_name: "another.access" }],
+    ["one that carries an address", { email: "mario@example.test" }],
+    ["one whose subject is a person", { sub: "someone" }],
+    ["one with no subject", { sub: undefined }],
+    ["one that expired", { exp: NOW / 1000 - 1 }],
+    ["another issuer", { iss: "https://another.cloudflareaccess.com" }],
+  ])("refuses at /api/totals %s", async (_said, over) => {
+    expect((await read("/api/totals", {}, await machine(over))).status).toBe(403);
+  });
+
+  it("refuses a service token signed by another key, and no token at all", async () => {
+    expect((await read("/api/totals", {}, await tokenBy(otherKeys.privateKey, MACHINE))).status).toBe(403);
+    expect((await read("/api/totals", {}, "")).status).toBe(403);
+  });
+
+  it("refuses every reader when its application or its token is not configured", async () => {
+    expect((await read("/api/totals", {}, undefined, { ...READER, clientId: "" })).status).toBe(403);
+    expect((await read("/api/totals", {}, undefined, { ...READER, audience: "" })).status).toBe(403);
+  });
+
+  it("leaves the operator as it was, and keeps the operator out of the reader's route", async () => {
+    expect((await asked("/api/overview")).status).toBe(200);
+    expect((await asked("/api/totals")).status).toBe(403);
   });
 });

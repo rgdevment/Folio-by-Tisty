@@ -54,7 +54,10 @@ amenazas legales.
 - **El panel del operador va aparte.** Es otro Worker, en panel.tisty.cl, sin
   acceso al almacenamiento de los documentos ni a sus llaves, así que no puede
   abrir nada. Está detrás de Cloudflare Access, comprueba de nuevo su token y
-  rechaza a todos si falta algo. Cada acción queda registrada.
+  rechaza a todos si falta algo. Cada acción queda registrada. Entra además
+  una sola máquina del operador, con un token de servicio de Access y en su
+  propia aplicación: solo lee los totales del servicio en `/api/totals`, nada
+  de un documento, una llave o una red, y se le rechaza todo lo demás.
 
 ## Qué no protege
 
