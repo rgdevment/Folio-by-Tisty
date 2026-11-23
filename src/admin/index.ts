@@ -9,6 +9,8 @@ interface Env {
   ACCESS_TEAM: string;
   ACCESS_AUDIENCE: string;
   OPERATOR_EMAIL?: string;
+  READER_AUDIENCE?: string;
+  READER_CLIENT_ID?: string;
 }
 
 export default {
@@ -23,6 +25,11 @@ export default {
           limitsSerial: SIGNED_LIMITS.serial,
         },
         access: { team: env.ACCESS_TEAM, audience: env.ACCESS_AUDIENCE, email: env.OPERATOR_EMAIL ?? "" },
+        reader: {
+          team: env.ACCESS_TEAM,
+          audience: env.READER_AUDIENCE ?? "",
+          clientId: env.READER_CLIENT_ID ?? "",
+        },
         certs: certsFrom(env.ACCESS_TEAM),
         now: Date.now(),
       });

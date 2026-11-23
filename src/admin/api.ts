@@ -1,8 +1,9 @@
 import type { Acted, CloudModeration, NewCase } from "../cloudflare/moderation";
 import { isSealedRecords } from "../core/case-records";
-import type { About, Dashboard, TopOrder } from "../core/dashboard";
-import type { AccessSettings, Certs } from "./access";
-import { isOperator } from "./access";
+import { type About, type Dashboard, type TopOrder, totalsOf } from "../core/dashboard";
+import { dayOf } from "../core/limits";
+import type { AccessSettings, Certs, ReaderSettings } from "./access";
+import { isOperator, isReader } from "./access";
 
 export interface AdminApi {
   moderation: Pick<
@@ -28,10 +29,12 @@ export interface AdminApi {
   dashboard: Dashboard;
   about: About;
   access: AccessSettings;
+  reader: ReaderSettings;
   certs: Certs;
   now: number;
 }
 
+const TOTALS_PATH = "/api/totals";
 const ACTION_PATH =
   /^\/api\/docs\/([A-Za-z0-9]{8})\/(accept|reject|block|opened|panic|purge_owner|case|handed_over|clear_warning)$/;
 const PURGE_PREVIEW_PATH = /^\/api\/docs\/([A-Za-z0-9]{8})\/purge_owner$/;
@@ -162,12 +165,25 @@ const reportsFromOf = (request: Request): number => {
   return Number.isSafeInteger(from) && from > 0 ? from : 0;
 };
 
-export const answer = async (request: Request, api: AdminApi): Promise<Response> => {
-  const operator = await isOperator(request.headers.get("Cf-Access-Jwt-Assertion"), api.access, api.certs, api.now);
-  if (!operator) return json(403, { refused: "not_the_operator" });
+// The reader's own route, under its own Access application: only the service's totals, and nothing else for it.
+const totals = async (request: Request, token: string | null, api: AdminApi): Promise<Response> => {
+  const { dashboard, now } = api;
+  if (request.method !== "GET" || !(await isReader(token, api.reader, api.certs, now))) {
+    return json(403, { refused: "not_the_reader" });
+  }
+  const [overview, days] = await Promise.all([dashboard.overview(now), dashboard.days(now)]);
+  return json(200, totalsOf(dayOf(now), overview, days));
+};
 
+export const answer = async (request: Request, api: AdminApi): Promise<Response> => {
+  const token = request.headers.get("Cf-Access-Jwt-Assertion");
   const url = new URL(request.url);
   const { pathname } = url;
+  if (pathname === TOTALS_PATH) return totals(request, token, api);
+
+  const operator = await isOperator(token, api.access, api.certs, api.now);
+  if (!operator) return json(403, { refused: "not_the_operator" });
+
   if (request.method === "GET" && pathname === "/api/queue") {
     const queue = await api.moderation.queue(api.now, reportsFromOf(request));
     const docs = [...queue.reports.map((one) => one.doc), ...queue.docs.map((one) => one.id)];

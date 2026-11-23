@@ -1,7 +1,7 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { type AccessSettings, type Certs, issuerOf } from "../src/admin/access";
+import { type AccessSettings, type Certs, issuerOf, type ReaderSettings } from "../src/admin/access";
 import { answer } from "../src/admin/api";
 import { CloudDashboard } from "../src/cloudflare/dashboard";
 import { CloudModeration } from "../src/cloudflare/moderation";
@@ -24,6 +24,7 @@ const store = new Cloud(testEnv, LIMITS);
 const dashboard = new CloudDashboard(testEnv.DB, LIMITS);
 const ROOT = "R".repeat(43);
 const ACCESS: AccessSettings = { team: "rina", audience: "the-panel", email: "mario@example.test" };
+const READER: ReaderSettings = { team: "rina", audience: "the-reader", clientId: "machine.access" };
 
 const shared = async (id: string, owner = ROOT, { net = "up", day = TODAY, body = "sealed", versions = 1 } = {}) => {
   await store.create({ id, owner, adminHash: "a", ttlDays: 3, net }, day);
@@ -542,6 +543,7 @@ describe("the panel's answers", () => {
         dashboard,
         about: { sharingOpen: true, termsVersion: "14", limitsSerial: 25 },
         access: ACCESS,
+        reader: READER,
         certs,
         now: NOW,
       },

@@ -1,5 +1,13 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { type AccessSettings, type Certs, certsFrom, isOperator, issuerOf } from "../src/admin/access";
+import {
+  type AccessSettings,
+  type Certs,
+  certsFrom,
+  isOperator,
+  isReader,
+  issuerOf,
+  type ReaderSettings,
+} from "../src/admin/access";
 import { toBase64Url } from "../src/core/start";
 
 describe("Access, and the keys it signs with", () => {
@@ -123,6 +131,53 @@ describe("Access, and the keys it signs with", () => {
     const forged = await tokenBy(two.privateKey, { kid: "zzz" });
     for (let at = 0; at < 20; at += 1) await isOperator(forged, ACCESS, certs, NOW);
     expect(calls.filter(Boolean)).toHaveLength(20);
+  });
+
+  describe("a machine with a service token", () => {
+    const READER: ReaderSettings = { team: ACCESS.team, audience: "the-reader", clientId: "machine.access" };
+    const MACHINE = { aud: [READER.audience], email: undefined, sub: "", common_name: READER.clientId };
+    const machine = (over: Record<string, unknown> = {}) => tokenBy(one.privateKey, {}, { ...MACHINE, ...over });
+
+    it("takes a service token signed by Access with the Client ID it expects", async () => {
+      const { certs, calls } = published(["one"], ["one"]);
+      expect(await isReader(await machine(), READER, certs, NOW)).toBe(true);
+      expect(calls).toEqual([false]);
+    });
+
+    it.each([
+      ["another Client ID", { common_name: "another.access" }],
+      ["an address", { email: "mario@example.test" }],
+      ["an empty address", { email: "" }],
+      ["a person's subject", { sub: "1234" }],
+      ["no subject", { sub: undefined }],
+      ["the operator's audience", { aud: [ACCESS.audience] }],
+      ["one that expired", { exp: NOW / 1000 - 1 }],
+    ])("asks Access for nothing when the claims refuse it (%s)", async (_what, over) => {
+      const { certs, calls } = published(["one"], ["one"]);
+      expect(await isReader(await machine(over), READER, certs, NOW)).toBe(false);
+      expect(calls).toEqual([]);
+    });
+
+    it("refuses a service token with a signature Access did not make", async () => {
+      const { certs } = published(["one"], ["one"]);
+      const forged = await tokenBy(two.privateKey, {}, MACHINE);
+      expect(await isReader(forged, READER, certs, NOW)).toBe(false);
+    });
+
+    it("refuses everyone when its Client ID or its audience is not set", async () => {
+      const { certs, calls } = published(["one"], ["one"]);
+      expect(await isReader(await machine(), { ...READER, clientId: "" }, certs, NOW)).toBe(false);
+      expect(await isReader(await machine(), { ...READER, audience: "" }, certs, NOW)).toBe(false);
+      expect(calls).toEqual([]);
+    });
+
+    it("never lets one identity pass for the other", async () => {
+      const { certs } = published(["one"], ["one"]);
+      expect(await isOperator(await machine({ aud: [ACCESS.audience] }), ACCESS, certs, NOW)).toBe(false);
+      expect(await isReader(await tokenBy(one.privateKey), { ...READER, audience: ACCESS.audience }, certs, NOW)).toBe(
+        false,
+      );
+    });
   });
 
   describe("how the certificates are fetched", () => {

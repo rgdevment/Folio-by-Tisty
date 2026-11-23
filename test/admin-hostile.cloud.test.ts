@@ -1,7 +1,7 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { type AccessSettings, type Certs, isOperator, issuerOf } from "../src/admin/access";
+import { type AccessSettings, type Certs, isOperator, issuerOf, type ReaderSettings } from "../src/admin/access";
 import { answer } from "../src/admin/api";
 import { CloudDashboard } from "../src/cloudflare/dashboard";
 import { CloudModeration } from "../src/cloudflare/moderation";
@@ -20,6 +20,7 @@ const TODAY = dayOf(NOW);
 const HOUR = Math.floor(NOW / 3_600_000);
 const ID = "AbCdEfGh";
 const ACCESS: AccessSettings = { team: "rina", audience: "the-panel", email: "mario@example.test" };
+const READER: ReaderSettings = { team: "rina", audience: "the-reader", clientId: "machine.access" };
 // Many documents of one owner in one day, which the daily cap of new shares would otherwise stop.
 const store = new Cloud(testEnv, { ...LEVEL_ONE, newSharesADay: 1000 });
 const moderation = new CloudModeration(testEnv.DB);
@@ -50,6 +51,7 @@ const asked = async (path: string, init: RequestInit = {}) => {
     dashboard,
     about: { sharingOpen: true, termsVersion: "14", limitsSerial: 25 },
     access: ACCESS,
+    reader: READER,
     certs,
     now: NOW,
   });
@@ -303,6 +305,7 @@ describe("what the panel keeps within bounds", () => {
       dashboard,
       about: { sharingOpen: true, termsVersion: "14", limitsSerial: 25 },
       access: ACCESS,
+      reader: READER,
       certs,
       now: NOW,
     });

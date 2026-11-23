@@ -21,6 +21,7 @@ database_id = "767d0dce-dff0-41b0-9857-b3ddcf2d36ad"
 migrations_dir = "migrations"
 
 # The operator's address is a secret, set with wrangler secret put OPERATOR_EMAIL, so it stays out of this public file.
+# /api/totals sits under its own Access application: READER_AUDIENCE and READER_CLIENT_ID are secrets too, and without them nobody reads it.
 [vars]
 ACCESS_TEAM = "rgdevment"
 ACCESS_AUDIENCE = "a916a786a4f677e24ab014759b69ea3eb43fd840b8b3335a7fb89bc03b508c1e"
