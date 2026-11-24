@@ -30,6 +30,15 @@ const designs = (): Plugin => ({
   },
 });
 
+const PRELOADER = "vite/preload-helper";
+
+// Vite's own only asks ahead for what the same import asks for, and its code weighs on every link.
+const plainImports = (): Plugin => ({
+  name: "folio-plain-imports",
+  enforce: "pre",
+  transform: (_, id) => (id.includes(PRELOADER) ? "export const __vitePreload = (load) => load();" : null),
+});
+
 const dompurifyFile = (name: string): string => readFileSync(`node_modules/dompurify/${name}`, "utf8");
 const contractFile = (name: string): string => readFileSync(`node_modules/@tisty/contracts/${name}`, "utf8");
 
@@ -83,7 +92,7 @@ const sitePages = (): Plugin => ({
 
 export default defineConfig({
   root: "src/page",
-  plugins: [tokens(), designs(), licenses(), domains(), sitePages()],
+  plugins: [tokens(), designs(), plainImports(), licenses(), domains(), sitePages()],
   define: { __FOLIO_SHARDS__: JSON.stringify(shardNames().map((name) => name.slice(0, 2))) },
   build: {
     outDir: "../../dist/page",
