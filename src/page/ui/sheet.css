@@ -769,7 +769,7 @@ svg[data-theme="dark"],
   /* Its sides are not on its @page, which would clip what a note holds itself by. */
   :host([data-sheets="true"]) .sheet {
     min-height: 0;
-    padding: 0 var(--margin-x);
+    padding: 0 20mm;
   }
 
   :host([data-sheets="true"]) :is(.sheet, .printed-page) > :not(.printed-page) {

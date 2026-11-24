@@ -18,6 +18,7 @@ let grown: () => void;
 let frames: (() => void)[];
 let scrolled: { top: number }[];
 let wide: number;
+let bandAt: number;
 
 const bandsBefore = (one: Element): number => {
   let gap = 0;
@@ -50,9 +51,10 @@ beforeEach(() => {
   const { window } = new JSDOM('<!doctype html><article class="sheet"></article>');
   sheet = window.document.querySelector(".sheet") as HTMLElement;
   wide = LEAF.across;
+  bandAt = 0;
   Object.defineProperty(sheet, "offsetWidth", { get: () => wide });
   Object.defineProperty(sheet, "offsetHeight", { get: () => 100 + sheet.querySelectorAll("*").length });
-  Object.defineProperty(window.HTMLElement.prototype, "offsetTop", { configurable: true, get: () => 0 });
+  Object.defineProperty(window.HTMLElement.prototype, "offsetTop", { configurable: true, get: () => bandAt });
   Object.defineProperty(window.HTMLElement.prototype, "offsetHeight", { configurable: true, get: () => 0 });
   frames = [];
   scrolled = [];
@@ -122,6 +124,27 @@ describe("a sheet cut for its paper", () => {
     );
     cut(sheet, LEAF);
     expect(turns().map((one) => one.nextElementSibling?.tagName)).toEqual(["TABLE"]);
+  });
+
+  it("fills from the foot of the headings that moved, though only a floated note follows them", () => {
+    laid(
+      p(10, 40),
+      { tag: "h2", top: 60, tall: 30 },
+      { tag: "blockquote", top: 100, tall: 80, markup: ' data-callout="idea" data-side="right"' },
+      { tag: "hr", top: 110, tall: 2 },
+    );
+    bandAt = 250;
+    cut(sheet, LEAF);
+    expect(turns().map((one) => one.nextElementSibling?.tagName)).toEqual(["H2"]);
+    const begins = bandAt + LEAF.margin;
+    const headingEnds = 60 + BAND + 30;
+    expect(fillOf(sheet.lastElementChild ?? undefined)).toBe(`${begins + ROOM - headingEnds}px`);
+  });
+
+  it("takes the tags for what they measure when a rule follows them", () => {
+    laid({ tag: "p", top: 10, tall: 20, markup: ' class="tags"' }, { tag: "hr", top: 42, tall: 2 });
+    cut(sheet, LEAF);
+    expect(fillOf(sheet.children[1])).toBe(`${ROOM - 20}px`);
   });
 
   it("fills under a turn from where its sheet begins, though only a floated note stands on it", () => {
@@ -236,6 +259,12 @@ describe("the sheets of a page", () => {
     Object.defineProperty(sheet.children[1], "getBoundingClientRect", { value: () => ({ top: -40, bottom: -1 }) });
     lay(null);
     expect(scrolled.at(-1)).toEqual({ top: -BAND, behavior: "instant" });
+  });
+
+  it("scroll nothing when nothing moved, or a glide on its way would stop", () => {
+    laid(p(60, 40), p(110, 10));
+    offerSheets(sheet)(LEAF);
+    expect(scrolled).toEqual([]);
   });
 
   it("keep the block in sight where it was", () => {

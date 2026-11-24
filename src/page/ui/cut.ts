@@ -9,7 +9,7 @@ const HEADING = /^H[1-6]$/;
 
 const bottomOf = (one: HTMLElement): number => one.offsetTop + one.offsetHeight;
 
-const isBlock = (one: HTMLElement): boolean => one.offsetHeight > 0 && one.className !== "tags";
+const isBlock = (one: HTMLElement): boolean => one.offsetHeight > 0;
 
 const floats = (one: Element): boolean => one.matches('blockquote[data-callout="idea"][data-side]');
 
@@ -52,7 +52,8 @@ export const cut = (sheet: HTMLElement, { down, margin }: Leaf): void => {
     if (!fresh && bottomOf(one) - begins > room) {
       const moving = headsOpen ? undefined : heads[0];
       beginUnder(turnBefore(moving ?? one), moving ? headsEnded : ended);
-      if (!moving) heads = [];
+      if (moving) ended = bottomOf(heads.at(-1) as HTMLElement);
+      else heads = [];
       headsOpen = true;
     }
     if (!HEADING.test(one.tagName)) heads = [];
@@ -60,7 +61,7 @@ export const cut = (sheet: HTMLElement, { down, margin }: Leaf): void => {
       headsEnded = ended;
       headsOpen = fresh;
     }
-    fresh = false;
+    fresh = one.className === "tags";
     deepest = Math.max(deepest, bottomOf(one));
     if (!floats(one)) ended = bottomOf(one);
   }
@@ -71,7 +72,8 @@ const keepingInSight = (sheet: HTMLElement, lay: () => void): void => {
   const first = [...sheet.children].find((one) => one.className !== TURN && one.getBoundingClientRect().bottom > 0);
   const top = first?.getBoundingClientRect().top ?? 0;
   lay();
-  if (first) scrollBy({ top: first.getBoundingClientRect().top - top, behavior: "instant" });
+  const moved = first ? first.getBoundingClientRect().top - top : 0;
+  if (Math.abs(moved) >= 1) scrollBy({ top: moved, behavior: "instant" });
 };
 
 export const offerSheets = (sheet: HTMLElement): ((leaf?: Leaf | null) => void) => {
