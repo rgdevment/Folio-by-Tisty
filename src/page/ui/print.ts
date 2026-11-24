@@ -53,7 +53,7 @@ export const offerPrinting = (printing: Printing): void => {
   const printNow = async (): Promise<void> => {
     if (asked) return;
     asked = true;
-    await printing.waiting();
+    while (printing.waiting()) await printing.waiting();
     asked = false;
     prepare();
     window.print();

@@ -1490,6 +1490,44 @@ describe("a design of its own", () => {
     expect(place.print).toHaveBeenCalledTimes(1);
   });
 
+  it("goes back to the section being read once the font of another language has come", async () => {
+    const cleaner = domPurifyCleaner(place);
+    const shown = (held: Document) => ({
+      held,
+      wordsOf: (html: string) => finished(cleaner.clean(html), []),
+      seal: SEAL,
+    });
+    here = true;
+    const show = drawFrame(shown(own({ font: "lora" })));
+    here = false;
+    scrolled.length = 0;
+    show(shown(own({ font: "lora" })));
+    expect(scrolled).toEqual([]);
+    come([]);
+    await settle();
+    expect(scrolled.map((one) => one.tagName)).toEqual(["H2"]);
+  });
+
+  it("is printed with the font of the language being read, though another was asked for first", async () => {
+    place.print = vi.fn();
+    const cleaner = domPurifyCleaner(place);
+    const shown = (held: Document) => ({
+      held,
+      wordsOf: (html: string) => finished(cleaner.clean(html), []),
+      seal: SEAL,
+    });
+    const show = drawFrame(shown(own({ font: "lora" })));
+    const comeFirst = come;
+    place.document.getElementById("print")?.click();
+    show(shown(own({ font: "lora" })));
+    comeFirst([]);
+    await settle();
+    expect(place.print).not.toHaveBeenCalled();
+    come([]);
+    await settle();
+    expect(place.print).toHaveBeenCalledTimes(1);
+  });
+
   it("waits for the font of the language being read, and not for the one before", async () => {
     const cleaner = domPurifyCleaner(place);
     const shown = (held: Document) => ({
@@ -1498,9 +1536,9 @@ describe("a design of its own", () => {
       seal: SEAL,
     });
     const show = drawFrame(shown(own({ font: "lora" })));
-    const before = come;
+    const comeFirst = come;
     show(shown(own({ font: "lora" })));
-    before([]);
+    comeFirst([]);
     await settle();
     expect(isCut()).toBe(false);
     come([]);
