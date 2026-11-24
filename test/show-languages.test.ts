@@ -147,6 +147,48 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("the sheet of a document in several languages", () => {
+  const sheet = () => root.querySelector(".sheet") as HTMLElement;
+  const inSheets = () => byId("sheet").dataset.sheets;
+
+  it("is its anchor's in every language, whatever the translation says", async () => {
+    opens[ANCHOR] = openedOf({ ...SPANISH, sheet: { design: "bosque", on: true } }, "owner");
+    opens[ENGLISH] = openedOf({ ...translation(ENGLISH, "Walks", "en"), sheet: { design: "coral" } }, "owner");
+    await opened(["en"]);
+    expect(place.document.title).toBe("Walks · Folio");
+    expect([sheet().dataset.design, inSheets()]).toEqual(["bosque", "true"]);
+    await choose("fr");
+    expect(sheet().dataset.design).toBe("bosque");
+    await choose("es");
+    expect(sheet().dataset.design).toBe("bosque");
+  });
+
+  it("is Tisty's when the anchor says none, though a translation does", async () => {
+    opens[ENGLISH] = openedOf({ ...translation(ENGLISH, "Walks", "en"), sheet: { design: "coral" } }, "owner");
+    await opened(["en"]);
+    expect(place.document.title).toBe("Walks · Folio");
+    expect(sheet().dataset.design).toBe("tisty");
+  });
+
+  it("is its anchor's on the pages of a translation too, whatever they say", async () => {
+    const page = (design: "coral" | "violeta") => ({
+      id: "p1",
+      page_of: ANCHOR,
+      at: 1,
+      title: "Enero",
+      html: "<h1>Enero</h1>",
+      body: "",
+      sheet: { design },
+    });
+    opens[ANCHOR] = openedOf({ ...SPANISH, sheet: { design: "bosque" }, pages: [page("coral")] }, "owner");
+    opens[ENGLISH] = openedOf({ ...translation(ENGLISH, "Walks", "en"), pages: [page("violeta")] }, "owner");
+    await opened(["en"]);
+    expect(sheet().dataset.design).toBe("bosque");
+    byId("pages").querySelector("button")?.click();
+    expect(sheet().dataset.design).toBe("bosque");
+  });
+});
+
 describe("a document in several languages", () => {
   it("opens in the first language of the reader's that the group has", async () => {
     await opened(["de-DE", "en-US", "es"]);
