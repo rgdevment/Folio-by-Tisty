@@ -473,9 +473,13 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
   let reading: AbortController | undefined;
   let drawing: AbortController | undefined;
   let showing: Document | Page = held;
+  const introduce = (place: HTMLElement, shown: Document | Page): void => {
+    place.lang = shown.lang ?? held.lang ?? "";
+    place.toggleAttribute("data-titled", !!shown.title);
+  };
   const goTo = (shown: Document | Page): void => {
     showing = shown;
-    sheet.lang = shown.lang ?? held.lang ?? "";
+    introduce(sheet, shown);
     drawing?.abort();
     drawing = new AbortController();
     const words = withCards(wordsOf(shown.html), drawing.signal);
@@ -517,7 +521,7 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
   const printedPage = (page: Document | Page, side: string, signal: AbortSignal): HTMLElement => {
     const printed = document.createElement("section");
     printed.className = `printed-page ${side}`;
-    printed.lang = page.lang ?? held.lang ?? "";
+    introduce(printed, page);
     printed.append(...tagsOf(page), withCards(wordsOf(page.html), signal));
     return printed;
   };

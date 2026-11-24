@@ -1381,6 +1381,28 @@ describe("the design a sheet says", () => {
   });
 });
 
+describe("the title of what is shown", () => {
+  const titled = () =>
+    [...root.querySelectorAll(".sheet, .printed-page")].map((one) => one.hasAttribute("data-titled"));
+
+  it("is said of the document, and of each page as it is turned to or printed", () => {
+    const { title: _, ...untitled } = ENERO;
+    draw({ ...HELD, pages: [ENERO, { ...untitled, id: "p2", at: 2 }] });
+    expect(titled()).toEqual([true]);
+    place.document.querySelectorAll<HTMLElement>("#pages button")[1]?.click();
+    expect(titled()).toEqual([false]);
+    place.dispatchEvent(new place.Event("beforeprint"));
+    expect(titled()).toEqual([false, true, true]);
+    place.dispatchEvent(new place.Event("afterprint"));
+  });
+
+  it("is not said of a document without one", () => {
+    const { title: _, ...untitled } = HELD;
+    draw(untitled);
+    expect(titled()).toEqual([false]);
+  });
+});
+
 describe("a document in sheets", () => {
   const isCut = () => root.querySelector(".sheet")?.hasAttribute("data-cut");
 

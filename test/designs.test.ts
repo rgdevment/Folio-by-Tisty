@@ -58,7 +58,7 @@ const drawn = (css: string, html: string): ((selector: string, name: string) => 
 
 const sheetIn = (design: string, words = ""): string =>
   [
-    `<article class="sheet" data-design="${design}"><h1>t</h1><blockquote class="q"><h2>h</h2></blockquote>`,
+    `<article class="sheet" data-titled data-design="${design}"><h1>t</h1><blockquote class="q"><h2>h</h2></blockquote>`,
     '<table><thead><tr><th>c <a href="#x">a</a></th></tr></thead><tbody><tr><td>f</td></tr></tbody></table>',
     '<blockquote class="callout" data-callout="tip"><h3>n</h3><table><thead><tr><th class="in-note">x</th></tr></thead></table></blockquote>',
     '<figure class="code"></figure><figure class="widget"></figure>',
@@ -145,18 +145,107 @@ describe("the designs of the contract", () => {
 
   it("dress only the title with its border, and only the head with its tint", () => {
     expect(SHEET.match(/var\(--design-title/g)).toHaveLength(1);
-    const [title = "none"] = SHEET.match(/[^}]+(?=\{[^}]*var\(--design-title)/) ?? [];
-    const { document } = new JSDOM().window;
-    const isTitle = (html: string): boolean => {
-      document.body.innerHTML = `<article class="sheet">${html}</article>`;
-      return document.querySelector("h1")?.matches(title) ?? false;
-    };
-    expect(isTitle("<h1>t</h1>")).toBe(true);
-    expect(isTitle('<p class="tags"></p><dl class="front"></dl><h1>t</h1>')).toBe(true);
-    expect(isTitle('<section class="printed-page"></section><h1>t</h1>')).toBe(true);
-    expect(isTitle("<p>intro</p><h1>t</h1>")).toBe(false);
     expect(SHEET.match(/var\(--design-head,/g)).toHaveLength(1);
     expect(SHEET).toMatch(/\nth \{\s+background: var\(--design-head, var\(--tisty-hover\)\)/);
+  });
+});
+
+describe("the title of a sheet", () => {
+  const onSheet = (words: string, titled = "data-titled", design = "coral"): string =>
+    `<article class="sheet" ${titled} data-design="${design}">${words}</article>`;
+  const DRESSED_AS_TITLE = "14px";
+  const REST = "<p>sigue</p>";
+
+  it.each(["h1", "h2", "h3", "p"])("is its first block when it is a %s, past its tags and properties", (tag) => {
+    const title = `<${tag} class="t">t</${tag}>`;
+    for (const before of [
+      "",
+      '<p class="tags">#a</p>',
+      '<dl class="front"></dl>',
+      '<p class="tags"></p><dl class="front"></dl>',
+    ]) {
+      const worn = drawn(inTheme("light"), onSheet(`${before}${title}${REST}`));
+      expect(worn(".t", "padding-bottom")).toBe(DRESSED_AS_TITLE);
+      expect(worn(".t", "font-size")).toBe("23.925px");
+      expect(worn(".t", "color")).toBe(designOf("coral").light.heading);
+      expect(worn(".sheet > p:last-child", "padding-bottom")).not.toBe(DRESSED_AS_TITLE);
+    }
+  });
+
+  it.each(NAMES)("is of the kind %s says, whichever block it is", (name) => {
+    const { border_bottom } = DESIGNS.titles[designOf(name).title] as { border_bottom: string };
+    const [width] = border_bottom.split(" ");
+    for (const tag of ["h1", "h2", "h3", "p"]) {
+      const css = inTheme("light").replaceAll(
+        "var(--design-title, 1px solid var(--tisty-hair))",
+        border_bottom.replace(/\S+$/, "red"),
+      );
+      expect(
+        drawn(css, onSheet(`<${tag} class="t">t</${tag}>${REST}`, "data-titled", name))(".t", "border-bottom-width"),
+      ).toBe(width);
+    }
+  });
+
+  it.each(["h4", "ul", "figure", "blockquote"])("is none when the sheet opens with a %s", (tag) => {
+    const worn = drawn(inTheme("light"), onSheet(`<${tag}>x</${tag}><p class="t">t</p><h1>otro</h1>${REST}`));
+    expect(worn(".t", "padding-bottom")).not.toBe(DRESSED_AS_TITLE);
+    expect(worn("h1", "padding-bottom")).not.toBe(DRESSED_AS_TITLE);
+  });
+
+  it("is only the first, and no heading further down", () => {
+    const worn = drawn(inTheme("light"), onSheet('<p>intro</p><h1 class="t">t</h1><p>a</p>'));
+    expect(worn(".t", "padding-bottom")).not.toBe(DRESSED_AS_TITLE);
+    expect(worn(".sheet > p:first-child", "padding-bottom")).toBe(DRESSED_AS_TITLE);
+  });
+
+  it.each(["doc-card", "file-player"])("is not a paragraph that holds a %s, drawn whole at its own size", (kind) => {
+    const worn = drawn(inTheme("light"), onSheet(`<p class="t"><a class="${kind}"></a></p>${REST}`));
+    expect(worn(".t", "padding-bottom")).not.toBe(DRESSED_AS_TITLE);
+  });
+
+  it("is none in a document without one, nor a note the page itself writes", () => {
+    expect(drawn(inTheme("light"), onSheet(`<h1 class="t">t</h1>${REST}`, ""))(".t", "padding-bottom")).not.toBe(
+      DRESSED_AS_TITLE,
+    );
+    const said = onSheet(`<p class="widget-said">x</p>${REST}`);
+    expect(drawn(inTheme("light"), said)(".widget-said", "padding-bottom")).not.toBe(DRESSED_AS_TITLE);
+    const tags = onSheet(`<p class="tags">#a</p><h1 class="t">t</h1>${REST}`);
+    expect(drawn(inTheme("light"), tags)(".tags", "padding-bottom")).not.toBe(DRESSED_AS_TITLE);
+  });
+
+  it.each(["h1", "h2", "h3", "p"])("has no margin, padding or border when it is a %s alone on the sheet", (tag) => {
+    for (const before of ["", '<p class="tags">#a</p>', '<dl class="front"></dl>']) {
+      const worn = drawn(inTheme("light"), onSheet(`${before}<${tag} class="t">t</${tag}>`));
+      expect(worn(".t", "padding-bottom")).toBe("0px");
+      expect(worn(".t", "margin-bottom")).toBe("0px");
+      expect(worn(".t", "font-size")).toBe("23.925px");
+    }
+  });
+
+  it("is, on paper, only the document's, whichever page is on screen", () => {
+    const page = (side: string, name: string) =>
+      `<section class="printed-page ${side}" data-titled><p class="tags">#a</p><h1 class="${name}">x</h1><p>y</p></section>`;
+    const fromTheDocument = drawn(
+      onPaper(),
+      onSheet(`<h1 class="t">t</h1>${REST}${page("after", "one")}${page("after", "two")}`),
+    );
+    expect(
+      ["t", "one", "two"].map((name) => fromTheDocument(`.${name}`, "padding-bottom") === DRESSED_AS_TITLE),
+    ).toEqual([true, false, false]);
+    const fromAPage = drawn(
+      onPaper(),
+      onSheet(
+        `${page("before", "doc")}${page("before", "one")}<p class="tags">#a</p><h1 class="t">t</h1>${REST}${page("after", "two")}`,
+      ),
+    );
+    expect(
+      ["doc", "one", "t", "two"].map((name) => fromAPage(`.${name}`, "padding-bottom") === DRESSED_AS_TITLE),
+    ).toEqual([true, false, false, false]);
+  });
+
+  it("stays alone on its sheet though pages are printed after it", () => {
+    const alone = onSheet('<h1 class="t">t</h1><section class="printed-page after"></section>');
+    expect(drawn(onPaper(), alone)(".t", "padding-bottom")).toBe("0px");
   });
 });
 

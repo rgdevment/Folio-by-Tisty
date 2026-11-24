@@ -132,18 +132,6 @@ h1 {
   letter-spacing: -0.01em;
 }
 
-.sheet > h1:first-of-type,
-.sheet:not([data-design="tisty"]) > .printed-page > h1:first-of-type {
-  margin: 0 0 22px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--tisty-hair);
-}
-
-:is(.sheet, .sheet:not([data-design="tisty"]) > .printed-page)
-  > h1:is(:first-child, .tags + *, .front + *, .printed-page + *) {
-  border-bottom: var(--design-title, 1px solid var(--tisty-hair));
-}
-
 h2 {
   margin: 22px 0 6px;
   font-size: 1.3em;
@@ -166,6 +154,37 @@ h6 {
 
 p {
   margin: 10px 0;
+}
+
+/* What opens a document with a title, past its tags and properties. Of what is printed, only the document has one, and no page. */
+:is(.sheet, .printed-page.before:first-child)[data-titled]
+  > :is(h1, h2, h3, p):is(:first-child, .tags + *, .front + *):not(
+    .tags,
+    .widget-said,
+    .printed-page ~ *,
+    :has(.doc-card, .file-player)
+  ) {
+  margin: 0 0 22px;
+  padding-bottom: 14px;
+  border-bottom: var(--design-title, 1px solid var(--tisty-hair));
+  color: var(--tisty-heading, inherit);
+  font-family: var(--design-headings, inherit);
+  font-size: 1.65em;
+  font-weight: 640;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+:is(.sheet, .printed-page.before:first-child)[data-titled]
+  > :is(h1, h2, h3, p):is(:first-child, .tags + *, .front + *):not(
+    .tags,
+    .widget-said,
+    .printed-page ~ *,
+    :has(.doc-card, .file-player)
+  ):is(:last-child, :has(+ .printed-page)) {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 ul,
