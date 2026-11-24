@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { CONTRACTS, type Document, type Page } from "@tisty/contracts";
+import VECTORS from "@tisty/contracts/vectors.json";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { domPurifyCleaner } from "../src/page/ui/clean";
@@ -1317,6 +1318,15 @@ describe("the design a sheet says", () => {
   it.each(["tisty", "bosque", "coral", "fiordo", "violeta"])("is worn when it is %s", (design) => {
     draw(withDesign(design));
     expect(sheet().dataset.design).toBe(design);
+  });
+
+  it.each(VECTORS.designs_worn)("is the one the contract's vectors say for $says", ({ document, page, wears }) => {
+    const sheetOf = (said: object) => said as Document["sheet"];
+    draw({ ...HELD, sheet: sheetOf(document), pages: page ? [{ ...ENERO, sheet: sheetOf(page) }] : [] });
+    expect(sheet().dataset.design).toBe(wears);
+    if (!page) return;
+    turnTo(0);
+    expect(sheet().dataset.design).toBe(wears);
   });
 
   it.each(["pergamino", "BOSQUE", "constructor", "__proto__", '"]{}', "", 3, null, ["bosque"], {}])(

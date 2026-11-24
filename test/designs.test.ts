@@ -115,6 +115,7 @@ describe("the designs of the contract", () => {
       const worn = drawn(inTheme(theme), sheetIn(name));
       for (const own of OWN_COLORS) {
         for (const color of OF_STYLE) expect(worn(own, `--tisty-${color}`)).toBe(STYLE.colors[theme][color]);
+        expect(worn(own, "--tisty-accent-soft")).toBe(ACCENT_SOFT.tisty?.[theme]);
         expect(worn(own, "color")).toBe(STYLE.colors[theme].ink);
       }
       expect(worn(".callout h3", "color")).toBe("inherit");
