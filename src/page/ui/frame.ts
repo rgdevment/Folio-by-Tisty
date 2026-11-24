@@ -1,4 +1,4 @@
-import type { Design, Document, Orientation, Page, Paper, Verdict } from "@tisty/contracts";
+import type { Document, Orientation, Page, Paper, Verdict } from "@tisty/contracts";
 import { type Standing, shownNameOf } from "../../core/look-alike";
 import { MAKER } from "../maker";
 import type { ShownEditor } from "../read";
@@ -6,6 +6,7 @@ import { cardsFor, referenceOf } from "./cards";
 import { bareUrl } from "./clean";
 import { type Leaf, offerSheets } from "./cut";
 import { element } from "./element";
+import { wear } from "./look";
 import { desktopOf, offerTisty, type Platform } from "./offer-tisty";
 import { offerPrinting } from "./print";
 import sheetStyles from "./sheet.css?url";
@@ -70,11 +71,6 @@ const paperOf = (held: Document): Paper => {
   const said = held.sheet?.paper as Paper | undefined;
   return said && Object.hasOwn(PAPER_MILLIMETRES, said) ? said : "a4";
 };
-
-// The closed list of the sheet contract, so no name a document says reaches the page's own elements as it came.
-const DESIGNS: readonly Design[] = ["tisty", "bosque", "coral", "fiordo", "violeta"];
-
-const designOf = ({ sheet }: Document): Design => DESIGNS.find((one) => one === sheet?.design) ?? "tisty";
 
 const pressed = (button: HTMLElement, on: boolean): void => button.setAttribute("aria-pressed", String(on));
 
@@ -473,6 +469,7 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
   let reading: AbortController | undefined;
   let drawing: AbortController | undefined;
   let showing: Document | Page = held;
+  let waiting: Promise<unknown> | undefined;
   const introduce = (place: HTMLElement, shown: Document | Page): void => {
     place.lang = shown.lang ?? held.lang ?? "";
     place.toggleAttribute("data-titled", !!shown.title);
@@ -505,8 +502,18 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
   const draw = (next: Shown, page = -1, section = -1): void => {
     ({ held, wordsOf, pressFile } = next);
     speak(held.lang);
+    const toSection = (): void => headingsIn(root)[section]?.scrollIntoView({ block: "start" });
     // Before its words arrive: its type and its title decide where paper cuts them, on every page of the document.
-    sheet.dataset.design = designOf(held);
+    const wearing = wear(sheet, held);
+    waiting = wearing;
+    sheet.toggleAttribute("data-waiting", !!wearing);
+    wearing?.then(() => {
+      if (waiting !== wearing) return;
+      waiting = undefined;
+      sheet.removeAttribute("data-waiting");
+      laySheets();
+      if (showing === landed && !scrollY) toSection();
+    });
     pages = held.pages ?? [];
     withCards = cardsFor(held, wordsOf);
     drawPages(pages, turnTo);
@@ -515,7 +522,8 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
     drawSeal(held, next.seal);
     const samePlace = pages[page];
     if (samePlace) goTo(samePlace);
-    headingsIn(root)[section]?.scrollIntoView({ block: "start" });
+    const landed = showing;
+    if (!wearing) toSection();
   };
   draw(first);
   const printedPage = (page: Document | Page, side: string, signal: AbortSignal): HTMLElement => {
@@ -529,6 +537,7 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
     button: element("print"),
     root,
     sheet,
+    waiting: () => waiting,
     others: (signal) => {
       const all: (Document | Page)[] = [held, ...pages];
       const at = all.indexOf(showing);

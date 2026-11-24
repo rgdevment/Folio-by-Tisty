@@ -386,12 +386,13 @@ describe("a link that lets someone edit", () => {
     draw(HELD);
   });
 
-  it("takes the key out of the address before it prints, and puts it back after", () => {
+  it("takes the key out of the address before it prints, and puts it back after", async () => {
     let addressPrinted = "";
     place.print = vi.fn(() => {
       addressPrinted = place.location.href;
     });
     place.document.getElementById("print")?.click();
+    await Promise.resolve();
     expect(addressPrinted).toBe("https://tisty.cl/k7Qm2xPa");
     expect(place.location.href).toBe("https://tisty.cl/k7Qm2xPa");
     place.dispatchEvent(new place.Event("afterprint"));
@@ -408,13 +409,14 @@ describe("a link that lets someone edit", () => {
   it.each([
     ["Ctrl", { ctrlKey: true }],
     ["Cmd", { metaKey: true }],
-  ])("takes the key out when printing with %s+P, before the browser takes the address", (_key, held) => {
+  ])("takes the key out when printing with %s+P, before the browser takes the address", async (_key, held) => {
     let addressPrinted = "";
     place.print = vi.fn(() => {
       addressPrinted = place.location.href;
     });
     const asking = new place.KeyboardEvent("keydown", { key: "p", cancelable: true, ...held });
     place.dispatchEvent(asking);
+    await Promise.resolve();
     expect(addressPrinted).toBe("https://tisty.cl/k7Qm2xPa");
     expect(asking.defaultPrevented).toBe(true);
     place.dispatchEvent(new place.Event("afterprint"));
@@ -1391,6 +1393,184 @@ describe("the design a sheet says", () => {
   });
 });
 
+describe("a design of its own", () => {
+  const sheet = () => root.querySelector(".sheet") as HTMLElement;
+  const isCut = () => sheet().hasAttribute("data-cut");
+  const own = (said: object, design = "own"): Document =>
+    ({ ...HELD, sheet: { design, own: said, on: true } }) as unknown as Document;
+  const settle = () => new Promise((resolve) => setTimeout(resolve));
+  let load: ReturnType<typeof vi.fn>;
+  let here: boolean;
+  let come: (faces?: unknown) => void;
+  let fail: (why: Error) => void;
+
+  beforeEach(() => {
+    here = false;
+    load = vi.fn(
+      () =>
+        new Promise((resolve, reject) => {
+          come = resolve;
+          fail = reject;
+        }),
+    );
+    Object.defineProperty(place.document, "fonts", { configurable: true, value: { load, check: () => here } });
+    Object.defineProperty(place.HTMLElement.prototype, "offsetWidth", { configurable: true, get: () => 794 });
+    vi.stubGlobal("innerHeight", 900);
+    vi.stubGlobal("scrollY", 0);
+    vi.stubGlobal("scrollBy", vi.fn());
+  });
+
+  it.each(VECTORS.designs_own)(
+    "wears each name alone, as the contract's vectors say for $says",
+    ({ own: said, wears }) => {
+      draw(own(said));
+      const { design, sheet: color, heading, ink, font } = sheet().dataset;
+      expect({ design, sheet: color, heading, ink, font }).toEqual({ design: "own", ...wears });
+    },
+  );
+
+  it.each(["__proto__", "constructor", '"]{}', 3, null, ["lora"]])("never wears %j, which is no name", (said) => {
+    draw(own({ sheet: said, heading: said, ink: said, font: said }));
+    const { sheet: color, heading, ink, font } = sheet().dataset;
+    expect([color, heading, ink, font]).toEqual(["papel", "grafito", "tinta", "sans"]);
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it("lets nothing it picked pass for the design", () => {
+    draw(own({ design: "coral" }, "pergamino"));
+    expect(sheet().dataset.design).toBe("tisty");
+  });
+
+  it.each([
+    ["its font is the system's", own({ font: "sans" })],
+    ["it picked none", own({})],
+    ["the design is another, which reads nothing it picked", own({ font: "lora" }, "coral")],
+  ])("asks for no font, and is cut at once, when %s", (_when, held) => {
+    draw(held);
+    expect(load).not.toHaveBeenCalled();
+    expect(sheet().hasAttribute("data-waiting")).toBe(false);
+    expect(isCut()).toBe(true);
+  });
+
+  it("asks for its font with the words of the document and of every page, so no letter comes after the cut", () => {
+    draw({ ...own({ font: "lora" }), pages: [{ ...ENERO, html: "<p>zażółć</p>" }] });
+    const [face, words] = load.mock.calls[0] as [string, string];
+    expect(face).toBe("1em own-lora");
+    expect(words).toContain("zażółć");
+    expect(words).toContain("Paseos");
+  });
+
+  it.each([
+    ["has come", () => come([])],
+    ["has failed", () => fail(new Error("offline"))],
+  ])("is cut only once its font %s", async (_when, end) => {
+    draw(own({ font: "lora" }));
+    expect([sheet().hasAttribute("data-waiting"), isCut()]).toEqual([true, false]);
+    place.document.querySelector<HTMLElement>("#pages button")?.click();
+    expect(isCut()).toBe(false);
+    end();
+    await settle();
+    expect([sheet().hasAttribute("data-waiting"), isCut()]).toEqual([false, true]);
+  });
+
+  it("waits for no font that is already here, as in another language of the same document", () => {
+    here = true;
+    draw(own({ font: "lora" }));
+    expect(load).not.toHaveBeenCalled();
+    expect([sheet().hasAttribute("data-waiting"), sheet().dataset.font, isCut()]).toEqual([false, "lora", true]);
+  });
+
+  it("is printed only once its font has come, and once however often it was asked", async () => {
+    place.print = vi.fn();
+    draw(own({ font: "lora" }));
+    for (let times = 0; times < 3; times++) place.document.getElementById("print")?.click();
+    await settle();
+    expect(place.print).not.toHaveBeenCalled();
+    come([]);
+    await settle();
+    expect(place.print).toHaveBeenCalledTimes(1);
+  });
+
+  it("goes back to the section being read once the font of another language has come", async () => {
+    const cleaner = domPurifyCleaner(place);
+    const shown = (held: Document) => ({
+      held,
+      wordsOf: (html: string) => finished(cleaner.clean(html), []),
+      seal: SEAL,
+    });
+    here = true;
+    const show = drawFrame(shown(own({ font: "lora" })));
+    here = false;
+    scrolled.length = 0;
+    show(shown(own({ font: "lora" })));
+    expect(scrolled).toEqual([]);
+    come([]);
+    await settle();
+    expect(scrolled.map((one) => one.tagName)).toEqual(["H2"]);
+  });
+
+  it.each([
+    ["turned to another page", () => place.document.querySelector<HTMLElement>("#pages button")?.click()],
+    ["gone down the page", () => vi.stubGlobal("scrollY", 400)],
+  ])("moves nobody who has %s while the font came", async (_where, leave) => {
+    const cleaner = domPurifyCleaner(place);
+    const shown = (held: Document) => ({
+      held,
+      wordsOf: (html: string) => finished(cleaner.clean(html), []),
+      seal: SEAL,
+    });
+    here = true;
+    const show = drawFrame(shown(own({ font: "lora" })));
+    here = false;
+    scrolled.length = 0;
+    const pages = [{ ...ENERO, html: "<h1>Enero</h1><h2>Dos</h2>" }];
+    show(shown({ ...own({ font: "lora" }), pages }));
+    leave();
+    come([]);
+    await settle();
+    expect(scrolled).toEqual([]);
+    expect(isCut()).toBe(true);
+  });
+
+  it("is printed with the font of the language being read, though another was asked for first", async () => {
+    place.print = vi.fn();
+    const cleaner = domPurifyCleaner(place);
+    const shown = (held: Document) => ({
+      held,
+      wordsOf: (html: string) => finished(cleaner.clean(html), []),
+      seal: SEAL,
+    });
+    const show = drawFrame(shown(own({ font: "lora" })));
+    const comeFirst = come;
+    place.document.getElementById("print")?.click();
+    show(shown(own({ font: "lora" })));
+    comeFirst([]);
+    await settle();
+    expect(place.print).not.toHaveBeenCalled();
+    come([]);
+    await settle();
+    expect(place.print).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for the font of the language being read, and not for the one before", async () => {
+    const cleaner = domPurifyCleaner(place);
+    const shown = (held: Document) => ({
+      held,
+      wordsOf: (html: string) => finished(cleaner.clean(html), []),
+      seal: SEAL,
+    });
+    const show = drawFrame(shown(own({ font: "lora" })));
+    const comeFirst = come;
+    show(shown(own({ font: "lora" })));
+    comeFirst([]);
+    await settle();
+    expect(isCut()).toBe(false);
+    come([]);
+    await settle();
+    expect(isCut()).toBe(true);
+  });
+});
+
 describe("the title of what is shown", () => {
   const titled = () =>
     [...root.querySelectorAll(".sheet, .printed-page")].map((one) => one.hasAttribute("data-titled"));
@@ -1703,7 +1883,7 @@ describe("another language in the same frame", () => {
     vi.stubGlobal("innerHeight", 900);
   });
 
-  it("draws the other document in the same sheet, and answers each click once", () => {
+  it("draws the other document in the same sheet, and answers each click once", async () => {
     const before = vi.fn();
     const after = vi.fn();
     place.print = vi.fn();
@@ -1718,6 +1898,7 @@ describe("another language in the same frame", () => {
     expect(after).toHaveBeenCalledTimes(1);
     expect(before).not.toHaveBeenCalled();
     place.document.getElementById("print")?.click();
+    await Promise.resolve();
     expect(place.print).toHaveBeenCalledTimes(1);
   });
 

@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { CONTRACTS } from "@tisty/contracts";
 import { defineConfig, type Plugin } from "vite";
+import { fontFaces, fontLicenses } from "./scripts/own-fonts";
+import { withoutTasks } from "./scripts/read-contract";
 import { HOME_FILES, POLICIES, policyPage, sitemap } from "./scripts/site-pages";
 import { type DesignsValues, designStyles, type StyleValues, styleTokens } from "./scripts/style-tokens";
 
@@ -17,7 +19,7 @@ const tokens = (): Plugin => ({
   resolveId: (id) => (id === TOKENS ? RESOLVED_TOKENS : null),
   load(id) {
     if (id !== RESOLVED_TOKENS) return null;
-    return styleTokens(valuesOf<StyleValues>("style"));
+    return styleTokens(valuesOf<StyleValues>("style")) + fontFaces(valuesOf<DesignsValues>("designs").own.fonts);
   },
 });
 
@@ -28,6 +30,14 @@ const designs = (): Plugin => ({
     if (!SHEET.test(id)) return null;
     return `${code}${designStyles(valuesOf<DesignsValues>("designs"), valuesOf<StyleValues>("style"))}`;
   },
+});
+
+const CHECK = /@tisty\/contracts\/check\.js$/;
+
+const readContract = (): Plugin => ({
+  name: "folio-read-contract",
+  enforce: "pre",
+  transform: (code, id) => (CHECK.test(id) ? withoutTasks(code) : null),
 });
 
 const PRELOADER = "vite/preload-helper";
@@ -51,7 +61,7 @@ const licenses = (): Plugin => ({
     this.emitFile({
       type: "asset",
       fileName: "licenses.txt",
-      source: `Folio by Tisty, Copyright 2026 Mario Hidalgo G. (rgdevment)\nUnder FSL-1.1-ALv2: https://github.com/rgdevment/Folio-by-Tisty/blob/main/LICENSE\n\nDOMPurify ${version}, (c) Cure53 and other contributors\nUnder Apache-2.0 or MPL-2.0, at your choice.\nSource: https://github.com/cure53/DOMPurify\n\n${dompurifyFile("LICENSE")}\n${dompurifyFile("LICENSE-MPL")}\n\n@tisty/contracts ${contract.version}, (c) Mario Hidalgo G. (rgdevment)\nUnder AGPL-3.0-only, with the additional permission that lets Folio include it.\nSource: https://github.com/rgdevment/Tisty\n\n${contractFile("ADDITIONAL-PERMISSION.md")}\n${contractFile("LICENSE")}`,
+      source: `Folio by Tisty, Copyright 2026 Mario Hidalgo G. (rgdevment)\nUnder FSL-1.1-ALv2: https://github.com/rgdevment/Folio-by-Tisty/blob/main/LICENSE\n\nDOMPurify ${version}, (c) Cure53 and other contributors\nUnder Apache-2.0 or MPL-2.0, at your choice.\nSource: https://github.com/cure53/DOMPurify\n\n${dompurifyFile("LICENSE")}\n${dompurifyFile("LICENSE-MPL")}\n\n@tisty/contracts ${contract.version}, (c) Mario Hidalgo G. (rgdevment)\nUnder AGPL-3.0-only, with the additional permission that lets Folio include it.\nSource: https://github.com/rgdevment/Tisty\n\n${contractFile("ADDITIONAL-PERMISSION.md")}\n${contractFile("LICENSE")}\n\nThe fonts a design of its own may wear, under the SIL Open Font License 1.1\n\n${fontLicenses(valuesOf<DesignsValues>("designs").own.fonts)}`,
     });
   },
 });
@@ -92,7 +102,7 @@ const sitePages = (): Plugin => ({
 
 export default defineConfig({
   root: "src/page",
-  plugins: [tokens(), designs(), plainImports(), licenses(), domains(), sitePages()],
+  plugins: [tokens(), designs(), plainImports(), readContract(), licenses(), domains(), sitePages()],
   define: { __FOLIO_SHARDS__: JSON.stringify(shardNames().map((name) => name.slice(0, 2))) },
   build: {
     outDir: "../../dist/page",

@@ -212,7 +212,7 @@ describe("which contract is below another (never_lower)", () => {
 
 describe("the contract in use", () => {
   it("is the version Folio fixed, and these samples are written under it", async () => {
-    expect(VERSION).toBe("1.12.1");
+    expect(VERSION).toBe("1.13.0");
     const { manifest } = await readEnvelope(hex(SAMPLES.main.envelope), MAIN);
     expect(manifest.contract).toBe(VERSION);
   });

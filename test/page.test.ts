@@ -33,6 +33,7 @@ describe("the page's headers", () => {
     expect(csp).toContain("script-src 'self'");
     expect(csp).toContain("style-src 'self'");
     expect(csp).toContain("img-src 'self' blob:");
+    expect(csp).toContain("font-src 'self'");
     expect(csp).toContain("worker-src 'self'");
     expect(csp).toContain("base-uri 'none'");
     expect(csp).toContain("form-action 'none'");
