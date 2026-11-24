@@ -1441,7 +1441,7 @@ describe("the paper", () => {
 
   describe("and its buttons", () => {
     const A4 = "@page { size: 210mm 297mm; }";
-    const LETTER = "@page { size: 215.9mm 279.4mm; margin: 22mm 20mm; }";
+    const LETTER = "@page { size: 215.9mm 279.4mm; margin: 22mm 0; }";
     const FOLIO = "@page { size: 215.9mm 330.2mm; }";
     let sizes: string[];
 
@@ -1537,7 +1537,7 @@ describe("the paper", () => {
       draw(HELD);
       toggle().click();
       landscape().click();
-      expect(printsOn()).toBe("@page { size: 297mm 210mm; margin: 22mm 20mm; }");
+      expect(printsOn()).toBe("@page { size: 297mm 210mm; margin: 22mm 0; }");
       toggle().click();
       expect(landscape().hidden).toBe(true);
       expect(printsOn()).toBe(A4);

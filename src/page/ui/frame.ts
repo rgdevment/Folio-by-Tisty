@@ -18,7 +18,7 @@ const PAPER_MILLIMETRES: Record<Paper, [number, number]> = {
   folio: [215.9, 330.2],
   tabloid: [279.4, 431.8],
 };
-const MARGIN_MILLIMETRES = { x: 20, y: 22 };
+const MARGIN_MILLIMETRES = 22;
 const PIXELS_PER_INCH = 96;
 const MILLIMETRES_PER_INCH = 25.4;
 const LONG_PAGE_WIDTH_PIXELS = 820;
@@ -58,12 +58,12 @@ const withLayout = (host: HTMLElement, sheets: boolean, paper: Paper, orientatio
   const across = orientation === "landscape" ? long : short;
   const down = orientation === "landscape" ? short : long;
   host.dataset.sheets = String(sheets);
-  printOn(across, down, sheets ? ` margin: ${MARGIN_MILLIMETRES.y}mm ${MARGIN_MILLIMETRES.x}mm;` : "");
+  printOn(across, down, sheets ? ` margin: ${MARGIN_MILLIMETRES}mm 0;` : "");
   // On the column, because the card of pages under the sheet keeps its width too.
   element("sheet-column").style.setProperty("--page-width", `${sheets ? pixels(across) : LONG_PAGE_WIDTH_PIXELS}px`);
   if (!sheets) return null;
   host.style.setProperty("--page-height", `${pixels(down)}px`);
-  return { across: pixels(across), down: pixels(down), margin: pixels(MARGIN_MILLIMETRES.y) };
+  return { across: pixels(across), down: pixels(down), margin: pixels(MARGIN_MILLIMETRES) };
 };
 
 const paperOf = (held: Document): Paper => {

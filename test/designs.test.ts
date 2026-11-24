@@ -146,7 +146,7 @@ describe("the designs of the contract", () => {
   it("dress only the title with its border, and only the head with its tint", () => {
     expect(SHEET.match(/var\(--design-title/g)).toHaveLength(1);
     expect(SHEET.match(/var\(--design-head,/g)).toHaveLength(1);
-    expect(SHEET).toMatch(/\nth \{\s+background: var\(--design-head, var\(--tisty-hover\)\)/);
+    expect(SHEET).toMatch(/\nthead th \{\s+background: var\(--design-head, var\(--tisty-hover\)\)/);
   });
 });
 
@@ -275,6 +275,16 @@ describe("printing with the page in dark", () => {
   it("takes the turns of the screen away, since on paper it is the browser that cuts", () => {
     const worn = drawn(onPaper(), sheetIn("coral", '<div class="sheet-turn"></div>'));
     expect(worn(".sheet-turn", "display")).toBe("none");
+  });
+
+  it.each(DRESSED)("tints in %s no heading cell out of the head", (name) => {
+    const cells =
+      '<table><tbody><tr><th class="side">x</th></tr></tbody><tfoot><tr><th class="foot">y</th></tr></tfoot></table>';
+    const worn = drawn(onPaper(), sheetIn(name, cells));
+    for (const cell of [".side", ".foot"]) {
+      expect(worn(cell, "print-color-adjust")).not.toBe("exact");
+      expect(worn(cell, "--tisty-ink")).toBe(designOf(name).light.ink);
+    }
   });
 
   it.each(DRESSED)("keeps the tint of %s, or its words would be white over white", (name) => {

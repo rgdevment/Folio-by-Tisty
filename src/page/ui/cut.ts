@@ -9,7 +9,7 @@ const HEADING = /^H[1-6]$/;
 
 const bottomOf = (one: HTMLElement): number => one.offsetTop + one.offsetHeight;
 
-const isBlock = (one: HTMLElement): boolean => one.offsetHeight > 0;
+const isBlock = (one: HTMLElement): boolean => one.offsetHeight > 0 && one.className !== "tags";
 
 const floats = (one: Element): boolean => one.matches('blockquote[data-callout="idea"][data-side]');
 
@@ -38,6 +38,7 @@ export const cut = (sheet: HTMLElement, { down, margin }: Leaf): void => {
   const beginUnder = (band: HTMLElement, from: number): void => {
     band.style.setProperty("--fill", `${Math.max(0, begins + room - from)}px`);
     begins = bottomOf(band) + margin;
+    ended = begins;
     deepest = begins;
     fresh = true;
   };
@@ -45,7 +46,6 @@ export const cut = (sheet: HTMLElement, { down, margin }: Leaf): void => {
     if (!isBlock(one)) continue;
     if (one.tagName === "HR") {
       beginUnder(one, ended);
-      ended = begins;
       heads = [];
       continue;
     }

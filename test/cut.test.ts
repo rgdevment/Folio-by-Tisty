@@ -114,6 +114,27 @@ describe("a sheet cut for its paper", () => {
     expect(turns()).toHaveLength(0);
   });
 
+  it("keeps the title with the tags Folio writes over it, which are no block of the document", () => {
+    laid(
+      { tag: "p", top: 10, tall: 20, markup: ' class="tags"' },
+      { tag: "h1", top: 40, tall: 30 },
+      { tag: "table", top: 80, tall: 500 },
+    );
+    cut(sheet, LEAF);
+    expect(turns().map((one) => one.nextElementSibling?.tagName)).toEqual(["TABLE"]);
+  });
+
+  it("fills under a turn from where its sheet begins, though only a floated note stands on it", () => {
+    laid(
+      p(10, 100),
+      { tag: "blockquote", top: 100, tall: 80, markup: ' data-callout="idea" data-side="right"' },
+      { tag: "hr", top: 110, tall: 2 },
+    );
+    cut(sheet, LEAF);
+    expect(turns()).toHaveLength(1);
+    expect(Number.parseInt(fillOf(sheet.lastElementChild ?? undefined) ?? "", 10)).toBe(ROOM);
+  });
+
   it("takes for no block what has no measures, as a formula or a drawing left bare", () => {
     laid(p(10, 40), { tag: "hr", top: 60, tall: 50 }, p(130, 40));
     const bare = document.createElementNS("http://www.w3.org/1998/Math/MathML", "math");

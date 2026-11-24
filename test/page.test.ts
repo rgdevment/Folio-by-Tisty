@@ -257,7 +257,7 @@ describe("the contract's numbers", () => {
       expect(FRAME).toContain(`${paper}: [${short}, ${long}]`);
     }
     const margins = sheet.margin_millimetres as { x: number; y: number };
-    expect(FRAME).toContain(`x: ${margins.x}, y: ${margins.y}`);
+    expect(FRAME).toContain(`MARGIN_MILLIMETRES = ${margins.y}`);
     const pixels = (millimetres: number) => Math.round((millimetres / 25.4) * Number(sheet.pixels_per_inch));
     expect(SHEET).toContain(`--margin-x: ${pixels(margins.x)}px;
   --margin-y: ${pixels(margins.y)}px;`);

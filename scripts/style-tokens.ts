@@ -115,7 +115,7 @@ const UNDESIGNED = ["tisty-heading", "design-headings", "design-head", "design-h
 
 // What a head holds in colours of its own would be lost over the accent.
 const headWords = (selector: string, { color }: { color: string }): string =>
-  `${selector} th:not(${OWN_COLORS} th){${["accent", "ink", "soft", "faint"]
+  `${selector} thead th:not(${OWN_COLORS} th){${["accent", "ink", "soft", "faint"]
     .filter((name) => name !== color)
     .map((name) => `--tisty-${name}:var(--tisty-${color});`)
     .join("")}}`;

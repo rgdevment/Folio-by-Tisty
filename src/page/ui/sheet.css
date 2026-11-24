@@ -766,10 +766,10 @@ svg[data-theme="dark"],
     box-shadow: none;
   }
 
-  /* The margins are on its @page, and the browser cuts by the rules the screen was cut by. */
+  /* Its sides are not on its @page, which would clip what a note holds itself by. */
   :host([data-sheets="true"]) .sheet {
     min-height: 0;
-    padding: 0;
+    padding: 0 var(--margin-x);
   }
 
   :host([data-sheets="true"]) :is(.sheet, .printed-page) > :not(.printed-page) {
@@ -952,7 +952,7 @@ tfoot td {
 }
 
 /* Over a tint its words are the paper's colour, so without it they would not be seen. */
-th {
+thead th {
   background: var(--design-head, var(--tisty-hover));
   color: var(--design-head-ink, inherit);
   -webkit-print-color-adjust: var(--design-head-print, inherit);
