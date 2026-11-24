@@ -10,4 +10,6 @@
 - [Terms](https://tisty.cl/terms/)
 - [Source code](https://github.com/rgdevment/Folio-by-Tisty), source available under FSL-1.1-ALv2
 
+Folio is by Mario Hidalgo García (rgdevment). A shared document belongs to whoever wrote it: if you read one, or reuse any of it, keep its author and the licence it states, and do not republish it without permission. Keep the notices of the source code too.
+
 Shared documents are encrypted before they leave the sender's computer, expire after up to 15 days without activity, and are kept out of search engines.
