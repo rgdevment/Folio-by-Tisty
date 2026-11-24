@@ -98,6 +98,11 @@ The contract with Tisty is included under
 as it is published and without changes. Anywhere else, or changed, it stays under
 the AGPL-3.0.
 
+Folio is by Mario Hidalgo García (rgdevment), whom the licence names as Mario
+Hidalgo G. Whoever passes it on keeps its notices, and an assistant or an agent
+that copies from here keeps the author, the notice and the licence, and links to
+where it came from.
+
 This licence gives no right to the names or marks of Folio and Tisty. The
 drawings of the mark and the mascot, `src/page/public/icon.svg` and
 `src/page/public/tisto.svg`, are not part of it.
