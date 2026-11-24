@@ -502,8 +502,8 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
   const draw = (next: Shown, page = -1, section = -1): void => {
     ({ held, wordsOf, pressFile } = next);
     speak(held.lang);
-    // Before its words arrive: its type and its title decide where paper cuts them, on every page of the document.
     const toSection = (): void => headingsIn(root)[section]?.scrollIntoView({ block: "start" });
+    // Before its words arrive: its type and its title decide where paper cuts them, on every page of the document.
     const wearing = wear(sheet, held);
     waiting = wearing;
     sheet.toggleAttribute("data-waiting", !!wearing);
@@ -512,7 +512,7 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
       waiting = undefined;
       sheet.removeAttribute("data-waiting");
       laySheets();
-      toSection();
+      if (showing === landed && !scrollY) toSection();
     });
     pages = held.pages ?? [];
     withCards = cardsFor(held, wordsOf);
@@ -522,6 +522,7 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
     drawSeal(held, next.seal);
     const samePlace = pages[page];
     if (samePlace) goTo(samePlace);
+    const landed = showing;
     if (!wearing) toSection();
   };
   draw(first);

@@ -1416,6 +1416,7 @@ describe("a design of its own", () => {
     Object.defineProperty(place.document, "fonts", { configurable: true, value: { load, check: () => here } });
     Object.defineProperty(place.HTMLElement.prototype, "offsetWidth", { configurable: true, get: () => 794 });
     vi.stubGlobal("innerHeight", 900);
+    vi.stubGlobal("scrollY", 0);
     vi.stubGlobal("scrollBy", vi.fn());
   });
 
@@ -1506,6 +1507,29 @@ describe("a design of its own", () => {
     come([]);
     await settle();
     expect(scrolled.map((one) => one.tagName)).toEqual(["H2"]);
+  });
+
+  it.each([
+    ["turned to another page", () => place.document.querySelector<HTMLElement>("#pages button")?.click()],
+    ["gone down the page", () => vi.stubGlobal("scrollY", 400)],
+  ])("moves nobody who has %s while the font came", async (_where, leave) => {
+    const cleaner = domPurifyCleaner(place);
+    const shown = (held: Document) => ({
+      held,
+      wordsOf: (html: string) => finished(cleaner.clean(html), []),
+      seal: SEAL,
+    });
+    here = true;
+    const show = drawFrame(shown(own({ font: "lora" })));
+    here = false;
+    scrolled.length = 0;
+    const pages = [{ ...ENERO, html: "<h1>Enero</h1><h2>Dos</h2>" }];
+    show(shown({ ...own({ font: "lora" }), pages }));
+    leave();
+    come([]);
+    await settle();
+    expect(scrolled).toEqual([]);
+    expect(isCut()).toBe(true);
   });
 
   it("is printed with the font of the language being read, though another was asked for first", async () => {
