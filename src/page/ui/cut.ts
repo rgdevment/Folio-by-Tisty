@@ -82,7 +82,7 @@ export const offerSheets = (sheet: HTMLElement): ((leaf?: Leaf | null) => void) 
   const size = (): string => `${sheet.offsetWidth} ${sheet.offsetHeight}`;
   const lay = (leaf = paper): void => {
     paper = leaf;
-    const fitsItsPaper = leaf !== null && sheet.offsetWidth === leaf.across;
+    const fitsItsPaper = leaf !== null && !sheet.hasAttribute("data-waiting") && sheet.offsetWidth === leaf.across;
     keepingInSight(sheet, () => {
       sheet.toggleAttribute("data-cut", fitsItsPaper);
       if (fitsItsPaper) cut(sheet, leaf);

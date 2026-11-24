@@ -14,7 +14,7 @@ as_browser() {
 }
 
 code_files() {
-  (cd "$page" && find . -type f \( -name '*.js' -o -name '*.css' -o -name index.html -o -name home.html -o -name 404.html -o -name widget-frame.html \) | sed 's|^\./||' | LC_ALL=C sort)
+  (cd "$page" && find . -type f \( -name '*.js' -o -name '*.css' -o -name '*.woff2' -o -name index.html -o -name home.html -o -name 404.html -o -name widget-frame.html \) | sed 's|^\./||' | LC_ALL=C sort)
 }
 
 sums() {
@@ -54,7 +54,7 @@ served_once() {
     esac
   done < <(code_files)
 
-  asset=$(code_files | grep -m1 '^assets/')
+  asset=$(code_files | grep -m1 '^assets/.*\.js$')
   if [ -n "$asset" ] && [ "$challenged" = 0 ]; then
     curl -s --max-time 10 -H "Accept-Encoding: br, gzip" -D "$headers" -o /dev/null "$address/$asset"
     grep -qi '^cache-control:.*immutable' "$headers" || differs+=("the cache of $asset")

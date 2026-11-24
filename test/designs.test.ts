@@ -2,12 +2,14 @@ import { readFileSync } from "node:fs";
 import { CONTRACTS, check } from "@tisty/contracts";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
+import { fontFaces, fontLicenses, packaged } from "../scripts/own-fonts";
 import { type DesignsValues, designStyles, type StyleValues, styleTokens } from "../scripts/style-tokens";
 
 const DESIGNS = (CONTRACTS.designs as { values: DesignsValues }).values;
 const STYLE = (CONTRACTS.style as { values: StyleValues }).values;
 const SHEET = readFileSync("src/page/ui/sheet.css", "utf8");
 const FRAME = readFileSync("src/page/ui/frame.ts", "utf8");
+const HTML = readFileSync("src/page/index.html", "utf8");
 const FRAME_CSS = readFileSync("src/page/ui/frame.css", "utf8");
 const OWN = designStyles(DESIGNS, STYLE);
 const CSS = `${styleTokens(STYLE)}${SHEET}${OWN}`;
@@ -47,7 +49,8 @@ const drawn = (css: string, html: string): ((selector: string, name: string) => 
     getComputedStyle(document.querySelector(selector) as Element)
       .getPropertyValue(name)
       .trim()
-      .replace(/(\d)\/(\d)/g, "$1 / $2");
+      .replace(/(\d)\/(\d)/g, "$1 / $2")
+      .replace(/,\s*/g, ", ");
   const resolved = (selector: string, said: string): string =>
     said.replace(WITH_FALLBACK, (_, name: string, otherwise = "") => {
       const value = property(selector, name);
@@ -66,9 +69,20 @@ const sheetIn = (design: string, words = ""): string =>
   ].join("");
 
 describe("the designs of the contract", () => {
-  it("are the closed list the page draws", () => {
+  it("are the closed lists the page draws, each from its default on", () => {
+    const { own } = DESIGNS;
+    const { defaults } = own as unknown as { defaults: Record<string, string> };
+    const listed = (new JSDOM(HTML).window.document.getElementById("looks") as HTMLElement).dataset;
     expect(Object.keys(DESIGNS.designs)).toEqual(NAMES);
-    expect(FRAME).toContain(`["${NAMES.join('", "')}"]`);
+    expect({ ...listed }).toEqual({
+      design: [...NAMES, "own"].join(" "),
+      sheet: Object.keys(own.sheets).join(" "),
+      heading: Object.keys(own.headings).join(" "),
+      ink: Object.keys(own.inks).join(" "),
+      font: Object.keys(own.fonts).join(" "),
+    });
+    expect(listed.design?.split(" ")[0]).toBe(DESIGNS.default);
+    for (const part of ["sheet", "heading", "ink", "font"]) expect(listed[part]?.split(" ")[0]).toBe(defaults[part]);
   });
 
   it("are drawn without one of their colours written by hand", () => {
@@ -83,7 +97,7 @@ describe("the designs of the contract", () => {
   });
 
   it("need no theme of their own, so the one of the page is the one of the sheet", () => {
-    const said = OWN.match(/--tisty-[\w-]+:(?!initial|var)[^;]+;/g) ?? [];
+    const said = OWN.match(/--tisty-[\w-]+:(?!initial|var|color-mix)[^;]+;/g) ?? [];
     expect(said.length).toBeGreaterThan(0);
     expect(said.filter((one) => !one.includes("light-dark("))).toEqual([]);
     expect(OWN).not.toContain("data-theme");
@@ -127,7 +141,7 @@ describe("the designs of the contract", () => {
   });
 
   it.each([
-    ["bosque", "rule", 'Georgia,Cambria,"Times New Roman",serif'],
+    ["bosque", "rule", "inherit"],
     ["coral", "bar", "inherit"],
     ["fiordo", "rule", "inherit"],
     ["violeta", "bar", "inherit"],
@@ -306,6 +320,122 @@ describe("the design a sheet says", () => {
     expect(check("sheet", { design })).not.toEqual([]);
     expect(check("document", { ...held, sheet: { design } })).not.toEqual([]);
     expect(check("document", { ...held, pages: [{ ...page, sheet: { design } }] })).not.toEqual([]);
+  });
+});
+
+describe("a design of its own", () => {
+  const { own } = DESIGNS;
+  const FONTS = packaged(own.fonts);
+  const PICKED = { sheet: "menta", heading: "ciruela", ink: "noche", font: "lora" };
+  const ownSheet = (picked: Record<string, string> = PICKED, waiting = ""): string =>
+    sheetIn("own").replace(
+      'data-design="own"',
+      `data-design="own" ${waiting} ${Object.entries(picked)
+        .map(([part, name]) => `data-${part}="${name}"`)
+        .join(" ")}`,
+    );
+  const toneOf = (palette: Record<string, Record<Theme, string>>, name: string, theme: Theme): string | undefined =>
+    palette[name]?.[theme];
+
+  describe.each(THEMES)("in %s", (theme) => {
+    it.each(Object.keys(own.sheets))("wears the sheet %s", (name) => {
+      const worn = drawn(inTheme(theme), ownSheet({ ...PICKED, sheet: name }));
+      expect(worn(".sheet", "--tisty-sheet")).toBe(toneOf(own.sheets, name, theme));
+    });
+
+    it.each(Object.keys(own.headings))("wears the headings %s, which are its accent", (name) => {
+      const worn = drawn(inTheme(theme), ownSheet({ ...PICKED, heading: name }));
+      const tone = toneOf(own.headings, name, theme) as string;
+      expect(worn("h2", "color")).toBe(tone);
+      expect(worn(".sheet", "--tisty-accent")).toBe(tone);
+      const [red, green, blue] = [1, 3, 5].map((at) => Number.parseInt(tone.slice(at, at + 2), 16));
+      expect(worn(".sheet", "--tisty-accent-soft")).toBe(
+        `rgb(${red} ${green} ${blue} / ${theme === "light" ? 0.08 : 0.11})`,
+      );
+      expect(worn(".sheet", "--tisty-line")).toBe(`color-mix(in srgb, ${tone} 28%, transparent)`);
+    });
+
+    it.each(Object.keys(own.inks))("wears the ink %s, and what is soft is mixed from it", (name) => {
+      const worn = drawn(inTheme(theme), ownSheet({ ...PICKED, ink: name }));
+      const tone = toneOf(own.inks, name, theme);
+      expect(worn(".sheet", "color")).toBe(tone);
+      expect(worn(".sheet", "--tisty-soft")).toBe(
+        `color-mix(in srgb, ${tone} 78%, ${toneOf(own.sheets, "menta", theme)})`,
+      );
+    });
+
+    it("leaves Tisty's colours to what has its own", () => {
+      const worn = drawn(inTheme(theme), ownSheet());
+      for (const one of OWN_COLORS) {
+        for (const color of OF_STYLE) expect(worn(one, `--tisty-${color}`)).toBe(STYLE.colors[theme][color]);
+        expect(worn(one, "--tisty-accent-soft")).toBe(ACCENT_SOFT.tisty?.[theme]);
+      }
+    });
+  });
+
+  it("has the type, the rule and the tint of the contract", () => {
+    const worn = drawn(inTheme("light"), ownSheet());
+    expect(worn(".sheet", "font-size")).toBe("14.5px");
+    expect(worn(".sheet", "line-height")).toBe("1.65");
+    expect(worn(".sheet", "--design-title")).toMatch(/^1px solid color-mix\(/);
+    expect(worn(".sheet", "--design-head")).toBe(toneOf(own.headings, "ciruela", "light"));
+    expect(worn("thead th", "color")).toBe(toneOf(own.sheets, "menta", "light"));
+    expect(worn("h2", "font-family")).toBe("inherit");
+  });
+
+  it.each(FONTS)("wears %s once it has come, and the text font of style while it comes", (font, { falls_to }) => {
+    const worn = (waiting: string) => drawn(inTheme("light"), ownSheet({ ...PICKED, font }, waiting));
+    expect(worn("")(".sheet", "font-family").replaceAll(", ", ",")).toBe(`own-${font},${falls_to}`);
+    expect(worn("data-waiting")(".sheet", "font-family")).toContain("-apple-system");
+  });
+
+  it("keeps the fonts of style on what keeps its colours, and the handwriting of a note", () => {
+    const note = '<blockquote class="callout" data-callout="idea"></blockquote>';
+    const worn = drawn(inTheme("light"), ownSheet().replace("</article>", `${note}</article>`));
+    for (const one of ["blockquote.callout", "figure.code", "figure.diagram", "figure.widget"]) {
+      expect(worn(one, "font-family")).toContain("-apple-system");
+    }
+    expect(worn('[data-callout="idea"]', "font-family")).toContain("Ink Free");
+  });
+
+  it("is printed in its light colours over white", () => {
+    const worn = drawn(onPaper(), ownSheet());
+    expect(worn(".sheet", "background-color")).toBe("rgb(255, 255, 255)");
+    expect(worn(".sheet", "--tisty-ink")).toBe(toneOf(own.inks, "noche", "light"));
+    expect(worn("thead th", "print-color-adjust")).toBe("exact");
+  });
+
+  describe("and its fonts", () => {
+    const FACES = fontFaces(own.fonts).match(/@font-face\{[^}]+\}/g) ?? [];
+
+    it("are the Latin and the Latin extended files of each package, and no other", () => {
+      expect(FACES).toHaveLength(FONTS.length * 2);
+      for (const [key, font] of FONTS) {
+        const files = FACES.filter((face) => face.includes(`font-family:own-${key};`));
+        const name = font.package.split("/")[1];
+        for (const subset of ["latin", "latin-ext"]) {
+          expect(files.join("")).toContain(`url("${font.package}/files/${name}-${subset}-wght-normal.woff2")`);
+        }
+        for (const face of files) expect(face).toMatch(/font-weight:\d+ \d+;.*unicode-range:U\+/);
+      }
+    });
+
+    it("are the versions of the contract, which the lock holds to", () => {
+      const { devDependencies } = JSON.parse(readFileSync("package.json", "utf8"));
+      for (const [, font] of FONTS) expect(devDependencies[font.package]).toBe(font.version);
+    });
+
+    it("go with their licenses", () => {
+      const said = fontLicenses(own.fonts);
+      expect(said.match(/SIL Open Font License, Version 1\.1/gi)?.length).toBeGreaterThanOrEqual(FONTS.length);
+      for (const [, font] of FONTS) expect(said).toContain(`${font.package} ${font.version}`);
+    });
+
+    it("stop the build when the package is another version, or lacks a file", () => {
+      const lora = own.fonts.lora as (typeof FONTS)[number][1];
+      expect(() => fontFaces({ lora: { ...lora, version: "0.0.1" } })).toThrow("0.0.1");
+      expect(() => fontFaces({ lora: { ...lora, package: "@fontsource-variable/papyrus" } })).toThrow("papyrus");
+    });
   });
 });
 

@@ -2,6 +2,7 @@ export interface Printing {
   button: HTMLElement;
   root: ShadowRoot;
   sheet: HTMLElement;
+  waiting: () => Promise<unknown> | undefined;
   others: (signal: AbortSignal) => { before: HTMLElement[]; after: HTMLElement[] };
 }
 
@@ -48,7 +49,12 @@ export const offerPrinting = (printing: Printing): void => {
     for (const step of undo) step();
     undo = [];
   };
-  const printNow = (): void => {
+  let asked = false;
+  const printNow = async (): Promise<void> => {
+    if (asked) return;
+    asked = true;
+    await printing.waiting();
+    asked = false;
     prepare();
     window.print();
   };

@@ -1,3 +1,5 @@
+import { familyOf, type OwnFont, packaged } from "./own-fonts";
+
 type Theme = "light" | "dark";
 type Themed<T> = Record<Theme, T>;
 type Colors = Record<string, string>;
@@ -16,10 +18,31 @@ export interface StyleValues {
   body: { size: string };
 }
 
-interface Design extends Themed<Colors> {
-  type: { text: string; headings: string; size: string; line_height: number; align: "left" | "justify" };
+interface Type {
+  text: string;
+  headings: string;
+  size: string;
+  line_height: number;
+  align: "left" | "justify";
+}
+
+interface Look {
+  type: Type;
   title: string;
   table: string;
+}
+
+interface Design extends Themed<Colors>, Look {}
+
+type Palette = Record<string, Themed<string>>;
+
+interface Own extends Look {
+  soft: string;
+  line: string;
+  sheets: Palette;
+  headings: Palette;
+  inks: Palette;
+  fonts: Record<string, OwnFont>;
 }
 
 export interface DesignsValues {
@@ -29,6 +52,7 @@ export interface DesignsValues {
   titles: Record<string, { border_bottom: string }>;
   tables: Record<string, string | { head: { color: string; background: string } }>;
   designs: Record<string, Design>;
+  own: Own;
 }
 
 const variables = ({ light, dark }: Themed<Colors>): string =>
@@ -86,12 +110,12 @@ const fontOf = (name: string, { fonts }: DesignsValues, { text_font }: StyleValu
 
 const border = (said: string): string => said.replace(/\S+$/, (color) => `var(--tisty-${color})`);
 
-const headOf = (design: Design, { tables }: DesignsValues): { color: string; background: string } | null => {
+const headOf = (design: Look, { tables }: DesignsValues): { color: string; background: string } | null => {
   const said = named(tables, design.table);
   return typeof said === "string" ? null : said.head;
 };
 
-const worn = (design: Design, designs: DesignsValues, style: StyleValues): string => {
+const worn = (design: Look, designs: DesignsValues, style: StyleValues): string => {
   const { text, headings, size, line_height, align } = design.type;
   const head = headOf(design, designs);
   return [
@@ -109,6 +133,7 @@ const worn = (design: Design, designs: DesignsValues, style: StyleValues): strin
 };
 
 const OWN_COLORS = ":is(blockquote.callout,figure.code,figure.diagram,figure.widget)";
+const OWN_FONT = ':is(blockquote.callout:not([data-callout="idea"]),figure.code,figure.diagram,figure.widget)';
 const UNDESIGNED = ["tisty-heading", "design-headings", "design-head", "design-head-ink", "design-head-print"]
   .map((name) => `--${name}:initial;`)
   .join("");
@@ -130,6 +155,44 @@ const designRules = (name: string, design: Design, designs: DesignsValues, style
   ].join("");
 };
 
+const mixed = (said: string): string => said.replace(/\b(ink|sheet|heading)\b/g, "var(--tisty-$1)");
+
+const picks = (part: string, palette: Palette, colorsOf: (tones: Themed<string>) => Themed<Colors>): string =>
+  Object.entries(palette)
+    .map(([name, tones]) => `[data-design="own"][data-${part}="${name}"]{${variables(colorsOf(tones))}}`)
+    .join("");
+
+const only =
+  (color: string) =>
+  ({ light, dark }: Themed<string>): Themed<Colors> => ({ light: { [color]: light }, dark: { [color]: dark } });
+
+const ownRules = (designs: DesignsValues, style: StyleValues): string => {
+  const { own } = designs;
+  const { light: day, dark: night } = designs.colors.accent_soft_percent;
+  const selector = '[data-design="own"]';
+  const look: Look = { ...own, type: { ...own.type, text: "sans", headings: "sans" } };
+  const head = headOf(look, designs);
+  const accented = ({ light, dark }: Themed<string>): Themed<Colors> => ({
+    light: { heading: light, accent: light, "accent-soft": sheer(light, day) },
+    dark: { heading: dark, accent: dark, "accent-soft": sheer(dark, night) },
+  });
+  return [
+    picks("sheet", own.sheets, only("sheet")),
+    picks("heading", own.headings, accented),
+    picks("ink", own.inks, only("ink")),
+    `${selector}{--tisty-soft:${mixed(own.soft)};--tisty-line:${mixed(own.line)};${worn(look, designs, style)}}`,
+    `${selector} figure.diagram{font-size:${style.body.size};}`,
+    head ? headWords(selector, head) : "",
+    packaged(own.fonts)
+      .map(
+        ([key, { falls_to }]) =>
+          `${selector}[data-font="${key}"]:not([data-waiting]){font-family:${familyOf(key)},${falls_to};}`,
+      )
+      .join(""),
+    `${selector} ${OWN_FONT}{font-family:${fontOf("sans", designs, style)};}`,
+  ].join("");
+};
+
 // The default wears what style says, so it has rules only for what keeps its colours inside another.
 const defaultRules = (design: Design, { colors }: DesignsValues): string =>
   `${OWN_COLORS}{${variables(colorsOf(design, colors))}${UNDESIGNED}}`;
@@ -139,4 +202,4 @@ export const designStyles = (designs: DesignsValues, style: StyleValues): string
     .map(([name, design]) =>
       name === designs.default ? defaultRules(design, designs) : designRules(name, design, designs, style),
     )
-    .join("");
+    .join("") + ownRules(designs, style);

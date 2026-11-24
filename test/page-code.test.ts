@@ -132,6 +132,21 @@ describe.runIf(HAS_POSIX_BASH)("comparing what is served with what was written",
     expect(answer.stdout).toContain("the compression of assets/app.js");
   });
 
+  describe("with fonts among its assets", () => {
+    beforeEach(() => {
+      writeFileSync(join(site, "assets/a-font.woff2"), "font\n");
+    });
+
+    it("attests them with the code", () => {
+      expect(run(`sums "${site}"`).stdout).toContain("assets/a-font.woff2");
+    });
+
+    it("looks for compression on the code, since a font is already compressed", () => {
+      const answer = run(`served "${site}" ${ADDRESS}`, { ASSET_ENCODING: "X-None: 1" });
+      expect(answer.stdout).toContain("the compression of assets/app.js");
+    });
+  });
+
   it("does not blame a deploy for a challenge to its runner", () => {
     const answer = run(`served "${site}" ${ADDRESS}`, { ADDS_SCRIPT: "1", MORE_HEADERS: "cf-mitigated: challenge" });
     expect(answer.status).toBe(0);
