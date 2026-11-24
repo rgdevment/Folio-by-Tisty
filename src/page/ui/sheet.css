@@ -1,5 +1,7 @@
 /* The sheet looks the same wherever it opens: these numbers are the style contract's (decision 113). */
 :host {
+  --margin-x: 76px;
+  --margin-y: 83px;
   display: block;
 }
 
@@ -19,6 +21,51 @@
 :host([data-sheets="true"]) .sheet {
   min-height: var(--page-height);
   padding: var(--margin-y) var(--margin-x);
+}
+
+/* Cut in sheets, each turn and each rule among the blocks is the band of desk between two of them. */
+@media screen {
+  .sheet[data-cut] {
+    position: relative;
+  }
+
+  :host([data-sheets="true"]) .sheet[data-cut] {
+    min-height: 0;
+    padding-bottom: calc(var(--margin-y) + var(--last, 0px));
+  }
+
+  .sheet[data-cut] > :last-child {
+    margin-bottom: 0;
+  }
+
+  .sheet[data-cut] > :is(hr, .sheet-turn) {
+    position: relative;
+    height: 50px;
+    margin: calc(var(--fill, 0px) + var(--margin-y)) calc(-1px - var(--margin-x)) var(--margin-y);
+    background: var(--desk);
+    border: 0;
+  }
+
+  .sheet[data-cut] > :is(hr, .sheet-turn)::before,
+  .sheet[data-cut] > :is(hr, .sheet-turn)::after {
+    content: "";
+    position: absolute;
+    inset-inline: 1px;
+    height: 10px;
+    background: var(--tisty-sheet);
+  }
+
+  .sheet[data-cut] > :is(hr, .sheet-turn)::before {
+    top: 0;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 7px 7px -7px var(--tisty-cast);
+  }
+
+  .sheet[data-cut] > :is(hr, .sheet-turn)::after {
+    bottom: 0;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 -7px 7px -7px var(--tisty-cast);
+  }
 }
 
 @media (max-width: 640px) {
@@ -67,6 +114,16 @@ h6,
   scroll-margin-top: calc(var(--bar-edge, 80px) + 8px);
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--tisty-heading, inherit);
+  font-family: var(--design-headings, inherit);
+}
+
 h1 {
   margin: 26px 0 8px;
   font-size: 1.65em;
@@ -75,10 +132,16 @@ h1 {
   letter-spacing: -0.01em;
 }
 
-.sheet > h1:first-of-type {
+.sheet > h1:first-of-type,
+.sheet:not([data-design="tisty"]) > .printed-page > h1:first-of-type {
   margin: 0 0 22px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--tisty-hair);
+}
+
+:is(.sheet, .sheet:not([data-design="tisty"]) > .printed-page)
+  > h1:is(:first-child, .tags + *, .front + *, .printed-page + *) {
+  border-bottom: var(--design-title, 1px solid var(--tisty-hair));
 }
 
 h2 {
@@ -384,13 +447,26 @@ blockquote[data-callout="idea"][data-side="left"] {
   margin: 4px 20px 12px 0;
 }
 
-:is(.sheet, .printed-page) > :is(hr, div.table, figure, pre, details, div.math, p[data-alone]) {
+:is(.sheet, .printed-page) > :is(hr, .sheet-turn, div.table, figure, pre, details, div.math, p[data-alone]) {
   clear: both;
 }
 
 /* Their markers, checks, borders and tints would run under a floated note. */
 :is(.sheet, .printed-page) > :is(ul, ol, blockquote) {
   display: flow-root;
+}
+
+/* What has colours of its own looks the same over the paper of any design. */
+.sheet:not([data-design="tisty"]) blockquote.callout:not([data-callout="idea"]) {
+  background: color-mix(in srgb, var(--said) 7%, var(--tisty-sheet));
+}
+
+.sheet:not([data-design="tisty"]) figure.code {
+  background: linear-gradient(var(--tisty-hover), var(--tisty-hover)), var(--tisty-sheet);
+}
+
+.sheet:not([data-design="tisty"]) :is(figure.code, figure.diagram, figure.widget) {
+  color: var(--tisty-ink);
 }
 
 mark {
@@ -666,8 +742,37 @@ svg[data-theme="dark"],
 /* Paper is light, whichever theme the screen was in. */
 @media print {
   .sheet {
+    background: #ffffff;
     border-radius: 0;
     box-shadow: none;
+  }
+
+  /* The margins are on its @page, and the browser cuts by the rules the screen was cut by. */
+  :host([data-sheets="true"]) .sheet {
+    min-height: 0;
+    padding: 0;
+  }
+
+  :host([data-sheets="true"]) :is(.sheet, .printed-page) > :not(.printed-page) {
+    break-inside: avoid;
+  }
+
+  :host([data-sheets="true"]) :is(.sheet, .printed-page) > :is(h1, h2, h3, h4, h5, h6) {
+    break-after: avoid;
+  }
+
+  :host([data-sheets="true"]) :is(.sheet, .printed-page) > hr {
+    margin: 0;
+    border: 0;
+    break-after: page;
+  }
+
+  :host([data-sheets="true"]) :is(.sheet, .printed-page) > hr + * {
+    margin-top: 0;
+  }
+
+  .sheet-turn {
+    display: none;
   }
 
   .printed-page {
@@ -825,6 +930,14 @@ th,
 tfoot td {
   background: var(--tisty-hover);
   font-weight: 600;
+}
+
+/* Over a tint its words are the paper's colour, so without it they would not be seen. */
+th {
+  background: var(--design-head, var(--tisty-hover));
+  color: var(--design-head-ink, inherit);
+  -webkit-print-color-adjust: var(--design-head-print, inherit);
+  print-color-adjust: var(--design-head-print, inherit);
 }
 
 table:has(th[data-type]) td {

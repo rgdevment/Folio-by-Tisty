@@ -105,6 +105,12 @@ describe("the cleaner, where a browser reads HTML otherwise", () => {
     ]);
   });
 
+  it("leaves as its words a link that puts a design on in Tisty, where here nothing changes one", () => {
+    const words = cleaner.clean('<p><a href="tisty:design/coral">Coral</a></p>');
+    expect(words.textContent).toBe("Coral");
+    expect(words.querySelector("a")?.attributes).toHaveLength(0);
+  });
+
   it("does not leave a class the contract does not know", () => {
     const words = cleaner.clean('<div class="table sheet bar">a</div>');
     expect(words.querySelector("div")?.getAttribute("class")).toBe("table");

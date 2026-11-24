@@ -48,12 +48,13 @@ const ownerNamed = ({ held, ownerFingerprint, signerStanding, ownerStanding }: O
     ? { name: held.signed_as ?? said().noName, standing: signerStanding }
     : { name: held.owner_name ?? said().noName, standing: ownerStanding };
 
-const shownOf = ({ id, linkKey, opened }: Showing, caseToken?: string): Shown => {
+// Whichever language is read, it is laid on the sheet of its anchor.
+const shownOf = ({ id, linkKey, opened }: Showing, { opened: anchor }: Showing, caseToken?: string): Shown => {
   const { held, pictures } = opened;
   const cleaner = domPurifyCleaner(window);
   const addresses = pictureAddresses(held.pictures ?? [], pictures);
   return {
-    held,
+    held: { ...held, sheet: anchor.held.sheet },
     wordsOf: (html) => finished(cleaner.clean(html), addresses),
     seal: opened,
     pressFile: filePresser({ id, linkKey, held, ...(caseToken === undefined ? {} : { caseToken }) }),
@@ -97,7 +98,7 @@ const shownInLanguages = async (anchor: Showing): Promise<void> => {
   const { id, opened } = anchor;
   const { lang = "", languages = [] } = opened.held;
   const offered = reachedBy(languages, opened.ownerKeeps);
-  const anchorLanguage = { lang, showing: anchor, shown: shownOf(anchor), byAnother: false };
+  const anchorLanguage = { lang, showing: anchor, shown: shownOf(anchor, anchor), byAnother: false };
   const kept = new Map<string, Language>([[lang, anchorLanguage]]);
   const languageOf = async (chosen: string): Promise<Language | undefined> => {
     const known = kept.get(chosen);
@@ -107,7 +108,7 @@ const shownInLanguages = async (anchor: Showing): Promise<void> => {
     if (!showing) return undefined;
     const ownersOwn = showing.opened.owner === opened.owner;
     if (!(await showsHere(anchor, translation, showing, ownersOwn))) return undefined;
-    const language = { lang: chosen, showing, shown: shownOf(showing), byAnother: !ownersOwn };
+    const language = { lang: chosen, showing, shown: shownOf(showing, anchor), byAnother: !ownersOwn };
     kept.set(chosen, language);
     return language;
   };
@@ -145,7 +146,7 @@ const shownInLanguages = async (anchor: Showing): Promise<void> => {
 const shown = async (id: string, linkKey: string, arrived: Arrived, caseToken?: string): Promise<void> => {
   const anchor = await opening(id, linkKey, arrived);
   if (caseToken === undefined) await shownInLanguages(anchor);
-  else drawFrame(shownOf(anchor, caseToken));
+  else drawFrame(shownOf(anchor, anchor, caseToken));
 };
 
 const opened = async (id: string, linkKey: string, arrived: Arrived, caseToken?: string): Promise<boolean> => {

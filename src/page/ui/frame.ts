@@ -1,9 +1,10 @@
-import type { Document, Orientation, Page, Paper, Verdict } from "@tisty/contracts";
+import type { Design, Document, Orientation, Page, Paper, Verdict } from "@tisty/contracts";
 import { type Standing, shownNameOf } from "../../core/look-alike";
 import { MAKER } from "../maker";
 import type { ShownEditor } from "../read";
 import { cardsFor, referenceOf } from "./cards";
 import { bareUrl } from "./clean";
+import { type Leaf, offerSheets } from "./cut";
 import { element } from "./element";
 import { desktopOf, offerTisty, type Platform } from "./offer-tisty";
 import { offerPrinting } from "./print";
@@ -45,36 +46,39 @@ export interface Seal {
 }
 
 // Through the object model, since the page's policy lets no style be written into it.
-const printOn = (across: number, down: number): void => {
+const printOn = (across: number, down: number, margin: string): void => {
   if (!("adoptedStyleSheets" in document)) return;
   const size = new CSSStyleSheet();
-  size.replaceSync(`@page { size: ${across}mm ${down}mm; }`);
+  size.replaceSync(`@page { size: ${across}mm ${down}mm;${margin} }`);
   document.adoptedStyleSheets = [size];
 };
 
-const withLayout = (host: HTMLElement, sheets: boolean, paper: Paper, orientation: Orientation): void => {
+const withLayout = (host: HTMLElement, sheets: boolean, paper: Paper, orientation: Orientation): Leaf | null => {
   const [short, long] = PAPER_MILLIMETRES[paper];
   const across = orientation === "landscape" ? long : short;
   const down = orientation === "landscape" ? short : long;
   host.dataset.sheets = String(sheets);
-  printOn(across, down);
+  printOn(across, down, sheets ? ` margin: ${MARGIN_MILLIMETRES.y}mm ${MARGIN_MILLIMETRES.x}mm;` : "");
   // On the column, because the card of pages under the sheet keeps its width too.
   element("sheet-column").style.setProperty("--page-width", `${sheets ? pixels(across) : LONG_PAGE_WIDTH_PIXELS}px`);
-  if (sheets) {
-    host.style.setProperty("--page-height", `${pixels(down)}px`);
-    host.style.setProperty("--margin-x", `${pixels(MARGIN_MILLIMETRES.x)}px`);
-    host.style.setProperty("--margin-y", `${pixels(MARGIN_MILLIMETRES.y)}px`);
-  }
+  if (!sheets) return null;
+  host.style.setProperty("--page-height", `${pixels(down)}px`);
+  return { across: pixels(across), down: pixels(down), margin: pixels(MARGIN_MILLIMETRES.y) };
 };
 
 const paperOf = (held: Document): Paper => {
   const said = held.sheet?.paper as Paper | undefined;
-  return said && said in PAPER_MILLIMETRES ? said : "a4";
+  return said && Object.hasOwn(PAPER_MILLIMETRES, said) ? said : "a4";
 };
+
+// The closed list of the sheet contract, so no name a document says reaches the page's own elements as it came.
+const DESIGNS: readonly Design[] = ["tisty", "bosque", "coral", "fiordo", "violeta"];
+
+const designOf = ({ sheet }: Document): Design => DESIGNS.find((one) => one === sheet?.design) ?? "tisty";
 
 const pressed = (button: HTMLElement, on: boolean): void => button.setAttribute("aria-pressed", String(on));
 
-const drawPaperPanel = (host: HTMLElement, held: Document): void => {
+const drawPaperPanel = (host: HTMLElement, held: Document, laySheets: (leaf: Leaf | null) => void): void => {
   const papers = element<HTMLFieldSetElement>("leaves");
   const leaves = [...papers.querySelectorAll<HTMLButtonElement>("button")];
   const sheets = element("sheets");
@@ -97,7 +101,7 @@ const drawPaperPanel = (host: HTMLElement, held: Document): void => {
     pressed(sheets, inSheets);
     pressed(landscape, acrossNow);
     landscape.hidden = !inSheets;
-    withLayout(host, inSheets, paperNow, acrossNow ? "landscape" : "portrait");
+    laySheets(withLayout(host, inSheets, paperNow, acrossNow ? "landscape" : "portrait"));
   };
   for (const leaf of leaves) {
     leaf.addEventListener("click", () => {
@@ -229,7 +233,7 @@ const lastDay = (diesOn: number): string =>
   inPageLanguage(new Date(diesOn * DAY_MILLISECONDS), { dateStyle: "long", timeZone: "UTC" });
 
 // What the sheet does not already say: the title and tags are on it, and the paper is in its own panel.
-const SAID_ELSEWHERE = new Set(["title", "tags", "tag", "paper", "sheets", "orientation", "lang"]);
+const SAID_ELSEWHERE = new Set(["title", "tags", "tag", "paper", "sheets", "orientation", "design", "lang"]);
 
 const drawDetails = (root: ShadowRoot, held: Document): void => {
   const list = element("details");
@@ -355,7 +359,8 @@ const drawDock = (): void => {
   });
 };
 
-const tagsOf = (tags: string[]): HTMLElement => {
+const tagsOf = ({ tags }: Document | Page): HTMLElement[] => {
+  if (!tags?.length) return [];
   const list = document.createElement("p");
   list.className = "tags";
   for (const tag of tags) {
@@ -363,7 +368,7 @@ const tagsOf = (tags: string[]): HTMLElement => {
     one.textContent = `#${tag}`;
     list.append(one);
   }
-  return list;
+  return [list];
 };
 
 // Nothing here changes the address by itself: the part after its # holds the link key (contract, «links»).
@@ -460,6 +465,7 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
   sheet.className = "sheet";
   sheet.tabIndex = -1;
   root.append(styles, sheet);
+  const laySheets = offerSheets(sheet);
 
   let { held, wordsOf, pressFile } = first;
   let pages: Page[] = [];
@@ -473,7 +479,8 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
     drawing?.abort();
     drawing = new AbortController();
     const words = withCards(wordsOf(shown.html), drawing.signal);
-    sheet.replaceChildren(...(shown.tags?.length ? [tagsOf(shown.tags)] : []), words);
+    sheet.replaceChildren(...tagsOf(shown), words);
+    laySheets();
     document.title = shown.title ? `${shown.title} · Folio` : "Folio by Tisty";
     const at = pages.indexOf(shown as Page);
     markPage(at);
@@ -494,6 +501,8 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
   const draw = (next: Shown, page = -1, section = -1): void => {
     ({ held, wordsOf, pressFile } = next);
     speak(held.lang);
+    // Before its words arrive: its type and its title decide where paper cuts them, on every page of the document.
+    sheet.dataset.design = designOf(held);
     pages = held.pages ?? [];
     withCards = cardsFor(held, wordsOf);
     drawPages(pages, turnTo);
@@ -509,7 +518,7 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
     const printed = document.createElement("section");
     printed.className = `printed-page ${side}`;
     printed.lang = page.lang ?? held.lang ?? "";
-    printed.append(...(page.tags?.length ? [tagsOf(page.tags)] : []), withCards(wordsOf(page.html), signal));
+    printed.append(...tagsOf(page), withCards(wordsOf(page.html), signal));
     return printed;
   };
   offerPrinting({
@@ -525,7 +534,7 @@ export const drawFrame = (first: Shown): ((next: Shown) => void) => {
       };
     },
   });
-  drawPaperPanel(host, held);
+  drawPaperPanel(host, held, laySheets);
   drawActions();
   drawDock();
   measurePanels();

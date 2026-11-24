@@ -2,45 +2,14 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { CONTRACTS } from "@tisty/contracts";
 import { defineConfig, type Plugin } from "vite";
 import { HOME_FILES, POLICIES, policyPage, sitemap } from "./scripts/site-pages";
+import { type DesignsValues, designStyles, type StyleValues, styleTokens } from "./scripts/style-tokens";
 
 const TOKENS = "virtual:tisty-tokens.css";
 const RESOLVED_TOKENS = `\0${TOKENS}`;
 
-type Theme = "light" | "dark";
-type Themed<T> = Record<Theme, T>;
+const SHEET = /\/sheet\.css(?:\?(?!url|raw)|$)/;
 
-interface Idea {
-  fill: Themed<Record<string, string>>;
-  ink: Themed<string>;
-  pins: Themed<string[]>;
-  tape: Themed<string>;
-}
-
-interface StyleValues {
-  colors: Themed<Record<string, string>>;
-  callouts: { idea: Idea };
-}
-
-const variables = ({ light, dark }: StyleValues["colors"]): string =>
-  Object.entries(light)
-    .map(([name, value]) => {
-      const night = dark[name];
-      if (night === undefined) throw new Error(`the style contract gives --tisty-${name} no dark colour`);
-      return `--tisty-${name}:light-dark(${value},${night});`;
-    })
-    .join("");
-
-const ideaColors = ({ fill, ink, pins, tape }: Idea, theme: Theme): Record<string, string> => ({
-  ...Object.fromEntries(Object.entries(fill[theme]).map(([hue, value]) => [`idea-${hue}`, value])),
-  ...Object.fromEntries(pins[theme].map((value, at) => [`idea-pin-${at}`, value])),
-  "idea-ink": ink[theme],
-  "idea-tape": tape[theme],
-});
-
-const colorsOf = ({ colors, callouts }: StyleValues): StyleValues["colors"] => ({
-  light: { ...colors.light, ...ideaColors(callouts.idea, "light") },
-  dark: { ...colors.dark, ...ideaColors(callouts.idea, "dark") },
-});
+const valuesOf = <T>(name: "style" | "designs"): T => (CONTRACTS[name] as { values: T }).values;
 
 // The colors come from the contract when building, so they change with it and no copy of them is kept here.
 const tokens = (): Plugin => ({
@@ -48,7 +17,16 @@ const tokens = (): Plugin => ({
   resolveId: (id) => (id === TOKENS ? RESOLVED_TOKENS : null),
   load(id) {
     if (id !== RESOLVED_TOKENS) return null;
-    return `:root{${variables(colorsOf((CONTRACTS.style as { values: StyleValues }).values))}}`;
+    return styleTokens(valuesOf<StyleValues>("style"));
+  },
+});
+
+const designs = (): Plugin => ({
+  name: "tisty-designs",
+  enforce: "pre",
+  transform(code, id) {
+    if (!SHEET.test(id)) return null;
+    return `${code}${designStyles(valuesOf<DesignsValues>("designs"), valuesOf<StyleValues>("style"))}`;
   },
 });
 
@@ -105,7 +83,7 @@ const sitePages = (): Plugin => ({
 
 export default defineConfig({
   root: "src/page",
-  plugins: [tokens(), licenses(), domains(), sitePages()],
+  plugins: [tokens(), designs(), licenses(), domains(), sitePages()],
   define: { __FOLIO_SHARDS__: JSON.stringify(shardNames().map((name) => name.slice(0, 2))) },
   build: {
     outDir: "../../dist/page",

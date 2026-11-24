@@ -21,6 +21,8 @@
     "test/admin-page-gaps.test.ts",
     "test/report-key-gaps.test.ts",
     "test/clean.test.ts",
+    "test/cut.test.ts",
+    "test/designs.test.ts",
     "test/ask.test.ts",
     "test/frame.test.ts",
     "test/limits-file.test.ts",

@@ -1304,6 +1304,110 @@ describe("turning a page", () => {
   });
 });
 
+describe("the design a sheet says", () => {
+  const sheet = () => root.querySelector(".sheet") as HTMLElement;
+  const withDesign = (design: unknown): Document => ({ ...HELD, sheet: { design } as Document["sheet"] });
+  const turnTo = (at: number) => place.document.querySelectorAll<HTMLElement>("#pages button")[at]?.click();
+
+  const PAGES: Page[] = [
+    { ...ENERO, sheet: { design: "coral" } },
+    { ...ENERO, id: "p2", at: 2, title: "Febrero" },
+  ];
+
+  it.each(["tisty", "bosque", "coral", "fiordo", "violeta"])("is worn when it is %s", (design) => {
+    draw(withDesign(design));
+    expect(sheet().dataset.design).toBe(design);
+  });
+
+  it.each(["pergamino", "BOSQUE", "constructor", "__proto__", '"]{}', "", 3, null, ["bosque"], {}])(
+    "is Tisty's, and never reaches the page, when it is %j",
+    (design) => {
+      draw(withDesign(design));
+      expect(sheet().dataset.design).toBe("tisty");
+      expect(root.innerHTML).not.toContain("pergamino");
+    },
+  );
+
+  it("is Tisty's when there is none, or no sheet at all", () => {
+    draw({ ...HELD, sheet: { paper: "letter" } });
+    expect(sheet().dataset.design).toBe("tisty");
+  });
+
+  it("is the document's on every page, whatever the page's own sheet says", () => {
+    draw({ ...withDesign("bosque"), pages: PAGES });
+    for (const at of [0, 1]) {
+      turnTo(at);
+      expect(sheet().dataset.design).toBe("bosque");
+    }
+    place.document.getElementById("crumb-back")?.click();
+    expect(sheet().dataset.design).toBe("bosque");
+  });
+
+  it("is Tisty's on every page of a document that says none", () => {
+    draw({ ...HELD, pages: PAGES });
+    turnTo(0);
+    expect(sheet().dataset.design).toBe("tisty");
+  });
+
+  it("is only one on paper, whichever page is on screen", () => {
+    draw({ ...withDesign("bosque"), pages: PAGES });
+    turnTo(0);
+    place.dispatchEvent(new place.Event("beforeprint"));
+    const printed = [...root.querySelectorAll<HTMLElement>(".sheet, .printed-page")];
+    expect(printed.map((one) => one.dataset.design)).toEqual(["bosque", undefined, undefined]);
+    place.dispatchEvent(new place.Event("afterprint"));
+    expect(root.querySelectorAll(".printed-page")).toHaveLength(0);
+  });
+
+  it("is worn before the words arrive, since its type and its title decide where a sheet is cut", () => {
+    const worn: (string | undefined)[] = [];
+    const cleaner = domPurifyCleaner(place);
+    const wordsOf = (html: string) => {
+      worn.push(sheet().dataset.design);
+      return finished(cleaner.clean(html), []);
+    };
+    drawFrame({ held: { ...withDesign("coral"), pages: PAGES }, wordsOf, seal: SEAL });
+    expect(worn[0]).toBe("coral");
+  });
+
+  it("is not said again in the details, as the rest of the sheet is not", () => {
+    draw({
+      ...withDesign("bosque"),
+      html: `<dl class="front"><dt>design</dt><dd>bosque</dd><dt>fuente</dt><dd>Apuntes</dd></dl>${HELD.html}`,
+    });
+    const said = place.document.getElementById("details")?.textContent;
+    expect(said).toContain("Apuntes");
+    expect(said).not.toContain("bosque");
+  });
+});
+
+describe("a document in sheets", () => {
+  const isCut = () => root.querySelector(".sheet")?.hasAttribute("data-cut");
+
+  beforeEach(() => {
+    vi.stubGlobal("scrollBy", vi.fn());
+    Object.defineProperty(place.HTMLElement.prototype, "offsetWidth", { configurable: true, get: () => 794 });
+  });
+
+  it("is cut for its paper, and whole again out of sheets", () => {
+    draw({ ...HELD, sheet: { on: true } });
+    expect(isCut()).toBe(true);
+    place.document.getElementById("sheets")?.click();
+    expect(isCut()).toBe(false);
+  });
+
+  it("stays cut on the page the reader turns to", () => {
+    draw({ ...HELD, sheet: { on: true } });
+    place.document.querySelector<HTMLElement>("#pages button")?.click();
+    expect(isCut()).toBe(true);
+  });
+
+  it("is not cut while the window shows it narrower than its paper", () => {
+    draw({ ...HELD, sheet: { on: true, paper: "letter" } });
+    expect(isCut()).toBe(false);
+  });
+});
+
 describe("the paper", () => {
   it("sets the width on the column, where the card of pages can see it too", () => {
     draw(HELD);
@@ -1315,7 +1419,7 @@ describe("the paper", () => {
 
   describe("and its buttons", () => {
     const A4 = "@page { size: 210mm 297mm; }";
-    const LETTER = "@page { size: 215.9mm 279.4mm; }";
+    const LETTER = "@page { size: 215.9mm 279.4mm; margin: 22mm 20mm; }";
     const FOLIO = "@page { size: 215.9mm 330.2mm; }";
     let sizes: string[];
 
@@ -1389,6 +1493,11 @@ describe("the paper", () => {
       expect(printsOn()).toBe(FOLIO);
     });
 
+    it("print on A4 a paper the contract does not name, though an object would", () => {
+      draw({ ...HELD, sheet: { paper: "constructor" } as unknown as Document["sheet"] });
+      expect(printsOn()).toBe(A4);
+    });
+
     it("keep the tabloid a document asked for, which they do not offer", () => {
       draw({ ...HELD, sheet: { paper: "tabloid" } });
       expect(leaf("tabloid").hidden).toBe(false);
@@ -1406,7 +1515,7 @@ describe("the paper", () => {
       draw(HELD);
       toggle().click();
       landscape().click();
-      expect(printsOn()).toBe("@page { size: 297mm 210mm; }");
+      expect(printsOn()).toBe("@page { size: 297mm 210mm; margin: 22mm 20mm; }");
       toggle().click();
       expect(landscape().hidden).toBe(true);
       expect(printsOn()).toBe(A4);
